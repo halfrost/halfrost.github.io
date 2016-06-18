@@ -12,11 +12,11 @@ tag: iOS
 ![](http://upload-images.jianshu.io/upload_images/1194012-324588e5f12ae955.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
 
 
-####前言
+#### 前言
 关于我和WebSocket的缘：我从大二在计算机网络课上听老师讲过之后，第一次使用就到了毕业之后的第一份工作。直到最近换了工作，到了一家是含有IM社交聊天功能的app的时候，我觉得我现在可以谈谈我对WebSocket/Socket的一些看法了。要想做IM聊天app，就不得不理解WebSocket和Socket的原理了，听我一一道来。
 
 
-####目录
+#### 目录
 - 1.WebSocket使用场景
 - 2.WebSocket诞生由来
 - 3.谈谈WebSocket协议原理
@@ -25,7 +25,7 @@ tag: iOS
 - 6.iOS平台如何实现WebSocket协议   
 
 
-#####一.WebSocket的使用场景
+##### 一.WebSocket的使用场景
 **1.社交聊天**  
 最著名的就是微信，QQ，这一类社交聊天的app。这一类聊天app的特点是低延迟，高即时。即时是这里面要求最高的，如果有一个紧急的事情，通过IM软件通知你，假设网络环境良好的情况下，这条message还无法立即送达到你的客户端上，紧急的事情都结束了，你才收到消息，那么这个软件肯定是失败的。  
 **2.弹幕**  
@@ -48,7 +48,7 @@ tag: iOS
 **11.总结**   
 从上面我列举的这些场景来看，一个共同点就是，高实时性！  
 
-#####二.WebSocket诞生由来
+##### 二.WebSocket诞生由来
 1.**最开始的轮询Polling阶段**
 ![](http://upload-images.jianshu.io/upload_images/1194012-ce4df238336909a5.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
 
@@ -83,7 +83,7 @@ tag: iOS
 
 
 
-#####三.谈谈WebSocket协议原理
+##### 三.谈谈WebSocket协议原理
 Websocket是应用层第七层上的一个应用层协议，它必须依赖 [HTTP 协议进行一次握手](http://tools.ietf.org/html/rfc6455#section-4) ，握手成功后，数据就直接从 TCP 通道传输，与 HTTP 无关了。
 
 Websocket的数据传输是frame形式传输的，比如会将一条消息分为几个frame，按照先后顺序传输出去。这样做会有几个好处：
@@ -113,7 +113,7 @@ Websocket的数据传输是frame形式传输的，比如会将一条消息分为
 
 ```
 
-#####四.WebSocket 和 Socket的区别与联系
+##### 四.WebSocket 和 Socket的区别与联系
 首先，  
 [Socket](http://en.wikipedia.org/wiki/Network_socket) 其实并不是一个协议。它工作在 OSI 模型会话层（第5层），是为了方便大家直接使用更底层协议（一般是 [TCP](http://en.wikipedia.org/wiki/Transmission_Control_Protocol) 或 [UDP](http://en.wikipedia.org/wiki/User_Datagram_Protocol) ）而存在的一个抽象层。Socket是对TCP/IP协议的封装，Socket本身并不是协议，而是一个调用接口(API)。
 
@@ -125,11 +125,11 @@ Socket在通讯过程中，服务端监听某个端口是否有连接请求，�
 
 所以基于WebSocket和基于Socket都可以开发出IM社交聊天类的app
 
-#####五.iOS平台有哪些WebSocket和Socket的开源框架
+##### 五.iOS平台有哪些WebSocket和Socket的开源框架
 Socket开源框架有：[CocoaAsync Socket](https://github.com/robbiehanson/CocoaAsyncSocket)，[socketio/socket.io-client-swift](https://github.com/socketio/socket.io-client-swift)
 WebSocket开源框架有:[facebook/Socket Rocket](https://github.com/facebook/SocketRocket)，[tidwall/SwiftWeb Socket ](https://github.com/tidwall/SwiftWebSocket)
 
-#####六.iOS平台如何实现WebSocket协议   
+##### 六.iOS平台如何实现WebSocket协议   
 >Talk is cheap。Show me the code ——Linus Torvalds
 
 我们今天来看看[facebook/Socket Rocket](https://github.com/facebook/SocketRocket)的实现方法
@@ -277,7 +277,7 @@ didReceiveMessage方法是必须实现的，用来接收消息的。
 }
 ```
 
-####最后
+#### 最后
 以上就是我想分享的一些关于Websocket的心得，文中如果有错误的地方，欢迎大家指点！一般没有微信QQ那么大用户量的app，用Websocket应该都可以完成IM社交聊天的任务。当用户达到亿级别，应该还有很多需要优化，优化性能各种的吧。
 
  

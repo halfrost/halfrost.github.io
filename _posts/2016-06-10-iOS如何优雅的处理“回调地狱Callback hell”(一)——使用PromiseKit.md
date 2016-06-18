@@ -11,17 +11,17 @@ tag: iOS
 
 
 
-####前言
+#### 前言
 最近看了一些Swift关于封装异步操作过程的文章，比如RxSwift，RAC等等，因为回调地狱我自己也写过，很有感触，于是就翻出了Promise来研究学习一下。现将自己的一些收获分享一下，有错误欢迎大家多多指教。
 
-####目录
+#### 目录
 - 1.PromiseKit简介
 - 2.PromiseKit安装和使用
 - 3.PromiseKit主要函数的使用方法
 - 4.PromiseKit的源码解析
 - 5.使用PromiseKit优雅的处理回调地狱
 
-####一.PromiseKit简介
+#### 一.PromiseKit简介
 PromiseKit是iOS/OS X 中一个用来出来异步编程框架。这个框架是由Max Howell(Mac下Homebrew的作者，传说中因为"不会"写反转二叉树而没有拿到Google offer)大神级人物开发出来的。
 
 在PromiseKit中，最重要的一个概念就是Promise的概念，Promise是异步操作后的future的一个值。
@@ -64,7 +64,7 @@ PromiseKit里面目前有2个类，一个是Promise<T>(Swift)，一个是AnyProm
 代码虽然看上去不优雅，功能都是正确的，但是这种代码基本大家都自己写过，我自己也写过很多。今天就让我们动起手来，用PromiseKit来优雅的处理掉Callback hell吧。
 
 
-####二.PromiseKit安装和使用
+#### 二.PromiseKit安装和使用
 1.下载安装CocoaPods  
 
 在墙外的安装步骤:
@@ -119,7 +119,7 @@ $ pod install
 安装完成之后，退出终端，打开新生成的.xcworkspace文件即可
 
 
-####三.PromiseKit主要函数的使用方法
+#### 三.PromiseKit主要函数的使用方法
 1. then
 经常我们会写出这样的代码:
 
@@ -374,7 +374,7 @@ myPromise().then {
 ```
 在我们执行完then，处理完error之后，还有一些操作，那么就可以放到finally和always里面去执行。
 
-####四.PromiseKit的源码解析
+#### 四.PromiseKit的源码解析
 经过上面对promise的方法的学习，我们已经可以了解到，在异步操作我们可以通过不断的返回promise，传递给后面的then来形成链式调用，所以重点就在then的实现了。在讨论then之前，我先说一下promise的状态和传递机制。
 
 
@@ -585,7 +585,7 @@ static void PMKResolve(PMKPromise *this, id result) {
 ```
 方式和when的数组方式基本一样，只不过多了一步，就是从字典里面先取出promise[key]，然后再继续对这个promise执行操作而已。所以when可以传入以promise为value的字典。
 
-####五.使用PromiseKit优雅的处理回调地狱
+#### 五.使用PromiseKit优雅的处理回调地狱
 这里我就举个例子，大家一起来感受感受用promise的简洁。
 先描述一下环境，假设有这样一个提交按钮，当你点击之后，就会提交一次任务。首先要先判断是否有权限提交，没有权限就弹出错误。有权限提交之后，还要请求一次，判断当前任务是否已经存在，如果存在，弹出错误。如果不存在，这个时候就可以安心提交任务了。
 
@@ -656,7 +656,7 @@ void (^errorHandler)(NSError *) = ^(NSError *error) {
 
 
 
-####最后
+#### 最后
 看完上面关于PromiseKit的使用方法之后，其实对于PromiseKit，我个人的理解它就是一个Monad（这是最近很火的一个概念，4月底在上海SwiftCon 2016中，唐巧大神分享的主题就是关于Monad，还不是很了解这个概念的可以去他博客看看，或者找视频学习学习。）Promise就是一个盒子里面封装了一堆操作，then对应的就是一组flatmap或map操作。不过缺点也还是有，如果网络用的AFNetWorking，网络请求很有可能会回调多次，这时用PromiseKit，就需要自己封装一个属于自己的promise了。PromiseKit原生的是用的OMGHTTPURLRQ这个网络框架。PromiseKit里面自带的封装的网络请求也还是基于NSURLConnection的。所以用了AFNetWorking的同学，要想再优雅的处理掉网络请求引起的回调地狱的时候，自己还是需要先封装一个自己的Promise，然后优雅的then一下。很多人可能看到这里，觉得我引入一个框架，本来是来解决问题的，但是现在还需要我再次封装才能解决问题，有点不值得。
 
 我自己的看法是，PromiseKit是个解决异步问题很优秀的一个开源库，尤其是解决回调嵌套，回调地狱的问题，效果非常明显。虽然需要自己封装AFNetWorking的promise，但是它的思想非常值得我们学习的！这也是接下来第二篇想和大家一起分享的内容，利用promise的思想，自己来优雅的处理回调地狱！这一篇PromiseKit先分享到这里。

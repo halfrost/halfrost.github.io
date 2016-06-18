@@ -9,7 +9,7 @@ tag: Code Review
 ![](http://upload-images.jianshu.io/upload_images/1194012-8641ab1b36a28f69.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
 
 
-####一.可能会用到的命令
+#### 一.可能会用到的命令
 1.重启phd守护线程
 先进入到Fabricator文件夹下面，然后 $./bin/phd/ log
 
@@ -23,7 +23,7 @@ sudo launchctl load -F /Library/LaunchDaemons/com.oracle.oss.mysql.mysqld.plist
 sudo /usr/sbin/apachectl restart
 sudo apachectl -k restart
 
-####二.可能会用到的一些坑
+#### 二.可能会用到的一些坑
 1.Mac如果出现“sudo: /etc/sudoers is owned by uid 501, should be 0 ”问题解决办法
 先启用root账户
 在 OS X 中启用和使用“root”用户
@@ -107,7 +107,7 @@ sudo ln -s/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/D
 
 当然也可以直接用XAMPP 中的phpize
 
-####三.后期维护
+#### 三.后期维护
 主要步骤：
 1.停止服务器，停止守护进程 
 2.git更新3个依赖组件 ,3个必须升级到相同的最新版

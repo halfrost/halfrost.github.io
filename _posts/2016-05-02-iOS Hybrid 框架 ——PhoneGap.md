@@ -10,7 +10,7 @@ tag: iOS
 
 
 
-####前言
+#### 前言
 
 Hybrid App（混合模式移动应用）是指介于web-app、native-app这两者之间的app，兼具“Native App良好用户交互体验的优势”和“Web App跨平台开发的优势”。
 
@@ -22,7 +22,7 @@ Hybrid App按网页语言与程序语言的混合，通常分为三种类型：�
 
 ![](http://upload-images.jianshu.io/upload_images/1194012-8578bb25ee8b09b3.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
 
-####一.Cordova
+#### 一.Cordova
 说到PhoneGap，就不得不说到Cordova
 
 Cordova 是一个可以让 JS 与原生代码(包括 Android 的 java，iOS 的 Objective-C 等)互相通信的一个库，并且提供了一系列的插件类，比如 JS 直接操作本地数据库的插件类。
@@ -37,7 +37,7 @@ Cordova在系统中的层级应该是这样子的:
 ![](http://upload-images.jianshu.io/upload_images/1194012-22b52111118a47b6.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
   
 
-####二.Js 与 Objective-C 通信
+#### 二.Js 与 Objective-C 通信
 Js 使用了两种方式来与 Objective-C 通信，一种是使用 XMLHttpRequest 发起请求的方式，另一种则是通过设置透明的 iframe 的 src 属性。
 
 我接下来说的主要是第二种方式，iframe bridge。
@@ -113,7 +113,7 @@ iOS这边对应的要在WebView里面写响应的方法
 
 这样就完成了Js和OC的通信了
 
-####三.Objective-C 与 Js 通信
+#### 三.Objective-C 与 Js 通信
 
 首先OC获取Js的请求数据
 
@@ -144,7 +144,7 @@ NSString *ret = [((HFNativeFunction*)strongSelf.actionDict[funcName]) doCall:arg
         [self.webView stringByEvaluatingJavaScriptFromString: js];
 ```
 
-####四.Cordova - Js工作原理
+#### 四.Cordova - Js工作原理
 
 Cordova JS 端请求方法的格式：  
 
@@ -201,7 +201,7 @@ iOSExec.nativeFetchMessages = function() {
 };
 ```
 
-####五.Cordova - OC工作原理
+#### 五.Cordova - OC工作原理
 
 Native OC拿到 callbackId、service、action 及 actionArgs 后，会做以下的处理：
 
@@ -299,7 +299,7 @@ Objective-C 返回结果给 JS 端
 ```
 
 
-####六.回调方法
+#### 六.回调方法
 
 Js端拿到数据根据 callbackId 回调
 
