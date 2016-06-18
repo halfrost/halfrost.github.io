@@ -1,0 +1,2568 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Halfrost&#39;s Field</title>
+    <description>嗨，我是于德志 (@halfrost)，一名来自中国的 iOS 开发者，已退役 acmer 。现居上海。吾笃信：德不孤，必有志，技不疏，必有朋。</description>
+    <link>http://vno.onevcat.com/</link>
+    <atom:link href="http://vno.onevcat.com/feed.xml" rel="self" type="application/rss+xml"/>
+    <pubDate>Sun, 19 Jun 2016 00:53:08 +0800</pubDate>
+    <lastBuildDate>Sun, 19 Jun 2016 00:53:08 +0800</lastBuildDate>
+    <generator>Jekyll v3.1.6</generator>
+    
+      <item>
+        <title>iOS如何优雅的处理“回调地狱Callback hell”(一)——使用PromiseKit</title>
+        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-2f5b4fb0534c69cd.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;h4&gt;前言&lt;/h4&gt;
+
+&lt;p&gt;最近看了一些Swift关于封装异步操作过程的文章，比如RxSwift，RAC等等，因为回调地狱我自己也写过，很有感触，于是就翻出了Promise来研究学习一下。现将自己的一些收获分享一下，有错误欢迎大家多多指教。&lt;/p&gt;
+
+&lt;h4&gt;目录&lt;/h4&gt;
+
+&lt;ul&gt;
+&lt;li&gt;1.PromiseKit简介&lt;/li&gt;
+&lt;li&gt;2.PromiseKit安装和使用&lt;/li&gt;
+&lt;li&gt;3.PromiseKit主要函数的使用方法&lt;/li&gt;
+&lt;li&gt;4.PromiseKit的源码解析&lt;/li&gt;
+&lt;li&gt;5.使用PromiseKit优雅的处理回调地狱&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h4&gt;一.PromiseKit简介&lt;/h4&gt;
+
+&lt;p&gt;PromiseKit是iOS/OS X 中一个用来出来异步编程框架。这个框架是由Max Howell(Mac下Homebrew的作者，传说中因为&amp;quot;不会&amp;quot;写反转二叉树而没有拿到Google offer)大神级人物开发出来的。&lt;/p&gt;
+
+&lt;p&gt;在PromiseKit中，最重要的一个概念就是Promise的概念，Promise是异步操作后的future的一个值。&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;A &lt;a href=&quot;http://wikipedia.org/wiki/Promise_%28programming%29&quot;&gt;promise&lt;/a&gt; represents the future value of an asynchronous task.
+A promise is an object that wraps an asynchronous task&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;Promise也是一个包装着异步操作的一个对象。使用PromiseKit，能够编写出整洁，有序的代码，逻辑简单的，将Promise作为参数，模块化的从一个异步任务到下一个异步任务中去。用PromiseKit写出的代码就是这样：&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+[self login].then(^{
+                  
+     // our login method wrapped an async task in a promise
+     return [API fetchData];
+                  
+}).then(^(NSArray *fetchedData){
+                          
+     // our API class wraps our API and returns promises
+     // fetchedData returned a promise that resolves with an array of data
+     self.datasource = fetchedData;
+     [self.tableView reloadData];
+                          
+}).catch(^(NSError *error){
+                                   
+     // any errors in any of the above promises land here
+     [[[UIAlertView alloc] init…] show];
+                                   
+});
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;PromiseKit就是用来干净简洁的代码，来解决异步操作，和奇怪的错误处理回调的。它将异步操作变成了链式的调用，简单的错误处理方式。&lt;/p&gt;
+
+&lt;p&gt;PromiseKit里面目前有2个类，一个是Promise&lt;T&gt;(Swift)，一个是AnyPromise(Objective-C)，2者的区别就在2种语言的特性上，Promise&lt;T&gt;是定义精确严格的，AnyPromise是定义宽松，灵活，动态的。&lt;/p&gt;
+
+&lt;p&gt;在异步编程中，有一个最最典型的例子就是回调地狱CallBack hell，要是处理的不优雅，就会出现下图这样:
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-76966b54ee252dce.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;
+上图的代码是真实存在的，也是朋友告诉我的，来自&lt;a href=&quot;http://www.kuaidadi.com/assets/js/animate.js&quot;&gt;快的的代码&lt;/a&gt;，当然现在人家肯定改掉了。虽然这种代码看着像这样：&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-77a2f359c5a95e9d.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;
+代码虽然看上去不优雅，功能都是正确的，但是这种代码基本大家都自己写过，我自己也写过很多。今天就让我们动起手来，用PromiseKit来优雅的处理掉Callback hell吧。&lt;/p&gt;
+
+&lt;h4&gt;二.PromiseKit安装和使用&lt;/h4&gt;
+
+&lt;p&gt;1.下载安装CocoaPods  &lt;/p&gt;
+
+&lt;p&gt;在墙外的安装步骤:
+在Terminal里面输入&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;sudo gem install cocoapods &amp;amp;&amp;amp; pod setup
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;大多数在墙内的同学应该看如下步骤了:   &lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;//移除原有的墙外Ruby 默认源
+$ gem sources --remove https://rubygems.org/
+//添加现有的墙内的淘宝源
+$ gem sources -a https://ruby.taobao.org/
+//验证新源是否替换成功
+$ gem sources -l
+//下载安装cocoapods
+// OS 10.11之前
+$ sudo gem install cocoapods
+//mark：OS 升级 OS X EL Capitan 后命令应该为:
+$ sudo gem install -n /usr/local/bin cocoapods
+//设置cocoapods
+$ pod setup
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;2.找到项目的路径，进入项目文件夹下面，执行：&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;$ touch Podfile &amp;amp;&amp;amp; open -e Podfile
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;此时会打开TextEdit，然后输入一下命令:&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;platform:ios, ‘7.0’
+
+target &amp;#39;PromisekitDemo&amp;#39; do  //由于最新版cocoapods的要求，所以必须加入这句话
+    pod &amp;#39;PromiseKit&amp;#39;
+end
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;blockquote&gt;
+&lt;p&gt;Tips：感谢qinfensky大神提醒，其实这里也可以用init命令
+Podfile是CocoaPods的特殊文件，在其中可以列入在项目中想要使用的开源库，若想创建Podfile，有2种方法：
+1.在项目目录中创建空文本文件，命名为Podfile
+2.或者可以再项目目录中运行“$ pod init “，来创建功能性文件（终端中输入cd 文件夹地址，然后再输入 pod init）
+两种方法都可以创建Podfile，使用你最喜欢使用的方法&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;3.安装PromiseKit&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;$ pod install
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;安装完成之后，退出终端，打开新生成的.xcworkspace文件即可&lt;/p&gt;
+
+&lt;h4&gt;三.PromiseKit主要函数的使用方法&lt;/h4&gt;
+
+&lt;ol&gt;
+&lt;li&gt;then
+经常我们会写出这样的代码:&lt;/li&gt;
+&lt;/ol&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;- (void)showUndoRedoAlert:(UndoRedoState *)state
+{
+     UIAlertView *alert = [[UIAlertView alloc] initWithTitle:……];
+     alert.delegate = self; 
+     self.state = state;
+     [alert show];
+}
+
+- (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex
+{
+    if (buttonIndex == 1) {
+        [self.state do];
+    }
+
+}
+
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;上面的写法也不是错误的，就是它在调用函数中保存了一个属性，在调用alertView会使用到这个属性。其实这个中间属性是不需要存储的。接下来我们就用then来去掉这个中间变量。&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+- (void)showUndoRedoAlert:(UndoRedoState *)state
+ {
+    UIAlertView *alert = [[UIAlertView alloc] initWithTitle:……];
+    [alert promise].then(^(NSNumber *dismissedButtonIndex){
+        [state do];
+    });
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;这时就有人问了，为啥能调用[alert promise]这个方法？后面点语法跟着then是什么？我来解释一下，原因其实只要打开Promise源码就一清二楚了。在pormise源码中&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+@interface UIAlertView (PromiseKit)
+
+/**
+ Displays the alert view.
+
+ @return A promise the fulfills with two parameters:
+ 1) The index of the button that was tapped to dismiss the alert.
+ 2) This alert view.
+*/
+- (PMKPromise *)promise;
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;对应的实现是这样的&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;- (PMKPromise *)promise {
+    PMKAlertViewDelegater *d = [PMKAlertViewDelegater new];
+    PMKRetain(d);
+    self.delegate = d;
+    [self show];
+    return [PMKPromise new:^(id fulfiller, id rejecter){
+        d-&amp;gt;fulfiller = fulfiller;
+    }];
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;调用[alert promise]返回还是一个promise对象，在promise的方法中有then的方法，所以上面可以那样链式的调用。上面代码里面的fulfiller放在源码分析里面去讲讲。&lt;/p&gt;
+
+&lt;p&gt;在PromiseKit里面，其实就默认给你创建了几个类的延展，如下图&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-ab9c742c3b4ce5a9.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;
+这些扩展类里面就封装了一些常用的生成promise方法，调用这些方法就可以愉快的一路.then执行下去了！&lt;/p&gt;
+
+&lt;p&gt;2.dispatch_promise
+项目中我们经常会异步的下载图片&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;typedefvoid(^onImageReady) (UIImage* image);
+
++ (void)getImageWithURL:(NSURL *)url onCallback:(onImageReady)callback
+{
+    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0ul);
+    dispatch_async(queue, ^{
+        NSData * imageData = [NSData dataWithContentsOfURL:url];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            UIImage *image = [UIImage imageWithData:imageData];
+            callback(image);
+        });
+    });
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;使用dispatch_promise，我们可以将它改变成下面这样:&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;    dispatch_promise(^{
+        return [NSData dataWithContentsOfURL:url];     
+    }).then(^(NSData * imageData){ 
+        self.imageView.image = [UIImage imageWithData:imageData];  
+    }).then(^{
+        // add code to happen next here
+    });
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;我们看看源码，看看调用的异步过程对不对&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;- (PMKPromise *(^)(id))then {
+    return ^(id block){
+        return self.thenOn(dispatch_get_main_queue(), block);
+    };
+}
+
+PMKPromise *dispatch_promise(id block) {
+    return dispatch_promise_on(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), block);
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;看了源码就知道上述是正确的。&lt;/p&gt;
+
+&lt;p&gt;3.catch
+在异步操作中，处理错误也是一件很头疼的事情，如下面这段代码，每次异步请求回来都必须要处理错误。&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+void (^errorHandler)(NSError *) = ^(NSError *error) {
+    [[UIAlertView …] show];
+};
+[NSURLConnection sendAsynchronousRequest:rq queue:q completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError) {
+    if (connectionError) {
+        errorHandler(connectionError);
+    } else {
+        NSError *jsonError = nil;
+        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&amp;amp;jsonError];
+        if (jsonError) {
+            errorHandler(jsonError);
+        } else {
+            id rq = [NSURLRequest requestWithURL:[NSURL URLWithString:json[@&amp;quot;avatar_url&amp;quot;]]];
+            [NSURLConnection sendAsynchronousRequest:rq queue:q completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError) {
+                UIImage *image = [UIImage imageWithData:data];
+                if (!image) {
+                    errorHandler(nil); // NSError TODO!
+                } else {
+                    self.imageView.image = image;
+                }
+            }];
+        }
+    }
+}];
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;我们可以用promise的catch来解决上面的错误处理的问题&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;//oc版
+[NSURLSession GET:url].then(^(NSDictionary *json){
+    return [NSURLConnection GET:json[@&amp;quot;avatar_url&amp;quot;]];
+}).then(^(UIImage *image){
+    self.imageView.image = image;
+}).catch(^(NSError *error){
+    [[UIAlertView …] show];
+})
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;//swift版
+firstly {
+    NSURLSession.GET(url)
+}.then { (json: NSDictionary) in
+    NSURLConnection.GET(json[&amp;quot;avatar_url&amp;quot;])
+}.then { (image: UIImage) in
+    self.imageView.image = image
+}.error { error in
+    UIAlertView(…).show()
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;用了catch以后，在传递promise的链中，一旦中间任何一环产生了错误，都会传递到catch去执行Error Handler。&lt;/p&gt;
+
+&lt;p&gt;4.when
+通常我们有这种需求:
+在执行一个A任务之前还有1，2个异步的任务，在全部异步操作完成之前，需要阻塞A任务。代码可能会写的像下面这样子：&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+__block int x = 0;
+void (^completionHandler)(id, id) = ^(MKLocalSearchResponse *response, NSError *error){
+    if (++x == 2) {
+        [self finish];
+    }
+};
+[[[MKLocalSearch alloc] initWithRequest:rq1] startWithCompletionHandler:completionHandler];
+[[[MKLocalSearch alloc] initWithRequest:rq2] startWithCompletionHandler:completionHandler];
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;这里就可以使用when来优雅的处理这种情况:&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+id search1 = [[[MKLocalSearch alloc] initWithRequest:rq1] promise];
+id search2 = [[[MKLocalSearch alloc] initWithRequest:rq2] promise];
+
+PMKWhen(@[search1, search2]).then(^(NSArray *results){
+    //…
+}).catch(^{
+    // called if either search fails
+});
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;在when后面传入一个数组，里面是2个promise，只有当这2个promise都执行完，才会去执行后面的then的操作。这样就达到了之前所说的需求。&lt;/p&gt;
+
+&lt;p&gt;这里when还有2点要说的，when的参数还可以是字典。&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+id coffeeSearch = [[MKLocalSearch alloc] initWithRequest:rq1];
+id beerSearch = [[MKLocalSearch alloc] initWithRequest:rq2];
+id input = @{@&amp;quot;coffee&amp;quot;: coffeeSearch, @&amp;quot;beer&amp;quot;: beerSearch};
+
+PMKWhen(input).then(^(NSDictionary *results){
+    id coffeeResults = results[@&amp;quot;coffee&amp;quot;];
+});
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;这个例子里面when传入了一个input字典，处理完成之后依旧可以生成新的promise传递到下一个then中，在then中可以去到results的字典，获得结果。传入字典的工作原理放在第四章会解释。&lt;/p&gt;
+
+&lt;p&gt;when传入的参数还可以是一个可变的属性：&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+@property id dataSource;
+
+- (id)dataSource {
+    return dataSource ?: [PMKPromise new:…];
+}
+
+- (void)viewDidAppear {
+    [PMKPromise when:self.dataSource].then(^(id result){
+        // cache the result
+        self.dataSource = result;
+    });
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;dataSource如果为空就新建一个promise，传入到when中，执行完之后，在then中拿到result，并把result赋值给dataSource，这样dataSource就有数据了。由此看来，when的使用非常灵活！&lt;/p&gt;
+
+&lt;p&gt;5.always &amp;amp; finally&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;//oc版
+[UIApplication sharedApplication].networkActivityIndicatorVisible = YES;
+[self myPromise].then(^{
+    //…
+}).finally(^{
+    [UIApplication sharedApplication].networkActivityIndicatorVisible = NO;
+})
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;//swift版
+UIApplication.sharedApplication().networkActivityIndicatorVisible = true
+myPromise().then {
+    //…
+}.always {
+    UIApplication.sharedApplication().networkActivityIndicatorVisible = false
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;在我们执行完then，处理完error之后，还有一些操作，那么就可以放到finally和always里面去执行。&lt;/p&gt;
+
+&lt;h4&gt;四.PromiseKit的源码解析&lt;/h4&gt;
+
+&lt;p&gt;经过上面对promise的方法的学习，我们已经可以了解到，在异步操作我们可以通过不断的返回promise，传递给后面的then来形成链式调用，所以重点就在then的实现了。在讨论then之前，我先说一下promise的状态和传递机制。&lt;/p&gt;
+
+&lt;p&gt;一个promise可能有三种状态：等待（pending）、已完成（fulfilled）、已拒绝（rejected）。
+一个promise的状态只可能从“等待”转到“完成”态或者“拒绝”态，不能逆向转换，同时“完成”态和“拒绝”态不能相互转换。
+promise必须实现then方法（可以说，then就是promise的核心），而且then必须返回一个promise，同一个promise的then可以调用多次，并且回调的执行顺序跟它们被定义时的顺序一致
+then方法接受两个参数，第一个参数是成功时的回调，在promise由“等待”态转换到“完成”态时调用，另一个是失败时的回调，在promise由“等待”态转换到“拒绝”态时调用。同时，then可以接受另一个promise传入，也接受一个“类then”的对象或方法，即thenable对象&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-2f135482415329ef.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;
+总结起来就是上图，pending状态的promise对象既可转换为带着一个成功值的 fulfilled 状态，也可变为带着一个 error 信息的 rejected 状态。当状态发生转换时， promise.then 绑定的方法就会被调用。(当绑定方法时，如果 promise 对象已经处于 fulfilled 或 rejected 状态，那么相应的方法将会被立刻调用， 所以在异步操作的完成情况和它的绑定方法之间不存在竞争关系。)从Pending转换为fulfilled或Rejected之后， 这个promise对象的状态就不会再发生任何变化。因此 then是只被调用一次的函数，从而也能说明，then生成的是一个新的promise，而不是原来的那个。&lt;/p&gt;
+
+&lt;p&gt;了解完流程之后，就可以开始继续研究源码了。在PromiseKit当中，最常用的当属then，thenInBackground，catch，finally&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+- (PMKPromise *(^)(id))then {
+    return ^(id block){
+        return self.thenOn(dispatch_get_main_queue(), block);
+    };
+}
+
+- (PMKPromise *(^)(id))thenInBackground {
+    return ^(id block){
+        return self.thenOn(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), block);
+    };
+}
+
+- (PMKPromise *(^)(id))catch {
+    return ^(id block){
+        return self.catchOn(dispatch_get_main_queue(), block);
+    };
+}
+
+- (PMKPromise *(^)(dispatch_block_t))finally {
+    return ^(dispatch_block_t block) {
+        return self.finallyOn(dispatch_get_main_queue(), block);
+    };
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;这四个方法底层调用了各自的thenon，catchon，finallyon方法，这些on的方法实现基本都差不多，那我就以最重要的thenon来分析一下。&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+- (PMKResolveOnQueueBlock)thenOn {
+    return [self resolved:^(id result) {
+        if (IsPromise(result))
+            return ((PMKPromise *)result).thenOn;
+
+        if (IsError(result)) return ^(dispatch_queue_t q, id block) {
+            return [PMKPromise promiseWithValue:result];
+        };
+
+        return ^(dispatch_queue_t q, id block) {
+            block = [block copy];
+            return dispatch_promise_on(q, ^{
+                return pmk_safely_call_block(block, result);
+            });
+        };
+    }
+    pending:^(id result, PMKPromise *next, dispatch_queue_t q, id block, void (^resolve)(id)) {
+        if (IsError(result))
+            PMKResolve(next, result);
+        else dispatch_async(q, ^{
+            resolve(pmk_safely_call_block(block, result));
+        });
+    }];
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;这个thenon就是返回一个方法，所以继续往下看&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;- (id)resolved:(PMKResolveOnQueueBlock(^)(id result))mkresolvedCallback
+       pending:(void(^)(id result, PMKPromise *next, dispatch_queue_t q, id block, void (^resolver)(id)))mkpendingCallback
+{
+    __block PMKResolveOnQueueBlock callBlock;
+    __block id result;
+    
+    dispatch_sync(_promiseQueue, ^{
+        if ((result = _result))
+            return;
+
+        callBlock = ^(dispatch_queue_t q, id block) {
+
+            block = [block copy];
+
+            __block PMKPromise *next = nil;
+
+            dispatch_barrier_sync(_promiseQueue, ^{
+                if ((result = _result))
+                    return;
+
+                __block PMKPromiseFulfiller resolver;
+                next = [PMKPromise new:^(PMKPromiseFulfiller fulfill, PMKPromiseRejecter reject) {
+                    resolver = ^(id o){
+                        if (IsError(o)) reject(o); else fulfill(o);
+                    };
+                }];
+                [_handlers addObject:^(id value){
+                    mkpendingCallback(value, next, q, block, resolver);
+                }];
+            });
+
+            return next ?: mkresolvedCallback(result)(q, block);
+        };
+    });
+
+    // We could just always return the above block, but then every caller would
+    // trigger a barrier_sync on the promise queue. Instead, if we know that the
+    // promise is resolved (since that makes it immutable), we can return a simpler
+    // block that doesn&amp;#39;t use a barrier in those cases.
+
+    return callBlock ?: mkresolvedCallback(result);
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;这个方法看上去很复杂，仔细看看，函数的形参其实就是2个block，一个是resolved的block，还有一个是pending的block。当一个promise经历过resolved之后，可能是fulfill，也可能是reject，之后生成next新的promise，传入到下一个then中，并且状态会变成pending。上面代码中第一个return，如果next为nil，那么意味着promise没有生成，这是会再调用一次mkresolvedCallback，并传入参数result，生成的PMKResolveOnQueueBlock，再次传入(q, block)，直到next的promise生成，并把pendingCallback存入到handler当中。这个handler存了所有待执行的block，如果把这个数组里面的block都执行，那么就相当于依次完成了上面的所有异步操作。第二个return是在callblock为nil的时候，还会再调一次mkresolvedCallback(result)，保证一定要生成next的promise。&lt;/p&gt;
+
+&lt;p&gt;这个函数里面的这里dispatch_barrier_sync这个方法，就是promise后面可以链式调用then的原因，因为GCD的这个方法，让后面then变得像一行行的then顺序执行了。&lt;/p&gt;
+
+&lt;p&gt;可能会有人问了，并没有看到各个block执行，仅仅只是加到handler数组里了，这个问题的答案，就是promise的核心了。promise执行block的操作是放在resove里面的。先来看看源码&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+static void PMKResolve(PMKPromise *this, id result) {
+    void (^set)(id) = ^(id r){
+        NSArray *handlers = PMKSetResult(this, r);
+        for (void (^handler)(id) in handlers)
+            handler(r);
+    };
+
+    if (IsPromise(result)) {
+        PMKPromise *next = result;
+        dispatch_barrier_sync(next-&amp;gt;_promiseQueue, ^{
+            id nextResult = next-&amp;gt;_result;
+            
+            if (nextResult == nil) {  // ie. pending
+                [next-&amp;gt;_handlers addObject:^(id o){
+                    PMKResolve(this, o);
+                }];
+            } else
+                set(nextResult);
+        });
+    } else
+        set(result);
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;这是一个递归函数，能形成递归的条件就是那句PMKResolve(this, o);当nextResult = nil的时候，就代表了这个promise还是pending状态，还没有被执行，这个时候就要递归调用，直到nextResult不为nil。不为nil，就会调用set方法，set方法是一个匿名函数，里面的for循环会依次循环，执行handler数组里面的每一个block。里面的那个if语句，是先判断result是否是一个promise，如果不是promise，就去执行set方法，依次调用各个block。&lt;/p&gt;
+
+&lt;p&gt;至此，一个then的执行原理就到此结束了。接下来我们再看看when的原理。&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;    return newPromise = [PMKPromise new:^(PMKPromiseFulfiller fulfiller, PMKPromiseRejecter rejecter){
+        NSPointerArray *results = nil;
+      #if TARGET_OS_IPHONE
+        results = [NSPointerArray strongObjectsPointerArray];
+      #else
+        if ([[NSPointerArray class] respondsToSelector:@selector(strongObjectsPointerArray)]) {
+            results = [NSPointerArray strongObjectsPointerArray];
+        } else {
+          #pragma clang diagnostic push
+          #pragma clang diagnostic ignored &amp;quot;-Wdeprecated-declarations&amp;quot;
+            results = [NSPointerArray pointerArrayWithStrongObjects];
+          #pragma clang diagnostic pop
+        }
+      #endif
+        results.count = count;
+
+        NSUInteger ii = 0;
+
+        for (__strong PMKPromise *promise in promises) {
+            if (![promise isKindOfClass:[PMKPromise class]])
+                promise = [PMKPromise promiseWithValue:promise];
+            promise.catch(rejecter(@(ii)));
+            promise.then(^(id o){
+                [results replacePointerAtIndex:ii withPointer:(__bridge void *)(o ?: [NSNull null])];
+                if (--count == 0)
+                    fulfiller(results.allObjects);
+            });
+            ii++;
+        }
+    }];
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;这里只截取了return的部分，理解了then，这里再看when就好理解了。when就是在传入的promises的数组里面，依次执行各个promise，结果最后传给新生成的一个promise，作为返回值返回。&lt;/p&gt;
+
+&lt;p&gt;这里要额外提一点的就是如果给when传入一个字典，它会如何处理的&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+    if ([promises isKindOfClass:[NSDictionary class]])
+        return newPromise = [PMKPromise new:^(PMKPromiseFulfiller fulfiller, PMKPromiseRejecter rejecter){
+            NSMutableDictionary *results = [NSMutableDictionary new];
+            for (id key in promises) {
+                PMKPromise *promise = promises[key];
+                if (![promise isKindOfClass:[PMKPromise class]])
+                    promise = [PMKPromise promiseWithValue:promise];
+                promise.catch(rejecter(key));
+                promise.then(^(id o){
+                    if (o)
+                        results[key] = o;
+                    if (--count == 0)
+                        fulfiller(results);
+                });
+            }
+        }];
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;方式和when的数组方式基本一样，只不过多了一步，就是从字典里面先取出promise[key]，然后再继续对这个promise执行操作而已。所以when可以传入以promise为value的字典。&lt;/p&gt;
+
+&lt;h4&gt;五.使用PromiseKit优雅的处理回调地狱&lt;/h4&gt;
+
+&lt;p&gt;这里我就举个例子，大家一起来感受感受用promise的简洁。
+先描述一下环境，假设有这样一个提交按钮，当你点击之后，就会提交一次任务。首先要先判断是否有权限提交，没有权限就弹出错误。有权限提交之后，还要请求一次，判断当前任务是否已经存在，如果存在，弹出错误。如果不存在，这个时候就可以安心提交任务了。&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+void (^errorHandler)(NSError *) = ^(NSError *error) {
+    [[UIAlertView …] show];
+};
+[NSURLConnection sendAsynchronousRequest:rq queue:q completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError) {
+    if (connectionError) {
+        errorHandler(connectionError);
+    } else {
+        NSError *jsonError = nil;
+        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&amp;amp;jsonError];
+        if (jsonError) {
+            errorHandler(jsonError);
+        } else {
+            id rq = [NSURLRequest requestWithURL:[NSURL URLWithString:json[@&amp;quot;have_authority&amp;quot;]]];
+            [NSURLConnection sendAsynchronousRequest:rq queue:q completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError) {
+                
+                NSError *jsonError = nil;
+                NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&amp;amp;jsonError];
+                
+                if (jsonError) {
+                    errorHandler(jsonError);
+                } else {
+                    id rq = [NSURLRequest requestWithURL:[NSURL URLWithString:json[@&amp;quot;exist&amp;quot;]]];
+                    [NSURLConnection sendAsynchronousRequest:rq queue:q completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError) {
+                        
+                        NSError *jsonError = nil;
+                        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&amp;amp;jsonError];
+                        
+                        if (jsonError) {
+                            errorHandler(jsonError);
+                        } else {
+                            if ([json[@&amp;quot;status&amp;quot;] isEqualToString:@&amp;quot;OK&amp;quot;]) {
+                                [self submitTask];
+                            } else {
+                                errorHandler(json[@&amp;quot;status&amp;quot;]);
+                            }
+                        }
+                    }];
+                }
+            }];
+        }
+    }
+}];
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;上面的代码里面有3层回调，看上去就很晕，接下来我们用promise来整理一下。&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+[NSURLSession GET:url].then(^(NSDictionary *json){
+    return [NSURLConnection GET:json[@&amp;quot;have_authority&amp;quot;]];
+}).then(^(NSDictionary *json){
+    return [NSURLConnection GET:json[@&amp;quot;exist&amp;quot;]];
+}).then(^(NSDictionary *json){
+    if ([json[@&amp;quot;status&amp;quot;] isEqualToString:@&amp;quot;OK&amp;quot;]) {
+        return [NSURLConnection GET:submitJson];
+    } else
+        @throw [NSError errorWithDomain:… code:… userInfo:json[@&amp;quot;status&amp;quot;]];
+}).catch(^(NSError *error){
+    [[UIAlertView …] show];
+})
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;之前将近40行代码就一下子变成15行左右，看上去比原来清爽多了，可读性更高。&lt;/p&gt;
+
+&lt;h4&gt;最后&lt;/h4&gt;
+
+&lt;p&gt;看完上面关于PromiseKit的使用方法之后，其实对于PromiseKit，我个人的理解它就是一个Monad（这是最近很火的一个概念，4月底在上海SwiftCon 2016中，唐巧大神分享的主题就是关于Monad，还不是很了解这个概念的可以去他博客看看，或者找视频学习学习。）Promise就是一个盒子里面封装了一堆操作，then对应的就是一组flatmap或map操作。不过缺点也还是有，如果网络用的AFNetWorking，网络请求很有可能会回调多次，这时用PromiseKit，就需要自己封装一个属于自己的promise了。PromiseKit原生的是用的OMGHTTPURLRQ这个网络框架。PromiseKit里面自带的封装的网络请求也还是基于NSURLConnection的。所以用了AFNetWorking的同学，要想再优雅的处理掉网络请求引起的回调地狱的时候，自己还是需要先封装一个自己的Promise，然后优雅的then一下。很多人可能看到这里，觉得我引入一个框架，本来是来解决问题的，但是现在还需要我再次封装才能解决问题，有点不值得。&lt;/p&gt;
+
+&lt;p&gt;我自己的看法是，PromiseKit是个解决异步问题很优秀的一个开源库，尤其是解决回调嵌套，回调地狱的问题，效果非常明显。虽然需要自己封装AFNetWorking的promise，但是它的思想非常值得我们学习的！这也是接下来第二篇想和大家一起分享的内容，利用promise的思想，自己来优雅的处理回调地狱！这一篇PromiseKit先分享到这里。&lt;/p&gt;
+
+&lt;p&gt;如有错误，还请大家请多多指教。&lt;/p&gt;
+</description>
+        <pubDate>Fri, 10 Jun 2016 19:51:00 +0800</pubDate>
+        <link>http://vno.onevcat.com/2016/06/iOS%E5%A6%82%E4%BD%95%E4%BC%98%E9%9B%85%E7%9A%84%E5%A4%84%E7%90%86-%E5%9B%9E%E8%B0%83%E5%9C%B0%E7%8B%B1Callback-hell-(%E4%B8%80)-%E4%BD%BF%E7%94%A8PromiseKit/</link>
+        <guid isPermaLink="true">http://vno.onevcat.com/2016/06/iOS%E5%A6%82%E4%BD%95%E4%BC%98%E9%9B%85%E7%9A%84%E5%A4%84%E7%90%86-%E5%9B%9E%E8%B0%83%E5%9C%B0%E7%8B%B1Callback-hell-(%E4%B8%80)-%E4%BD%BF%E7%94%A8PromiseKit/</guid>
+        
+        <category>iOS</category>
+        
+        
+        <category>iOS</category>
+        
+      </item>
+    
+      <item>
+        <title>手把手教你从Core Data迁移到Realm</title>
+        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-86f3f1bc02294ac7.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;h4&gt;前言&lt;/h4&gt;
+
+&lt;p&gt;看了这篇文章的标题，也许有些人还不知道Realm是什么，那么我先简单介绍一下这个新生的数据库。号称是用来替代SQLite 和 Core Data的。Realm有以下优点：
+1. 使用方便
+Realm并不是基于SQLite的对象关系映射数据库。它是使用自己的持久化引擎，为简单和速度而生。&lt;a href=&quot;https://realm.io/users&quot;&gt;用户&lt;/a&gt;们说，他们在数分钟之内就上手了Realm，构建一个app只需要数小时，每个app开发时间至少节约数周的时间。&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;快
+Realm比其他的对象关系映射型数据库(Object Relational Mapping)，甚至比原生的SQLite更加快，这都得益于它零拷贝的设计。看看&lt;a href=&quot;https://realm.io/news/introducing-realm/#fast&quot;&gt;iOS&lt;/a&gt;用户和&lt;a href=&quot;https://realm.io/news/realm-for-android/#realm-for-android&quot;&gt;Android&lt;/a&gt;用户都是怎么评价它的快的&lt;a href=&quot;https://twitter.com/realm/favorites&quot;&gt;Twitter&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;跨平台
+Realm 支持 iOS 和 OS X (&lt;a href=&quot;https://static.realm.io/downloads/objc/realm-objc-1.0.0.zip&quot;&gt;Objective‑C&lt;/a&gt; &amp;amp; &lt;a href=&quot;https://static.realm.io/downloads/swift/realm-swift-1.0.0.zip&quot;&gt;Swift&lt;/a&gt;) 和&lt;a href=&quot;https://static.realm.io/downloads/java/realm-java-1.0.0.zip&quot;&gt;Android&lt;/a&gt;。你可以通过使用相同的model，共享Realm文件到各个平台，Java，Swift，Objective-C。并且在全平台可以使用相同的业务逻辑
+ &lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;优秀的特性
+Realm支持先进的特性，如&lt;a href=&quot;https://realm.io/docs/java/latest/#encryption&quot;&gt;加密&lt;/a&gt;，&lt;a href=&quot;https://realm.io/docs/objc/latest/#queries&quot;&gt;图形查询&lt;/a&gt;，&lt;a href=&quot;https://realm.io/docs/swift/latest/#migrations&quot;&gt;轻松的迁移&lt;/a&gt;。Realm的API是一个非常适合打造高响应的应用程​​序，并且Realm为我们提供方便的组件，以轻松构建复杂的用户界面&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;值得信任
+Realm已经获得了银行，医疗保健提供商，复杂的企业app，星巴克这些产品的青睐。&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;社区驱动
+Realm是Github上星标最多的数据库里面排名第四，仅次于Java 和 Cocoa 的repos。除了核心工程之外，Realm的社区已经编译了&lt;a href=&quot;https://realm.io/addons&quot;&gt;上百个app插件和组件&lt;/a&gt;&lt;/p&gt;&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;支持
+可以从Realm公司快速获得官方的答案，去编译和支持你的数据库。Realm的团队会在&lt;a href=&quot;https://github.com/realm&quot;&gt;Github&lt;/a&gt;, &lt;a href=&quot;https://stackoverflow.com/questions/tagged/realm?sort=newest&quot;&gt;StackOverflow&lt;/a&gt;, &amp;amp; &lt;a href=&quot;https://twitter.com/realm&quot;&gt;Twitter&lt;/a&gt;回答大家的各种问题&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;下面再发3张令人惊喜的性能对比图&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-c5a9a2eba990151e.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;上图是每秒能在20万条数据中进行查询后count的次数。realm每秒可以进行30.9次查询后count。SQLite仅仅只有每秒13.6次查询后的count，相对于Core Data只有可怜的1。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-f44984d9ac96595c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;在20万条中进行一次遍历查询，数据和前面的count相似：Realm一秒可以遍历20万条数据31次，而RCore Data只能进行两次查询。 SQLite也只有14次而已。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-c808e85259fbccf5.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt; &lt;/p&gt;
+
+&lt;p&gt;这是在一次事务每秒插入数据的对比，Realm每秒可以插入9.4万条记录，在这个比较里纯SQLite的性能最好，每秒可以插入17.8万条记录。然而封装了SQLite的FMDB的成绩大概是Realm的一半，4.7万，Core Data就更低了，只有可怜的1.8万。&lt;/p&gt;
+
+&lt;p&gt;从以上3张图可以看出Realm优秀的特性。那么我们开始使用Realm吧。第一步就是把本地的数据库换成Realm。&lt;/p&gt;
+
+&lt;p&gt;下面是我翻译的一篇手把手教程，那么让我们赶紧通过教程，来把Core Data迁移到Realm吧。&lt;/p&gt;
+
+&lt;h4&gt;&lt;a href=&quot;https://realm.io/news/migrating-from-core-data-to-realm/&quot;&gt;原文&lt;/a&gt;&lt;/h4&gt;
+
+&lt;h4&gt;译文&lt;/h4&gt;
+
+&lt;p&gt;把一个使用core data框架作为数据库存储方式的app，迁移到Realm的确是一件很容易的事情。如果你现在有一个已经用了Core Data的app，并且考虑换成Realm，这个手把手教程正适合你！&lt;/p&gt;
+
+&lt;p&gt;很多开发者在用户界面，高度集成了Core Data(有时可能有上千行代码),这时很多人会告诉你转换Core Data到Realm可能会花数小时。Core Data和Realm两者都是把你的数据当成Object看待，所以迁移通常是很直接的过程:把你已经存在的Core Data的代码重构成使用Realm API的过程是很简单的。&lt;/p&gt;
+
+&lt;p&gt;迁移后，你会为Realm为你app带来的易用性，速度快，和稳定性而感到兴奋。&lt;/p&gt;
+
+&lt;h4&gt;1.移除Core Data Framework&lt;/h4&gt;
+
+&lt;p&gt;首先，如果你的app当前正在使用Core Data，你需要找出哪些代码是包含了Core Data的代码。这些代码是需要重构的。幸运的是，这里有一个手动的方式去做这件事:你可以手动的在整个代码里面搜索相关的代码，然后删除每个导入了Core Data头文件声明的语句&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;#import &amp;lt;CoreData/CoreData.h&amp;gt;
+//or
+@import CoreData;
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;一旦这样删除以后，每一行使用了Core Data的将会报一个编译错误，接下来，解决这些编译错误只是时间问题。&lt;/p&gt;
+
+&lt;h4&gt;2.移除Core Data的设置代码&lt;/h4&gt;
+
+&lt;p&gt;在Core Data中，对model objects的更改是要通过managed object context object来实现的。而managed object context objects又是被persistent store coordinator object创建的，它们两者又是被managed object model object创建的。&lt;/p&gt;
+
+&lt;p&gt;可以这么说，在你开始思考用Core Data读取，或者写入数据的时候，你通常需要在你的app中的某处去设置依赖的对象，暴露一些Core Data的方法给你的app逻辑使用。无论在你的application delegate中，全局的单例中，或者就是在inline实现中，这些地方都会存在大量的潜在的Core Data 设置代码。&lt;/p&gt;
+
+&lt;p&gt;当你准备转换到Realm时，所有的这些代码都可以删掉。&lt;/p&gt;
+
+&lt;p&gt;在Realm中，所有设置都在你第一次创建一个Realm object的时候就已经都完成了。当然也是可以手动去配置它，就像你指定Realm数据文件存储在你的硬盘的哪个路径下，这些完全都可以在runtime的时候去选择的。&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;RLMRealm *defaultRealm = [RLMRealm defaultRealm];
+//or
+let realm = Realm()
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;感觉很好吧？&lt;/p&gt;
+
+&lt;h4&gt;3.迁移model文件&lt;/h4&gt;
+
+&lt;p&gt;在Core Data中，实用的那些类都是被定义成NSManagedObject的子类。这些object的接口都是很标准的，原始的类型(比如NSInteger 和 CGFloat)是不能被使用的，它们必须抽象成一个NSNumber对象。&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;@interface Dog : NSManagedObject
+
+@property (nonatomic, copy) NSString *name;
+@property (nonatomic, strong) NSNumber *age;
+@property (nonatomic, strong) NSDate *birthdate;
+
+@end
+
+@implementation Dog
+
+@dynamic name;
+@dynamic age;
+@dynamic birthdate;
+
+@end
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;把这些managed object subclasses转换成Realm是非常简单的:&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;@interface Dog : RLMObject
+
+@property NSString *uuid;
+@property NSString *name;
+@property NSInteger age;
+@property NSDate *birthdate;
+
+@end
+
+@implementation Dog
+
++ (NSString *)primaryKey
+{
+    return @&amp;quot;uuid&amp;quot;;
+}
+
++ (NSDictionary *)defaultPropertyValues
+{
+    return @{ @&amp;quot;uuid&amp;quot; : [[NSUUID UUID] UUIDString],
+              @&amp;quot;name&amp;quot; : @&amp;quot;&amp;quot;,
+              @&amp;quot;birthdate&amp;quot; : [NSDate date]};
+}
+
+@end
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;或者&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+class Dog: Object {
+    dynamic var uuid = NSUUID().UUIDString
+    dynamic var name = &amp;quot;&amp;quot;
+    dynamic var age = 0
+    dynamic var birthdate = NSDate().date
+    
+    override static func primaryKey() -&amp;gt; String? {
+        return &amp;quot;uuid&amp;quot;
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;完成！这是多么的简单？&lt;/p&gt;
+
+&lt;p&gt;看这些实现，还是有一些Realm的细节需要注意的。&lt;/p&gt;
+
+&lt;p&gt;对于初次使用Realm的人来说，没有必要去指定属性关键字，Realm在内部已经管理了。所以这些类的头文件看上去都很精简。此外，Realm支持简单的数据类型，比如NSInteger 和 CGFloat，所有所有的NSNumber都可以安全的删除。&lt;/p&gt;
+
+&lt;p&gt;另一方面，这有一些关于Realm model的声明额外的说明。
+1. Core Data objects通过内部的NSManagedObjectID属性去唯一标识一个objects，Realm把这个留给开发者去完成。在上面的例子中，我们额外添加了一个名为uuid的属性，然后通过调用 [RLMObject primaryKey]方法去作为这个class的唯一标识。当然，如果你的objects完全不需要唯一标识，这些都可以跳过。&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;在写数据的过程中(这个过程不会太长！),Realm不能处理nil的object的属性。原因是，在[RLMObject defaultPropertyValues]这个类方法中给每个object在最初创建的时候，每个object属性都定义了一系列default值。当然这只是暂时的，我们很高兴的告诉你，在接下来的更新中，我们将会支持Realm object的属性可以为nil。&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h4&gt;4.迁移写操作&lt;/h4&gt;
+
+&lt;p&gt;如果你不能保存你的数据，这肯定不是一个持久的方案！创建一个新的Core Data对象然后再简单的修改一下它，需要下面这些代码：&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+//Create a new Dog
+Dog *newDog = [NSEntityDescription insertNewObjectForEntityForName:@&amp;quot;Dog&amp;quot; inManagedObjectContext:myContext];
+newDog.name = @&amp;quot;McGruff&amp;quot;;
+
+//Save the new Dog object to disk
+NSError *saveError = nil;
+[newDog.managedObjectContext save:&amp;amp;saveError];
+
+//Rename the Dog
+newDog.name = @&amp;quot;Pluto&amp;quot;;
+[newDog.managedObjectContext save:&amp;amp;saveError];
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;相比之下，Realm保存的操作是略有不同的，但在相同的范围内修改上面的代码，仍然有相似的地方。&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;//Create the dog object
+Dog *newDog = [[Dog alloc] init];
+newDog.name = @&amp;quot;McGruff&amp;quot;;
+
+//Save the new Dog object to disk (Using a block for the transaction)
+RLMRealm *defaultRealm = [RLMRealm defaultRealm];
+[defaultRealm transactionWithBlock:^{
+    [defaultRealm addObject:newDog];
+}];
+
+//Rename the dog (Using open/close methods for the transaction)
+[defaultRealm beginWriteTransaction];
+newDog.name = @&amp;quot;Pluto&amp;quot;;
+[defaultRealm commitWriteTransaction];
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;或者&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;//Create the dog object
+let mydog = Dog()
+myDog.name = &amp;quot;McGruff&amp;quot;
+
+//Save the new Dog object to disk (Using a block for the transaction)
+Realm().write {
+    realm.add(myDog)
+}
+
+//Rename the dog (Using open/close methods for the transaction)
+Realm().beginWrite()
+myDog.name = &amp;quot;Pluto&amp;quot;
+Realm().commitWrite()
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;完成！我们的数据被保存了！&lt;/p&gt;
+
+&lt;p&gt;明显的不同是，在Realm中，一旦一个objects被添加到一个Realm object中，它就是不可被修改的。为了在修改属性操作的后面执行，Realm object会被保存在一个写的事务中。这种不能被修改的model，保证了在不同线程中读/写 object数据的情况下，数据的一致性。&lt;/p&gt;
+
+&lt;p&gt;Core Data的实现确实可以改变属性，然后调用save方法，对比Realm的实现，只是一些小小的不同罢了。&lt;/p&gt;
+
+&lt;h4&gt;5.迁移查询&lt;/h4&gt;
+
+&lt;p&gt;另一方面，如果你不能检索查询你的数据，这肯定不是一个持久的方案！&lt;/p&gt;
+
+&lt;p&gt;在Core Data的基础实现中，它运用了fetch requests的概念去从硬盘检索数据。一个fetch request object是被当成一个单独的实例化对象去创建的，包含了一些额外的过滤参数，排序条件。&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+NSManagedObjectContext *context = self.managedObjectContext;
+
+//A fetch request to get all dogs younger than 5 years old, in alphabetical order
+NSEntityDescription *entity = [NSEntityDescription
+                               entityForName:@&amp;quot;Dog&amp;quot; inManagedObjectContext:context];
+
+NSPredicate *predicate = [NSPredicate predicateWithFormat:@&amp;quot;age &amp;lt; 5&amp;quot;];
+
+NSSortDescriptor *sortDescriptor = [[NSSortDescriptor alloc] initWithKey:@&amp;quot;name&amp;quot; ascending:YES];
+
+NSFetchRequest *request = [[NSFetchRequest alloc] init];
+request.entity = entity;
+request.predicate = predicate;
+request.sortDescriptors = @[sortDescriptor];
+
+NSError *error;
+NSArray *dogs = [moc executeFetchRequest:request error:&amp;amp;error];
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;虽然这确实挺好，但是需要编写大量的代码！一些聪明的开发者就开发了一些library使这些代码编写的更加容易。比如MagicalRecord。&lt;/p&gt;
+
+&lt;p&gt;对比这些，使用了Realm之后，这些查询的等效代码如下:&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;RLMResults *dogs = [[Dog objectsWhere:@&amp;quot;age &amp;lt; 5&amp;quot;] sortedResultsUsingProperty:@&amp;quot;name&amp;quot; ascending:YES];
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;或者&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;var dogs = Realm().objects(Dog).filter(&amp;quot;age &amp;lt; 5&amp;quot;).sorted(&amp;quot;name&amp;quot;)
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;在一行调用了2个方法。对比Core Data将近10行代码。&lt;/p&gt;
+
+&lt;p&gt;当然，相同操作得到的结果是相同的(RLMResults 和 NSArray 基本类似),转换到Realm，由于这些查询都是很独立的，所以查询周围的逻辑只需要重构很少的一部分代码就可以了。&lt;/p&gt;
+
+&lt;h4&gt;6.迁移用户数据&lt;/h4&gt;
+
+&lt;p&gt;一旦你所有代码都迁移到Realm，这里还有一个突出的问题，你如何迁移所有用户已经存在在他们设备上的数据，从Core Data迁移到Realm中？&lt;/p&gt;
+
+&lt;p&gt;显然，这是非常复杂的问题，它决定于你的app的功能，还有用户的环境。你处理这种情况可能解决办法每次都不一样。&lt;/p&gt;
+
+&lt;p&gt;目前，我们看到了2种情况:
+1. 一旦你迁移到Realm，你可以重新导入Core Data framework到你的app，用原生的NSManagedObject objects去fetch你的用户的Core Data数据，然后手动的把数据传给Realm。你可以把这段迁移的代码永久的留在app中，或者也可以经过非常充足的时间之后，再删除掉。&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;如果用户数据不是不可替代的——举个例子，如果是一些简单的缓存信息，可以通过硬盘上的用户数据重新生成的话，那么可以很简单的就把Core Data数据直接清除掉，当用户下次打开app的时候，一切从0开始。当然这需要经过非常谨慎的考虑，不然的话，会给很多人留下非常坏的用户体验。&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;最终，决定应该偏向于用户。理想的情况是不要留下Core Data还连接着你的app，但是结果还是要取决于你的情况。好运！&lt;/p&gt;
+
+&lt;h4&gt;进一步的讨论&lt;/h4&gt;
+
+&lt;p&gt;虽然在移植一个应用程序到Realm过程中，没有真正重要的步骤，但是有一些额外的情况下，你应该知道：&lt;/p&gt;
+
+&lt;h6&gt;并发&lt;/h6&gt;
+
+&lt;p&gt;如果你在后台线程做了一些比较重的操作，你可能会发现你需要在线程之间传递Realm object。在Core Data中允许你在线程之间传递managed objects(虽然这样做不是最佳实践)，但是在Realm中，在线程中传递objects是严格禁止的，并且任何企图这样做的，都会抛出一个严重的异常。&lt;/p&gt;
+
+&lt;p&gt;如此来说，对于下面这些情况，是件很容易的事情:&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0), ^{
+    //Rename the dog in a background queue
+    [[RLMRealm defaultRealm] transactionWithBlock:^{
+        dog.name = @&amp;quot;Peanut Wigglebutt&amp;quot;;
+    }];
+    
+    //Print the dog&amp;#39;s name on the main queue
+    NSString *uuid = dog.uuid;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        Dog *localDog = [Dog objectForPrimaryKey:uuid];
+        NSLog(@&amp;quot;Dog&amp;#39;s name is %@&amp;quot;, localDog.name);
+    });
+});
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;或者&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+dispatch_async(queue) {
+    //Rename the dog in a background queue
+    Realm().write {
+        dog.name = &amp;quot;Peanut Wigglebutt&amp;quot;
+    }
+    
+    //Print the dog&amp;#39;s name on the main queue
+    let uuid = dog.uuid
+    dispatch_async(dispatch_get_main_queue()) {
+        let localDog = Realm().objectForPrimaryKey(Dog, uuid)
+        println(&amp;quot;Dog&amp;#39;s name is \\(localDog.name)&amp;quot;)
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;虽然Realm objects不能在线程间被传递，但是Realm properties的副本可以在线程中被传递。考虑到Realm从磁盘中检索objects是非常快速的，如果只是简单的通过新线程在存储区中重新refetch相同的object，这只会造成很小的性能损失。在这个例子中，我们取了对象的主键的copy，然后把它从后台队列传递给主队列，然后再通过它在主线程的上下文中重新获取该对象。&lt;/p&gt;
+
+&lt;h6&gt;NSFetchedResultsController 的等效做法&lt;/h6&gt;
+
+&lt;p&gt;相比Core Data的所有缺点，可能使用Core Data最充足的理由就是NSFetchedResultsController——这是一个类，它可以检测到数据存储的变化，并且能自动的把这一变化展示到UI上。&lt;/p&gt;
+
+&lt;p&gt;在写这篇文章的时候，Realm还没有相似的机制。虽然它可以注册一个block，这个block会在数据源发生变化的时候被执行，但是这种&amp;quot;蛮力&amp;quot;的做法对大多数的UI来说都是不友好的。目前，如果你的UI代码很依赖Realm，那么这种做法对你来说就像处理一个breaker一样。&lt;/p&gt;
+
+&lt;p&gt;Realm的cocoa工程师现在正在开发一套通知系统，当一些object的属性被更改的时候，允许我们去注册一个通知，来接收到这些改变。这些特性都会在Realm的Swift and  Objective‑C 的未来的更新版本中。&lt;/p&gt;
+
+&lt;p&gt;在此期间，如果现有的通知block API还是没有满足你的需要，但是你还是需要当特定的property被更改了收到一个通知，这里推荐使用神奇的第三方库，名字叫&lt;a href=&quot;https://github.com/Roobiq/RBQFetchedResultsController&quot;&gt;RBQFetchedResultsController&lt;/a&gt;，它能模仿上述功能。除此之外，你还可以通过在objects里面加入setter方法，当setter方法被调用的时候，发送一个广播通知，这样做也能实现相同的功能。&lt;/p&gt;
+
+&lt;h4&gt;结尾&lt;/h4&gt;
+
+&lt;p&gt;Core Data和Realm的在展示数据的时候都是通过model objects，由于这一相似性，得以让我们从Core Data迁移到Realm时非常迅速，简单(并且非常令人满意！)。尽管开始看上去令人怯步，但是实际做起来，就是需要把每个Core Data的方法调用转换成等价的Realm的方法，然后写一个辅助类去帮你迁移用户的数据。这些也都非常简单。&lt;/p&gt;
+
+&lt;p&gt;如果你在你的app中使用Core Data遇到了些困难，需要些更加简单的解决办法，我们强烈推荐你尝试一下Realm，看看它是否适用于你。如果适用，请你告诉我们！&lt;/p&gt;
+
+&lt;p&gt;感谢阅读这篇文章。快去用Realm构建一个令人惊喜的app吧！在这些地方可以联系到我们&lt;a href=&quot;https://stackoverflow.com/questions/tagged/realm?sort=newest&quot;&gt;StackOverflow&lt;/a&gt;, &lt;a href=&quot;https://github.com/realm/realm-cocoa&quot;&gt;GitHub&lt;/a&gt;, or &lt;a href=&quot;https://twitter.com/realm&quot;&gt;Twitter&lt;/a&gt;.&lt;/p&gt;
+</description>
+        <pubDate>Fri, 03 Jun 2016 00:02:00 +0800</pubDate>
+        <link>http://vno.onevcat.com/2016/06/%E6%89%8B%E6%8A%8A%E6%89%8B%E6%95%99%E4%BD%A0%E4%BB%8ECore-Data%E8%BF%81%E7%A7%BB%E5%88%B0Realm/</link>
+        <guid isPermaLink="true">http://vno.onevcat.com/2016/06/%E6%89%8B%E6%8A%8A%E6%89%8B%E6%95%99%E4%BD%A0%E4%BB%8ECore-Data%E8%BF%81%E7%A7%BB%E5%88%B0Realm/</guid>
+        
+        <category>iOS</category>
+        
+        
+        <category>iOS</category>
+        
+      </item>
+    
+      <item>
+        <title>iOS app旧貌换新颜(一)—Launch Page让Logo&quot;飞&quot;出屏幕</title>
+        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-cf3e37d486bf7c51.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;h4&gt;前言&lt;/h4&gt;
+
+&lt;p&gt;当今是个看脸的世界，一个app的颜值可能会决定用户的使用次数，icon的颜值更可能决定了用户是否回去下载，如果太丑，放在手机桌面都难看，那用户很可能就直接卸载了。所以漂亮的界面UI + 合理的用户体验UX/UE也会很大程度决定用户的黏性。最近由于公司的app准备美化一下界面，提升性能，所以我就想把美化过程中可以和大家分享的东西都整理整理，拿出来也和大家一起分享学习。这个“旧貌换新颜”我就写成一个系列吧，相信美化的道路是永无止境的！(场外音:自己又给自己开了一个巨坑)&lt;/p&gt;
+
+&lt;h4&gt;一.灵感的来源&lt;/h4&gt;
+
+&lt;p&gt;也许有些人看了文章的标题并不一定完全懂是啥意思，其实设计这个的来源源自于我在微博上看到的一个动图，很生动，形象。
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-2c82a315c04b2a63.gif?imageMogr2/auto-orient/strip&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;一个呆萌的大叔点开Twitter客户端，启动界面有一个动效，就是他们的logo直接“飞”出屏幕，打在了他的脸上。这个效果我当时看了就觉得很有趣。很多应用每次启动之后都是直接进去，或者先展示一个几秒的广告页。其实要是加一个这种启动特性，感觉也挺不错。&lt;/p&gt;
+
+&lt;h4&gt;二.动画原理&lt;/h4&gt;
+
+&lt;p&gt;接下来说一下上面那个启动特效的原理，其实原理很简单:app在启动之后，先加载一个View，上面放了我们的logo，然后在做一个放大的UIView的动画就好了。接下来看看我的做法吧。&lt;/p&gt;
+
+&lt;h4&gt;三.准备工具&lt;/h4&gt;
+
+&lt;p&gt;PS + AI 或者 Sketch + PaintCode
+这个可能有人问了，怎么突然还需要这些作图的工具。其实大家也可以加载一个logo图片放在view上，一样可以实现。不过老板觉得加载一张图片如果太高清会占app大小，能尽量程序画出来的，就让程序画出来。对于不规则复杂的图形，就只好用上面这一套组合工具了。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-4ce2d7bca595f60e.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;PS主要是把logo抠出来&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-1a7156da405557e4.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-f570354c4b17de1c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;AI和Sketch是为了把抠出来的logo用钢笔工具，进行描点，导出路径。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-5a872f4388f8c95c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;最后PaintCode就是把路径转换成UIBezierPath(PaintCode这个软件很厉害，可以直接把SVG里面的路径直接转换成对应的Swift或者Objective-C代码)(后来我发现其实只要用PaintCode一个软件就可以完成上面所有功能了，它也可以直接用钢笔工具画路径)&lt;/p&gt;
+
+&lt;h4&gt;四.开始制作&lt;/h4&gt;
+
+&lt;p&gt;1.首先用PS把Logo图抠出来，保存成图片。
+2.然后打开Sketch，导入刚刚的Logo图片。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-93cc2ee749ecde12.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;3.选择左上角的“Insert”-“Vector”钢笔工具，依次连接Logo图标的各个顶点
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-4504387610269f31.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;
+4.然后在每段顶点之间，加新的锚点，钢笔工具会出现+号。在软件的右侧，会出现下面这个面板&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-b4faccaa7e9955c4.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;
+通过拖拉这些你加出来的点，可以使路径完全吻合Logo复杂的外形。拖过一番拖拽之后，就应该成下面这个图的样子了。
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-a10c6a94f30c1d49.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;5.接下来我们就选择左边面板上面有一个Page面板
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-195b264d904142c8.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;
+选一下刚刚描出来的Path，右下角会出现一个Export面板&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-692ee827e904a2a4.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-f90a1583f99ecc95.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-2c9e94dcdd68baba.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;这个时候我们选择导出SVG文件&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;SVG&lt;a href=&quot;http://baike.baidu.com/pic/SVG/63178/0/4e83cb62211a2be5e7113acd?fr=lemma&amp;amp;ct=single&quot;&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-50421760e6be23df.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;svg logo&quot;&gt;&lt;/a&gt;可缩放矢量图形（Scalable Vector Graphics）是基于
+可扩展标记语言（XML），用于描述二维矢量图形的一种图形格式。SVG是W3C(&amp;quot;World Wide Web ConSortium&amp;quot; 即 &amp;quot; 国际互联网标准组织&amp;quot;)在2000年8月制定的一种新的二维矢量图形格式，也是规范中的网络矢量图形标准。SVG严格遵从XML语法，并用文本格式的描述性语言来描述图像内容，因此是一种和图像分辨率无关的矢量图形格式&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;其实这里有一个小插曲，绘制路径的时候，其实我用的是AI描点的，之后导出SVG给PaintCode，居然不识别我的路径。后来网上问了问，大神要我换Sketch试试，然后就行了。后来我比较了一下Sketch和AI导出的SVG有什么不同，才发现，我之前AI导出的，加了几个图层，把路径盖住了。用AI绘制路径的方法和Sketch的差不多，如下图。
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-c41cf3802e3c5b9f.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-37b8ee89ce46e689.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;6.把之前导出的SVG文件导入到PaintCode中，下面会自动生成Objective-C代码
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-e13e918ec6ce6c5b.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;把生成的这些代码复制出来。&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;//// Color Declarations
+UIColor* color1 = [UIColor colorWithRed: 0.521 green: 0.521 blue: 0.521 alpha: 1];
+
+//// Bezier Drawing
+
+
+//// Page-1
+{
+    //// Bezier 2 Drawing
+    UIBezierPath* bezier2Path = UIBezierPath.bezierPath;
+    [bezier2Path moveToPoint: CGPointMake(552.37, 9.09)];
+    [bezier2Path addCurveToPoint: CGPointMake(519.07, 26.69) controlPoint1: CGPointMake(552.37, 9.09) controlPoint2: CGPointMake(538.05, 18.98)];
+    [bezier2Path addCurveToPoint: CGPointMake(480.56, 38.26) controlPoint1: CGPointMake(500.1, 34.4) controlPoint2: CGPointMake(480.56, 38.26)];
+    [bezier2Path addCurveToPoint: CGPointMake(439.19, 9.09) controlPoint1: CGPointMake(480.56, 38.26) controlPoint2: CGPointMake(467.44, 22.55)];
+    [bezier2Path addCurveToPoint: CGPointMake(368.15, 2.85) controlPoint1: CGPointMake(410.93, -4.38) controlPoint2: CGPointMake(368.15, 2.85)];
+    [bezier2Path addCurveToPoint: CGPointMake(316.47, 30.92) controlPoint1: CGPointMake(368.15, 2.85) controlPoint2: CGPointMake(340.52, 7.85)];
+    [bezier2Path addCurveToPoint: CGPointMake(281.09, 86.36) controlPoint1: CGPointMake(292.42, 53.99) controlPoint2: CGPointMake(290.08, 59.09)];
+    [bezier2Path addCurveToPoint: CGPointMake(279.09, 144.27) controlPoint1: CGPointMake(272.1, 113.63) controlPoint2: CGPointMake(279.09, 144.27)];
+    [bezier2Path addCurveToPoint: CGPointMake(181.55, 124.87) controlPoint1: CGPointMake(279.09, 144.27) controlPoint2: CGPointMake(224.85, 139.76)];
+    [bezier2Path addCurveToPoint: CGPointMake(101.23, 83.11) controlPoint1: CGPointMake(138.25, 109.98) controlPoint2: CGPointMake(101.23, 83.11)];
+    [bezier2Path addLineToPoint: CGPointMake(38.19, 22.55)];
+    [bezier2Path addCurveToPoint: CGPointMake(21.56, 66.97) controlPoint1: CGPointMake(38.19, 22.55) controlPoint2: CGPointMake(24, 45.21)];
+    [bezier2Path addCurveToPoint: CGPointMake(28.04, 113.2) controlPoint1: CGPointMake(19.12, 88.74) controlPoint2: CGPointMake(28.04, 113.2)];
+    [bezier2Path addCurveToPoint: CGPointMake(45.34, 151.3) controlPoint1: CGPointMake(28.04, 113.2) controlPoint2: CGPointMake(34.12, 134.96)];
+    [bezier2Path addCurveToPoint: CGPointMake(72.71, 178.32) controlPoint1: CGPointMake(56.55, 167.65) controlPoint2: CGPointMake(72.71, 178.32)];
+    [bezier2Path addCurveToPoint: CGPointMake(45.34, 173.23) controlPoint1: CGPointMake(72.71, 178.32) controlPoint2: CGPointMake(57.6, 176.78)];
+    [bezier2Path addCurveToPoint: CGPointMake(21.56, 163.51) controlPoint1: CGPointMake(33.08, 169.68) controlPoint2: CGPointMake(21.56, 163.51)];
+    [bezier2Path addCurveToPoint: CGPointMake(28.04, 210.73) controlPoint1: CGPointMake(21.56, 163.51) controlPoint2: CGPointMake(20.58, 191.27)];
+    [bezier2Path addCurveToPoint: CGPointMake(53.47, 246.86) controlPoint1: CGPointMake(35.49, 230.2) controlPoint2: CGPointMake(53.47, 246.86)];
+    [bezier2Path addCurveToPoint: CGPointMake(80.14, 268.29) controlPoint1: CGPointMake(53.47, 246.86) controlPoint2: CGPointMake(65.25, 259.74)];
+    [bezier2Path addCurveToPoint: CGPointMake(113.46, 281.28) controlPoint1: CGPointMake(95.04, 276.83) controlPoint2: CGPointMake(113.46, 281.28)];
+    [bezier2Path addCurveToPoint: CGPointMake(86.11, 286.04) controlPoint1: CGPointMake(113.46, 281.28) controlPoint2: CGPointMake(98.18, 285.95)];
+    [bezier2Path addCurveToPoint: CGPointMake(62.93, 281.67) controlPoint1: CGPointMake(74.03, 286.13) controlPoint2: CGPointMake(62.93, 281.67)];
+    [bezier2Path addCurveToPoint: CGPointMake(80.14, 317.03) controlPoint1: CGPointMake(62.93, 281.67) controlPoint2: CGPointMake(71.12, 304.22)];
+    [bezier2Path addCurveToPoint: CGPointMake(103.91, 339.84) controlPoint1: CGPointMake(89.17, 329.83) controlPoint2: CGPointMake(103.91, 339.84)];
+    [bezier2Path addCurveToPoint: CGPointMake(135.88, 359.44) controlPoint1: CGPointMake(103.91, 339.84) controlPoint2: CGPointMake(119.59, 353.53)];
+    [bezier2Path addCurveToPoint: CGPointMake(170.93, 364.15) controlPoint1: CGPointMake(152.16, 365.34) controlPoint2: CGPointMake(170.93, 364.15)];
+    [bezier2Path addCurveToPoint: CGPointMake(135.88, 386.44) controlPoint1: CGPointMake(170.93, 364.15) controlPoint2: CGPointMake(153.54, 376.98)];
+    [bezier2Path addCurveToPoint: CGPointMake(101.13, 401.54) controlPoint1: CGPointMake(118.21, 395.9) controlPoint2: CGPointMake(101.13, 401.54)];
+    [bezier2Path addCurveToPoint: CGPointMake(53.47, 412.64) controlPoint1: CGPointMake(101.13, 401.54) controlPoint2: CGPointMake(81.16, 409.59)];
+    [bezier2Path addCurveToPoint: CGPointMake(0.29, 412.64) controlPoint1: CGPointMake(25.78, 415.7) controlPoint2: CGPointMake(0.29, 412.64)];
+    [bezier2Path addCurveToPoint: CGPointMake(72.71, 447.67) controlPoint1: CGPointMake(0.29, 412.64) controlPoint2: CGPointMake(36.62, 435.16)];
+    [bezier2Path addCurveToPoint: CGPointMake(149.39, 464.31) controlPoint1: CGPointMake(108.8, 460.17) controlPoint2: CGPointMake(149.39, 464.31)];
+    [bezier2Path addCurveToPoint: CGPointMake(249.01, 457.71) controlPoint1: CGPointMake(149.39, 464.31) controlPoint2: CGPointMake(196.6, 469.56)];
+    [bezier2Path addCurveToPoint: CGPointMake(352.07, 418.46) controlPoint1: CGPointMake(301.42, 445.86) controlPoint2: CGPointMake(352.07, 418.46)];
+    [bezier2Path addCurveToPoint: CGPointMake(414.45, 370.11) controlPoint1: CGPointMake(352.07, 418.46) controlPoint2: CGPointMake(388.26, 396.31)];
+    [bezier2Path addCurveToPoint: CGPointMake(458.34, 312.2) controlPoint1: CGPointMake(440.64, 343.92) controlPoint2: CGPointMake(458.34, 312.2)];
+    [bezier2Path addCurveToPoint: CGPointMake(489.68, 246.86) controlPoint1: CGPointMake(458.34, 312.2) controlPoint2: CGPointMake(476.64, 284.33)];
+    [bezier2Path addCurveToPoint: CGPointMake(509.39, 165.55) controlPoint1: CGPointMake(502.73, 209.38) controlPoint2: CGPointMake(509.39, 165.55)];
+    [bezier2Path addLineToPoint: CGPointMake(510.48, 117.41)];
+    [bezier2Path addCurveToPoint: CGPointMake(542.8, 90.45) controlPoint1: CGPointMake(510.48, 117.41) controlPoint2: CGPointMake(526.7, 107.34)];
+    [bezier2Path addCurveToPoint: CGPointMake(569.12, 56.54) controlPoint1: CGPointMake(558.9, 73.55) controlPoint2: CGPointMake(569.12, 56.54)];
+    [bezier2Path addLineToPoint: CGPointMake(537.79, 66.97)];
+    [bezier2Path addLineToPoint: CGPointMake(503.61, 73.55)];
+    [bezier2Path addCurveToPoint: CGPointMake(537.79, 43.14) controlPoint1: CGPointMake(503.61, 73.55) controlPoint2: CGPointMake(528.94, 56.27)];
+    [bezier2Path addCurveToPoint: CGPointMake(552.37, 9.09) controlPoint1: CGPointMake(546.63, 30.01) controlPoint2: CGPointMake(552.37, 9.09)];
+    [bezier2Path closePath];
+    bezier2Path.miterLimit = 4;
+
+    bezier2Path.usesEvenOddFillRule = YES;
+
+    [color1 setStroke];
+    bezier2Path.lineWidth = 1;
+    [bezier2Path stroke];
+}
+
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;小插曲:当我全部忙活完这些以后，我才发现PaintCode也有钢笔工具&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-8f2308c103a3639d.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;
+也就是说只用一个PaintCode就可以完成所有想做的事情了，不需要Sketch或者AI去画路径了。PaintCode自己就可以画路径，导出OC或者Swift代码了。&lt;/p&gt;
+
+&lt;p&gt;7.现在我们回到Xcode工程中。添加一个UIView用来显示Logo。并且把Layer加到View的Layer中&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;-(void)addLayerToLaunchView
+{
+    //self.launchView是我添加的一个显示Logo的UIVIew
+    CAShapeLayer *layer = [[CAShapeLayer alloc]init];
+    layer.path = [self setBezierPath].CGPath;
+    layer.bounds = CGPathGetBoundingBox(layer.path);
+    
+    self.launchView.backgroundColor = [UIColor blueColor];
+    layer.position = CGPointMake(self.view.layer.bounds.size.width / 2, self.view.layer.bounds.size.height/ 2);
+    layer.fillColor = [UIColor whiteColor].CGColor;
+    [self.launchView.layer addSublayer:layer];
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+-(UIBezierPath *)setBezierPath
+{
+    //  这里面加入的就是刚刚PaintCode粘贴出来的代码
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-7a0cc3fd94a481c1.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;8.给这个View添加动画。仔细观察我文章开头的那个呆萌大叔打开Twitter的Gif图，动画效果是先把鸟缩小，然后再变大&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+- (void)startLaunch
+{
+    [UIView animateWithDuration:0.2 animations:^{
+        // 这里先把View缩小
+        self.launchView.frame = CGRectMake(0, 0, 50, 50);
+        self.launchView.center = self.view.center;
+    } completion:^(BOOL finished) {
+        [UIView animateWithDuration:0.3 animations:^{
+            // 这里要把View放大
+            self.launchView.frame = CGRectMake(0, 0, 5000, 5000);
+            self.launchView.center = self.view.center;
+            self.alpha = 0;
+        } completion:^(BOOL finished) {
+            [self.launchView removeFromSuperview];
+        }];;
+    }];
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;接下来运行工程就可以实现应用启动的时候，让Logo&amp;quot;飞&amp;quot;起来的效果啦。&lt;/p&gt;
+
+&lt;p&gt;这是我把这个效果做到app中的效果：&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-613695775b65dd57.gif?imageMogr2/auto-orient/strip&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;h4&gt;结尾&lt;/h4&gt;
+
+&lt;p&gt;这个效果其实适用很多app，如果公司也没有强制要加入广告页，等等其他页面，
+可以考虑在启动之后加上这些动画来增加app的用户体验。优秀的过场动画能让app更加鲜活，充满活力！&lt;/p&gt;
+</description>
+        <pubDate>Wed, 25 May 2016 06:56:00 +0800</pubDate>
+        <link>http://vno.onevcat.com/2016/05/iOS-app%E6%97%A7%E8%B2%8C%E6%8D%A2%E6%96%B0%E9%A2%9C(%E4%B8%80)-Launch-Page%E8%AE%A9Logo-%E9%A3%9E-%E5%87%BA%E5%B1%8F%E5%B9%95/</link>
+        <guid isPermaLink="true">http://vno.onevcat.com/2016/05/iOS-app%E6%97%A7%E8%B2%8C%E6%8D%A2%E6%96%B0%E9%A2%9C(%E4%B8%80)-Launch-Page%E8%AE%A9Logo-%E9%A3%9E-%E5%87%BA%E5%B1%8F%E5%B9%95/</guid>
+        
+        <category>iOS</category>
+        
+        
+        <category>iOS</category>
+        
+      </item>
+    
+      <item>
+        <title>微信,QQ这类IM app怎么做——谈谈Websocket</title>
+        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-324588e5f12ae955.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;h4&gt;前言&lt;/h4&gt;
+
+&lt;p&gt;关于我和WebSocket的缘：我从大二在计算机网络课上听老师讲过之后，第一次使用就到了毕业之后的第一份工作。直到最近换了工作，到了一家是含有IM社交聊天功能的app的时候，我觉得我现在可以谈谈我对WebSocket/Socket的一些看法了。要想做IM聊天app，就不得不理解WebSocket和Socket的原理了，听我一一道来。&lt;/p&gt;
+
+&lt;h4&gt;目录&lt;/h4&gt;
+
+&lt;ul&gt;
+&lt;li&gt;1.WebSocket使用场景&lt;/li&gt;
+&lt;li&gt;2.WebSocket诞生由来&lt;/li&gt;
+&lt;li&gt;3.谈谈WebSocket协议原理&lt;/li&gt;
+&lt;li&gt;4.WebSocket 和 Socket的区别与联系&lt;/li&gt;
+&lt;li&gt;5.iOS平台有哪些WebSocket和Socket的开源框架&lt;/li&gt;
+&lt;li&gt;6.iOS平台如何实现WebSocket协议&lt;br&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h5&gt;一.WebSocket的使用场景&lt;/h5&gt;
+
+&lt;p&gt;&lt;strong&gt;1.社交聊天&lt;/strong&gt;&lt;br&gt;
+最著名的就是微信，QQ，这一类社交聊天的app。这一类聊天app的特点是低延迟，高即时。即时是这里面要求最高的，如果有一个紧急的事情，通过IM软件通知你，假设网络环境良好的情况下，这条message还无法立即送达到你的客户端上，紧急的事情都结束了，你才收到消息，那么这个软件肯定是失败的。&lt;br&gt;
+&lt;strong&gt;2.弹幕&lt;/strong&gt;&lt;br&gt;
+说到这里，大家一定里面想到了A站和B站了。确实，他们的弹幕一直是一种特色。而且弹幕对于一个视频来说，很可能弹幕才是精华。发弹幕需要实时显示，也需要和聊天一样，需要即时。&lt;br&gt;
+&lt;strong&gt;3.多玩家游戏&lt;/strong&gt;&lt;br&gt;
+&lt;strong&gt;4.协同编辑&lt;/strong&gt;&lt;br&gt;
+现在很多开源项目都是分散在世界各地的开发者一起协同开发，此时就会用到版本控制系统，比如Git，SVN去合并冲突。但是如果有一份文档，支持多人实时在线协同编辑，那么此时就会用到比如WebSocket了，它可以保证各个编辑者都在编辑同一个文档，此时不需要用到Git，SVN这些版本控制，因为在协同编辑界面就会实时看到对方编辑了什么，谁在修改哪些段落和文字。&lt;br&gt;
+&lt;strong&gt;5.股票基金实时报价&lt;/strong&gt;&lt;br&gt;
+金融界瞬息万变——几乎是每毫秒都在变化。如果采用的网络架构无法满足实时性，那么就会给客户带来巨大的损失。几毫秒钱股票开始大跌，几秒以后才刷新数据，一秒钟的时间内，很可能用户就已经损失巨大财产了。&lt;br&gt;
+&lt;strong&gt;6.体育实况更新&lt;/strong&gt;&lt;br&gt;
+全世界的球迷，体育爱好者特别多，当然大家在关心自己喜欢的体育活动的时候，比赛实时的赛况是他们最最关心的事情。这类新闻中最好的体验就是利用Websocket达到实时的更新！&lt;br&gt;
+&lt;strong&gt;7.视频会议/聊天&lt;/strong&gt;&lt;br&gt;
+视频会议并不能代替和真人相见，但是他能让分布在全球天涯海角的人聚在电脑前一起开会。既能节省大家聚在一起路上花费的时间，讨论聚会地点的纠结，还能随时随地，只要有网络就可以开会。&lt;br&gt;
+&lt;strong&gt;8.基于位置的应用&lt;/strong&gt;&lt;br&gt;
+越来越多的开发者借用移动设备的GPS功能来实现他们基于位置的网络应用。如果你一直记录用户的位置(比如运行应用来记录运动轨迹)，你可以收集到更加细致化的数据。&lt;br&gt;
+&lt;strong&gt;9.在线教育&lt;/strong&gt;&lt;br&gt;
+在线教育近几年也发展迅速。优点很多，免去了场地的限制，能让名师的资源合理的分配给全国各地想要学习知识的同学手上，Websocket是个不错的选择，可以视频聊天、即时聊天以及其与别人合作一起在网上讨论问题...&lt;br&gt;
+&lt;strong&gt;10.智能家居&lt;/strong&gt;&lt;br&gt;
+这也是我一毕业加入的一个伟大的物联网智能家居的公司。考虑到家里的智能设备的状态必须需要实时的展现在手机app客户端上，毫无疑问选择了Websocket。&lt;br&gt;
+&lt;strong&gt;11.总结&lt;/strong&gt;&lt;br&gt;
+从上面我列举的这些场景来看，一个共同点就是，高实时性！  &lt;/p&gt;
+
+&lt;h5&gt;二.WebSocket诞生由来&lt;/h5&gt;
+
+&lt;p&gt;1.&lt;strong&gt;最开始的轮询Polling阶段&lt;/strong&gt;
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-ce4df238336909a5.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;这种方式下，是不适合获取实时信息的，客户端和服务器之间会一直进行连接，每隔一段时间就询问一次。客户端会轮询，有没有新消息。这种方式连接数会很多，一个接受，一个发送。而且每次发送请求都会有Http的Header，会很耗流量，也会消耗CPU的利用率。&lt;/p&gt;
+
+&lt;p&gt;2.&lt;strong&gt;改进版的长轮询Long polling阶段&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-6ca608d5a37095e6.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;长轮询是对轮询的改进版，客户端发送HTTP给服务器之后，有没有新消息，如果没有新消息，就一直等待。当有新消息的时候，才会返回给客户端。在某种程度上减小了网络带宽和CPU利用率等问题。但是这种方式还是有一种弊端：例如假设服务器端的数据更新速度很快，服务器在传送一个数据包给客户端后必须等待客户端的下一个Get请求到来，才能传递第二个更新的数据包给客户端，那么这样的话，客户端显示实时数据最快的时间为2×RTT（往返时间），而且如果在网络拥塞的情况下，这个时间用户是不能接受的，比如在股市的的报价上。另外，由于http数据包的头部数据量往往很大（通常有400多个字节），但是真正被服务器需要的数据却很少（有时只有10个字节左右），这样的数据包在网络上周期性的传输，难免对网络带宽是一种浪费。&lt;/p&gt;
+
+&lt;p&gt;3.&lt;strong&gt;WebSocket诞生&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;现在急需的需求是能支持客户端和服务器端的双向通信，而且协议的头部又没有HTTP的Header那么大，于是，Websocket就诞生了！&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-b88b2623a2e4a8ea.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;上图就是Websocket和Polling的区别，从图中可以看到Polling里面客户端发送了好多Request，而下图，只有一个Upgrade，非常简洁高效。至于消耗方面的比较就要看下图了&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-f1f91e25b9635701.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;
+上图中，我们先看蓝色的柱状图，是Polling轮询消耗的流量，&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Use case A: &lt;/strong&gt;1,000 clients polling every second: Network throughput is (871 x 1,000) = 871,000 bytes = 6,968,000 bits per second (6.6 Mbps)&lt;br&gt;
+&lt;strong&gt;Use case B: &lt;/strong&gt;10,000 clients polling every second: Network throughput is (871 x 10,000) = 8,710,000 bytes = 69,680,000 bits per second (66 Mbps)&lt;br&gt;
+&lt;strong&gt;Use case C: &lt;/strong&gt;100,000 clients polling every 1 second: Network throughput is (871 x 100,000) = 87,100,000 bytes = 696,800,000 bits per second (665 Mbps)
+而Websocket的Frame是 just two bytes of overhead instead of 871，仅仅用2个字节就代替了轮询的871字节！&lt;br&gt;
+&lt;strong&gt;Use case A: &lt;/strong&gt;1,000 clients receive 1 message per second: Network throughput is (2 x 1,000) = 2,000 bytes = 16,000 bits per second (0.015 Mbps)&lt;br&gt;
+&lt;strong&gt;Use case B: &lt;/strong&gt;10,000 clients receive 1 message per second: Network throughput is (2 x 10,000) = 20,000 bytes = 160,000 bits per second (0.153 Mbps)&lt;br&gt;
+&lt;strong&gt;Use case C: &lt;/strong&gt;100,000 clients receive 1 message per second: Network throughput is (2 x 100,000) = 200,000 bytes = 1,600,000 bits per second (1.526 Mbps)  &lt;/p&gt;
+
+&lt;p&gt;相同的每秒客户端轮询的次数，当次数高达10W/s的高频率次数的时候，Polling轮询需要消耗665Mbps，而Websocket仅仅只花费了1.526Mbps，将近435倍！！&lt;/p&gt;
+
+&lt;h5&gt;三.谈谈WebSocket协议原理&lt;/h5&gt;
+
+&lt;p&gt;Websocket是应用层第七层上的一个应用层协议，它必须依赖 &lt;a href=&quot;http://tools.ietf.org/html/rfc6455#section-4&quot;&gt;HTTP 协议进行一次握手&lt;/a&gt; ，握手成功后，数据就直接从 TCP 通道传输，与 HTTP 无关了。&lt;/p&gt;
+
+&lt;p&gt;Websocket的数据传输是frame形式传输的，比如会将一条消息分为几个frame，按照先后顺序传输出去。这样做会有几个好处：&lt;/p&gt;
+
+&lt;p&gt;1 大数据的传输可以分片传输，不用考虑到数据大小导致的长度标志位不足够的情况。
+2 和http的chunk一样，可以边生成数据边传递消息，即提高传输效率。&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt; 0                   1                   2                   3
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ +-+-+-+-+-------+-+-------------+-------------------------------+
+ |F|R|R|R| opcode|M| Payload len |    Extended payload length    |
+ |I|S|S|S|  (4)  |A|     (7)     |             (16/64)           |
+ |N|V|V|V|       |S|             |   (if payload len==126/127)   |
+ | |1|2|3|       |K|             |                               |
+ +-+-+-+-+-------+-+-------------+ - - - - - - - - - - - - - - - +
+ |     Extended payload length continued, if payload len == 127  |
+ + - - - - - - - - - - - - - - - +-------------------------------+
+ |                               |Masking-key, if MASK set to 1  |
+ +-------------------------------+-------------------------------+
+ | Masking-key (continued)       |          Payload Data         |
+ +-------------------------------- - - - - - - - - - - - - - - - +
+ :                     Payload Data continued ...                :
+ + - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - +
+ |                     Payload Data continued ...                |
+ +---------------------------------------------------------------+
+
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;h5&gt;四.WebSocket 和 Socket的区别与联系&lt;/h5&gt;
+
+&lt;p&gt;首先，&lt;br&gt;
+&lt;a href=&quot;http://en.wikipedia.org/wiki/Network_socket&quot;&gt;Socket&lt;/a&gt; 其实并不是一个协议。它工作在 OSI 模型会话层（第5层），是为了方便大家直接使用更底层协议（一般是 &lt;a href=&quot;http://en.wikipedia.org/wiki/Transmission_Control_Protocol&quot;&gt;TCP&lt;/a&gt; 或 &lt;a href=&quot;http://en.wikipedia.org/wiki/User_Datagram_Protocol&quot;&gt;UDP&lt;/a&gt; ）而存在的一个抽象层。Socket是对TCP/IP协议的封装，Socket本身并不是协议，而是一个调用接口(API)。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-d35653654be833ae.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;
+Socket通常也称作”套接字”，用于描述IP地址和端口，是一个通信链的句柄。网络上的两个程序通过一个双向的通讯连接实现数据的交换，这个双向链路的一端称为一个Socket，一个Socket由一个IP地址和一个端口号唯一确定。应用程序通常通过”套接字”向网络发出请求或者应答网络请求。&lt;/p&gt;
+
+&lt;p&gt;Socket在通讯过程中，服务端监听某个端口是否有连接请求，客户端向服务端发送连接请求，服务端收到连接请求向客户端发出接收消息，这样一个连接就建立起来了。客户端和服务端也都可以相互发送消息与对方进行通讯，直到双方连接断开。&lt;/p&gt;
+
+&lt;p&gt;所以基于WebSocket和基于Socket都可以开发出IM社交聊天类的app&lt;/p&gt;
+
+&lt;h5&gt;五.iOS平台有哪些WebSocket和Socket的开源框架&lt;/h5&gt;
+
+&lt;p&gt;Socket开源框架有：&lt;a href=&quot;https://github.com/robbiehanson/CocoaAsyncSocket&quot;&gt;CocoaAsync Socket&lt;/a&gt;，&lt;a href=&quot;https://github.com/socketio/socket.io-client-swift&quot;&gt;socketio/socket.io-client-swift&lt;/a&gt;
+WebSocket开源框架有:&lt;a href=&quot;https://github.com/facebook/SocketRocket&quot;&gt;facebook/Socket Rocket&lt;/a&gt;，&lt;a href=&quot;https://github.com/tidwall/SwiftWebSocket&quot;&gt;tidwall/SwiftWeb Socket &lt;/a&gt;&lt;/p&gt;
+
+&lt;h5&gt;六.iOS平台如何实现WebSocket协议&lt;/h5&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;Talk is cheap。Show me the code ——Linus Torvalds&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;我们今天来看看&lt;a href=&quot;https://github.com/facebook/SocketRocket&quot;&gt;facebook/Socket Rocket&lt;/a&gt;的实现方法
+首先这是SRWebSocket定义的一些成员变量&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+@property (nonatomic, weak) id &amp;lt;SRWebSocketDelegate&amp;gt; delegate;
+/**
+ A dispatch queue for scheduling the delegate calls. The queue doesn&amp;#39;t need be a serial queue.
+
+ If `nil` and `delegateOperationQueue` is `nil`, the socket uses main queue for performing all delegate method calls.
+ */
+@property (nonatomic, strong) dispatch_queue_t delegateDispatchQueue;
+/**
+ An operation queue for scheduling the delegate calls.
+
+ If `nil` and `delegateOperationQueue` is `nil`, the socket uses main queue for performing all delegate method calls.
+ */
+@property (nonatomic, strong) NSOperationQueue *delegateOperationQueue;
+@property (nonatomic, readonly) SRReadyState readyState;
+@property (nonatomic, readonly, retain) NSURL *url;
+@property (nonatomic, readonly) CFHTTPMessageRef receivedHTTPHeaders;
+// Optional array of cookies (NSHTTPCookie objects) to apply to the connections
+@property (nonatomic, copy) NSArray&amp;lt;NSHTTPCookie *&amp;gt; *requestCookies;
+
+// This returns the negotiated protocol.
+// It will be nil until after the handshake completes.
+@property (nonatomic, readonly, copy) NSString *protocol;
+
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;下面这些是SRWebSocket的一些方法&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+// Protocols should be an array of strings that turn into Sec-WebSocket-Protocol.
+- (instancetype)initWithURLRequest:(NSURLRequest *)request;
+- (instancetype)initWithURLRequest:(NSURLRequest *)request protocols:(NSArray&amp;lt;NSString *&amp;gt; *)protocols;
+- (instancetype)initWithURLRequest:(NSURLRequest *)request protocols:(NSArray&amp;lt;NSString *&amp;gt; *)protocols allowsUntrustedSSLCertificates:(BOOL)allowsUntrustedSSLCertificates;
+
+// Some helper constructors.
+- (instancetype)initWithURL:(NSURL *)url;
+- (instancetype)initWithURL:(NSURL *)url protocols:(NSArray&amp;lt;NSString *&amp;gt; *)protocols;
+- (instancetype)initWithURL:(NSURL *)url protocols:(NSArray&amp;lt;NSString *&amp;gt; *)protocols allowsUntrustedSSLCertificates:(BOOL)allowsUntrustedSSLCertificates;
+
+// By default, it will schedule itself on +[NSRunLoop SR_networkRunLoop] using defaultModes.
+- (void)scheduleInRunLoop:(NSRunLoop *)aRunLoop forMode:(NSString *)mode;
+- (void)unscheduleFromRunLoop:(NSRunLoop *)aRunLoop forMode:(NSString *)mode;
+
+// SRWebSockets are intended for one-time-use only.  Open should be called once and only once.
+- (void)open;
+- (void)close;
+- (void)closeWithCode:(NSInteger)code reason:(NSString *)reason;
+
+///--------------------------------------
+#pragma mark Send
+///--------------------------------------
+
+//下面是4个发送的方法
+/**
+ Send a UTF-8 string or binary data to the server.
+
+ @param message UTF-8 String or Data to send.
+
+ @deprecated Please use `sendString:` or `sendData` instead.
+ */
+- (void)send:(id)message __attribute__((deprecated(&amp;quot;Please use `sendString:` or `sendData` instead.&amp;quot;)));
+- (void)sendString:(NSString *)string;
+- (void)sendData:(NSData *)data;
+- (void)sendPing:(NSData *)data;
+
+@end
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;对应5种状态的代理方法&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;///--------------------------------------
+#pragma mark - SRWebSocketDelegate
+///--------------------------------------
+@protocol SRWebSocketDelegate &amp;lt;NSObject&amp;gt;
+
+- (void)webSocket:(SRWebSocket *)webSocket didReceiveMessage:(id)message;
+
+@optional
+- (void)webSocketDidOpen:(SRWebSocket *)webSocket;
+- (void)webSocket:(SRWebSocket *)webSocket didFailWithError:(NSError *)error;
+- (void)webSocket:(SRWebSocket *)webSocket didCloseWithCode:(NSInteger)code reason:(NSString *)reason wasClean:(BOOL)wasClean;
+- (void)webSocket:(SRWebSocket *)webSocket didReceivePong:(NSData *)pongPayload;
+
+// Return YES to convert messages sent as Text to an NSString. Return NO to skip NSData -&amp;gt; NSString conversion for Text messages. Defaults to YES.
+- (BOOL)webSocketShouldConvertTextFrameToString:(SRWebSocket *)webSocket;
+@end
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;didReceiveMessage方法是必须实现的，用来接收消息的。
+下面4个did方法分别对应着Open，Fail，Close，ReceivePong不同状态的代理方法&lt;/p&gt;
+
+&lt;p&gt;方法就上面这些了，我们实际来看看代码怎么写&lt;/p&gt;
+
+&lt;p&gt;先是初始化Websocket连接，注意此处ws://或者wss://连接有且最多只能有一个，这个是Websocket协议规定的&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;    self.ws = [[SRWebSocket alloc] initWithURLRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:[NSString stringWithFormat:@&amp;quot;%@://%@:%zd/ws&amp;quot;, serverProto, serverIP, serverPort]]]];
+    self.ws.delegate = delegate;
+    [self.ws open];
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;发送消息&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;    [self.ws send:message];
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;接收消息以及其他3个代理方法&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;//这个就是接受消息的代理方法了，这里接受服务器返回的数据，方法里面就应该写处理数据，存储数据的方法了。
+- (void)webSocket:(SRWebSocket *)webSocket didReceiveMessage:(id)message
+{
+    NSDictionary *data = [NetworkUtils decodeData:message];
+    if (!data)
+        return;
+}
+
+//这里是Websocket刚刚Open之后的代理方法。就想微信刚刚连接中，会显示连接中，当连接上了，就不显示连接中了，取消显示连接的方法就应该写在这里面
+- (void)webSocketDidOpen:(SRWebSocket *)webSocket
+{
+    // Open = silent ping
+    [self.ws receivedPing];
+}
+
+//这是关闭Websocket的代理方法
+- (void)webSocket:(SRWebSocket *)webSocket didCloseWithCode:(NSInteger)code reason:(NSString *)reason wasClean:(BOOL)wasClean
+{
+    [self failedConnection:NSLS(Disconnected)];
+}
+
+//这里是连接Websocket失败的方法，这里面一般都会写重连的方法
+- (void)webSocket:(SRWebSocket *)webSocket didFailWithError:(NSError *)error
+{
+    [self failedConnection:NSLS(Disconnected)];
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;h4&gt;最后&lt;/h4&gt;
+
+&lt;p&gt;以上就是我想分享的一些关于Websocket的心得，文中如果有错误的地方，欢迎大家指点！一般没有微信QQ那么大用户量的app，用Websocket应该都可以完成IM社交聊天的任务。当用户达到亿级别，应该还有很多需要优化，优化性能各种的吧。&lt;/p&gt;
+
+&lt;p&gt;最后，微信和QQ的实现方法也许并不是只用Websocket和Socket这么简单，也许是他们自己开发的一套能支持这么大用户，大数据的，各方面也都优化都最优的方法。如果有开发和微信和QQ的大神看到这篇文章，可以留言说说看你们用什么方式实现的，也可以和我们一起分享，我们一起学习！我先谢谢大神们的指点了！&lt;/p&gt;
+</description>
+        <pubDate>Sun, 15 May 2016 18:55:00 +0800</pubDate>
+        <link>http://vno.onevcat.com/2016/05/%E5%BE%AE%E4%BF%A1,QQ%E8%BF%99%E7%B1%BBIM-app%E6%80%8E%E4%B9%88%E5%81%9A-%E8%B0%88%E8%B0%88Websocket/</link>
+        <guid isPermaLink="true">http://vno.onevcat.com/2016/05/%E5%BE%AE%E4%BF%A1,QQ%E8%BF%99%E7%B1%BBIM-app%E6%80%8E%E4%B9%88%E5%81%9A-%E8%B0%88%E8%B0%88Websocket/</guid>
+        
+        <category>iOS</category>
+        
+        
+        <category>iOS</category>
+        
+      </item>
+    
+      <item>
+        <title>iOS Core Data 数据迁移 指南</title>
+        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-4e1295f1f4cd4d75.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;h4&gt;前言&lt;/h4&gt;
+
+&lt;p&gt;Core Data是iOS上一个效率比较高的数据库框架，(但是Core Data并不是一种数据库，它底层还是利用Sqlite3来存储数据的)，它可以把数据当成对象来操作，而且开发者并不需要在乎数据在磁盘上面的存储方式。它会把位于NSManagedObject Context里面的托管对象NSManagedObject类的实例或者某个NSManagedObject子类的实例，通过NSManagedObjectModel托管对象模型，把托管对象保存到持久化存储协调器NSPersistentStoreCoordinator持有的一个或者多个持久化存储区中NSPersistentStore中。使用Core Data进行查询的语句都是经过Apple特别优化过的，所以都是效率很高的查询。  &lt;/p&gt;
+
+&lt;p&gt;当你进行简单的设定，比如说设定某个实体的默认值，设定级联删除的操作，设定数据的验证规则，使用数据的请求模板，这些修改Core Data都会自己完成，不用自己进行数据迁移。那那些操作需要我们进行数据迁移呢？凡是会引起NSManagedObjectModel托管对象模型变化的，都最好进行数据迁移，防止用户升级应用之后就闪退。会引起NSManagedObjectModel托管对象模型变化的有以下几个操作，新增了一张表，新增了一张表里面的一个实体，新增一个实体的一个属性，把一个实体的某个属性迁移到另外一个实体的某个属性里面…………大家应该现在都知道哪些操作需要进行数据迁移了吧。&lt;/p&gt;
+
+&lt;h4&gt;小技巧：&lt;/h4&gt;
+
+&lt;p&gt;进入正题之前，我先说3个调试Core Data里面调试可能你会需要的操作。&lt;/p&gt;
+
+&lt;p&gt;1.一般打开app沙盒里面的会有三种类型的文件，sqlite，sqlite-shm,sqlite-wal,后面2者是iOS7之后系统会默认开启一个新的“数据库日志记录模式”(database journaling mode)生成的，sqlite-shm是共享内存(Shared Memory)文件，该文件里面会包含一份sqlite-wal文件的索引，系统会自动生成shm文件，所以删除它，下次运行还会生成。sqlite-wal是预写式日志(Write-Ahead Log)文件，这个文件里面会包含尚未提交的数据库事务，所以看见有这个文件了，就代表数据库里面还有还没有处理完的事务需要提交，所以说如果有sqlite-wal文件，再去打开sqlite文件，很可能最近一次数据库操作还没有执行。  &lt;/p&gt;
+
+&lt;p&gt;所以在调试的时候，我们需要即时的观察数据库的变化，我们就可以先禁用这个日志记录模式，只需要在建立持久化存储区的时候存入一个参数即可。具体代码如下&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;    NSDictionary *options =
+    @{
+          NSSQLitePragmasOption: @{@&amp;quot;journal_mode&amp;quot;: @&amp;quot;DELETE&amp;quot;}
+     };
+    
+    NSError *error = nil;
+    _store = [_coordinator addPersistentStoreWithType:NSSQLiteStoreType
+                                        configuration:nil
+                                                  URL:[self storeURL]
+                                              options:options error:&amp;amp;error];
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;2.Mac上打开数据库的方式很多，我推荐3个，一个是Firefox里面直接有sqlite的插件，免费的，可以直接安装，也很方便。当然也有不用Firefox的朋友，就像我是Chrome重度使用者，那就推荐2个免费的小的app，一个是sqlitebrowser，一个是sqlite manager，这2个都比较轻量级，都比较好用。&lt;/p&gt;
+
+&lt;p&gt;3.如果你想看看Core Data到底底层是如何优化你的查询语句的，这里有一个方法可以看到。&lt;/p&gt;
+
+&lt;p&gt;先点击Product -&amp;gt;Scheme -&amp;gt;Edit Scheme
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-d786cef528c3cfea.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;然后再切换到Arguments分页中,在Arguments Passed On Launch里面加入 “- com.apple.CoreData.SQLDebug 3”,重新运行app，下面就会显示Core Data优化过的Sql语句了。
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-7b48361d04265a5c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;好了，调试信息应该都可以完美显示了，可以开始愉快的进入正文了！&lt;/p&gt;
+
+&lt;h4&gt;一.Core Data自带的轻量级的数据迁移&lt;/h4&gt;
+
+&lt;p&gt;这种迁移可别小看它，在你新建一张表的时候还必须加上它才行，否则会出现如下的错误，&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;**Failed to add store. Error: Error Domain=NSCocoaErrorDomain Code=134100 &amp;quot;(null)&amp;quot; UserInfo={metadata={**
+**    NSPersistenceFrameworkVersion = 641;**
+**    NSStoreModelVersionHashes =     {**
+**        Item = &amp;lt;64288772 72e62096 a8a4914f 83db23c9 13718f81 4417e297 293d0267 79b04acb&amp;gt;;**
+**        Measurement = &amp;lt;35717f0e 32cae0d4 57325758 58ed0d11 c16563f2 567dac35 de63d5d8 47849cf7&amp;gt;;**
+**    };**
+**    NSStoreModelVersionHashesVersion = 3;**
+**    NSStoreModelVersionIdentifiers =     (**
+**        &amp;quot;&amp;quot;**
+**    );**
+**    NSStoreType = SQLite;**
+**    NSStoreUUID = &amp;quot;9A16746E-0C61-421B-B936-412F0C904FDF&amp;quot;;**
+**    &amp;quot;_NSAutoVacuumLevel&amp;quot; = 2;**
+**}, reason=The model used to open the store is incompatible with the one used to create the store}**
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;错误原因写的比较清楚了，reason=The model used to open the store is incompatible with the one used to create the store，这个是因为我新建了一张表，但是我没有打开轻量级的迁移Option。这里会有人会问了，我新建表从来没有出现这个错误啊？那是因为你们用的第三方框架就已经写好了改Option了。(场外人:这年头谁还自己从0开始写Core Data啊，肯定都用第三方框架啊)那这里我就当讲解原理了哈。如果是自己从0开始写的Core Data的话，这里是应该会报错了，解决办法当然是加上代码，利用Core Data的轻量级迁移，来防止这种找不到存储区的闪退问题&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+NSDictionary *options =
+    @{
+      NSSQLitePragmasOption: @{@&amp;quot;journal_mode&amp;quot;: @&amp;quot;DELETE&amp;quot;},
+      NSMigratePersistentStoresAutomaticallyOption :@YES,
+      NSInferMappingModelAutomaticallyOption:@YES
+    };
+    
+    NSError *error = nil;
+    _store = [_coordinator addPersistentStoreWithType:NSSQLiteStoreType
+                                        configuration:nil
+                                                  URL:[self storeURL]
+                                              options:options error:&amp;amp;error];
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;这里说一下新增加的2个参数的意义：&lt;br&gt;
+NSMigratePersistentStoresAutomaticallyOption = YES，那么Core Data会试着把之前低版本的出现不兼容的持久化存储区迁移到新的模型中，这里的例子里，Core Data就能识别出是新表，就会新建出新表的存储区来，上面就不会报上面的error了。   &lt;/p&gt;
+
+&lt;p&gt;NSInferMappingModelAutomaticallyOption = YES,这个参数的意义是Core Data会根据自己认为最合理的方式去尝试MappingModel，从源模型实体的某个属性，映射到目标模型实体的某个属性。&lt;/p&gt;
+
+&lt;p&gt;接着我们来看看MagicRecord源码是怎么写的，所以大家才能执行一些操作不会出现我上面说的闪退的问题&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
++ (NSDictionary *) MR_autoMigrationOptions;
+{
+    // Adding the journalling mode recommended by apple
+    NSMutableDictionary *sqliteOptions = [NSMutableDictionary dictionary];
+    [sqliteOptions setObject:@&amp;quot;WAL&amp;quot; forKey:@&amp;quot;journal_mode&amp;quot;];
+    
+    NSDictionary *options = [NSDictionary dictionaryWithObjectsAndKeys:
+                             [NSNumber numberWithBool:YES], NSMigratePersistentStoresAutomaticallyOption,
+                             [NSNumber numberWithBool:YES], NSInferMappingModelAutomaticallyOption,
+                             sqliteOptions, NSSQLitePragmasOption,
+                             nil];
+    return options;
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;上面这一段就是MagicRecord源码里面替大家加的Core Data轻量级的数据迁移的保护了，所以大家不写那2个参数，一样不会报错。(题外话：MagicRecord默认这里是开启了WAL日志记录模式了)  此处如果大家注销掉那两个参数，或者把参数的值设置为NO，再运行一次，新建一张表，就会出现我上面提到的错误了。大家可以实践实践，毕竟实践出真知嘛。&lt;/p&gt;
+
+&lt;p&gt;只要打开上面2个参数，Core Data就会执行自己的轻量级迁移了，当然，在实体属性迁移时候，用该方式不靠谱，之前我觉得它肯定能推断出来，结果后来还是更新后直接闪退报错了，可能是因为表结构太复杂，超过了它简单推断的能力范围了，所以我建议，在进行复杂的实体属性迁移到另一个属性迁移的时候，不要太相信这种方式，还是最好自己Mapping一次。当然，你要是新建一张表的时候，这2个参数是必须要加上的！！！&lt;/p&gt;
+
+&lt;h4&gt;二.Core Data手动创建Mapping文件进行迁移&lt;/h4&gt;
+
+&lt;p&gt;这种方式比前一种方式要更加精细一些，Mapping文件会指定哪个实体的某个属性迁移到哪个实体的某个属性，这比第一种交给Core Data自己去推断要靠谱一些，这种方法直接指定映射！&lt;br&gt;
+先说一下，如果复杂的迁移，不加入这个Mapping文件会出现什么样的错误&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+**Failed to add store. Error: Error Domain=NSCocoaErrorDomain Code=134140 &amp;quot;(null)&amp;quot; UserInfo={destinationModel=(&amp;lt;NSManagedObjectModel: 0x7f82d4935280&amp;gt;) isEditable 0, entities {**
+**    Amount = &amp;quot;(&amp;lt;NSEntityDescription: 0x7f82d4931960&amp;gt;) name Amount, managedObjectClassName NSManagedObject, renamingIdentifier Amount, isAbstract 0, superentity name (null), properties {\n    qwe = \&amp;quot;(&amp;lt;NSAttributeDescription: 0x7f82d4930f40&amp;gt;), name qwe, isOptional 1, isTransient 0, entity Amount, renamingIdentifier qwe, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 700 , attributeValueClassName NSString, defaultValue (null)\&amp;quot;;\n}, subentities {\n}, userInfo {\n}, versionHashModifier (null), uniquenessConstraints (\n)&amp;quot;;**
+**    Item = &amp;quot;(&amp;lt;NSEntityDescription: 0x7f82d4931a10&amp;gt;) name Item, managedObjectClassName Item, renamingIdentifier Item, isAbstract 0, superentity name (null), properties {\n    collected = \&amp;quot;(&amp;lt;NSAttributeDescription: 0x7f82d4930fd0&amp;gt;), name collected, isOptional 1, isTransient 0, entity Item, renamingIdentifier collected, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 800 , attributeValueClassName NSNumber, defaultValue 0\&amp;quot;;\n    listed = \&amp;quot;(&amp;lt;NSAttributeDescription: 0x7f82d4931060&amp;gt;), name listed, isOptional 1, isTransient 0, entity Item, renamingIdentifier listed, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 800 , attributeValueClassName NSNumber, defaultValue 1\&amp;quot;;\n    name = \&amp;quot;(&amp;lt;NSAttributeDescription: 0x7f82d49310f0&amp;gt;), name name, isOptional 1, isTransient 0, entity Item, renamingIdentifier name, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 700 , attributeValueClassName NSString, defaultValue New Item\&amp;quot;;\n    photoData = \&amp;quot;(&amp;lt;NSAttributeDescription: 0x7f82d4931180&amp;gt;), name photoData, isOptional 1, isTransient 0, entity Item, renamingIdentifier photoData, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 1000 , attributeValueClassName NSData, defaultValue (null)\&amp;quot;;\n    quantity = \&amp;quot;(&amp;lt;NSAttributeDescription: 0x7f82d4931210&amp;gt;), name quantity, isOptional 1, isTransient 0, entity Item, renamingIdentifier quantity, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 600 , attributeValueClassName NSNumber, defaultValue 1\&amp;quot;;\n}, subentities {\n}, userInfo {\n}, versionHashModifier (null), uniquenessConstraints (\n)&amp;quot;;**
+**}, fetch request templates {**
+**    Test = &amp;quot;&amp;lt;NSFetchRequest: 0x7f82d49316c0&amp;gt; (entity: Item; predicate: (name CONTAINS \&amp;quot;e\&amp;quot;); sortDescriptors: ((null)); type: NSManagedObjectResultType; )&amp;quot;;**
+**}, sourceModel=(&amp;lt;NSManagedObjectModel: 0x7f82d488e930&amp;gt;) isEditable 1, entities {**
+**    Amount = &amp;quot;(&amp;lt;NSEntityDescription: 0x7f82d488f880&amp;gt;) name Amount, managedObjectClassName NSManagedObject, renamingIdentifier Amount, isAbstract 0, superentity name (null), properties {\n    abc = \&amp;quot;(&amp;lt;NSAttributeDescription: 0x7f82d488f9d0&amp;gt;), name abc, isOptional 1, isTransient 0, entity Amount, renamingIdentifier abc, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 700 , attributeValueClassName NSString, defaultValue (null)\&amp;quot;;\n}, subentities {\n}, userInfo {\n}, versionHashModifier (null), uniquenessConstraints (\n)&amp;quot;;**
+**    Item = &amp;quot;(&amp;lt;NSEntityDescription: 0x7f82d488fbe0&amp;gt;) name Item, managedObjectClassName NSManagedObject, renamingIdentifier Item, isAbstract 0, superentity name (null), properties {\n    collected = \&amp;quot;(&amp;lt;NSAttributeDescription: 0x7f82d48901c0&amp;gt;), name collected, isOptional 1, isTransient 0, entity Item, renamingIdentifier collected, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 800 , attributeValueClassName NSNumber, defaultValue 0\&amp;quot;;\n    listed = \&amp;quot;(&amp;lt;NSAttributeDescription: 0x7f82d488fd20&amp;gt;), name listed, isOptional 1, isTransient 0, entity Item, renamingIdentifier listed, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 800 , attributeValueClassName NSNumber, defaultValue 1\&amp;quot;;\n    name = \&amp;quot;(&amp;lt;NSAttributeDescription: 0x7f82d488fdb0&amp;gt;), name name, isOptional 1, isTransient 0, entity Item, renamingIdentifier name, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 700 , attributeValueClassName NSString, defaultValue New Item\&amp;quot;;\n    photoData = \&amp;quot;(&amp;lt;NSAttributeDescription: 0x7f82d488fad0&amp;gt;), name photoData, isOptional 1, isTransient 0, entity Item, renamingIdentifier photoData, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 1000 , attributeValueClassName NSData, defaultValue (null)\&amp;quot;;\n    quantity = \&amp;quot;(&amp;lt;NSAttributeDescription: 0x7f82d488fc90&amp;gt;), name quantity, isOptional 1, isTransient 0, entity Item, renamingIdentifier quantity, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 600 , attributeValueClassName NSNumber, defaultValue 1\&amp;quot;;\n}, subentities {\n}, userInfo {\n}, versionHashModifier (null), uniquenessConstraints (\n)&amp;quot;;**
+**}, fetch request templates {**
+**    Test = &amp;quot;&amp;lt;NSFetchRequest: 0x7f82d488fa60&amp;gt; (entity: Item; predicate: (name CONTAINS \&amp;quot;e\&amp;quot;); sortDescriptors: ((null)); type: NSManagedObjectResultType; )&amp;quot;;**
+**}, reason=Can&amp;#39;t find mapping model for migration}**
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;直接看最后一行错误的原因Can&amp;#39;t find mapping model for migration，这直接说出了错误的原因，那么接下来我们就创建一个Mapping Model文件。&lt;/p&gt;
+
+&lt;p&gt;在你xcdatamodeld相同的文件夹目录下，“New File” -&amp;gt;&amp;quot;Core Data&amp;quot;-&amp;gt;&amp;quot;Mapping Model&amp;quot;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-cafd6005b2d41601.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;选择需要Mapping的源数据库
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-039eeb0ebb70af99.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;再选择目标数据库&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-bf99eb848bf7397f.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;
+接着命名一下Mapping Model文件的名字&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-302f517320b14f37.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;
+这里说明一下，名字最好能一眼看上去就能区分出是哪个数据库的版本升级上来的，这里我写的就是ModelV4ToV5，这样一看就知道是V4到V5的升级。&lt;/p&gt;
+
+&lt;p&gt;这里说明一下Mapping文件的重要性，首先，每个版本的数据库之间都最好能加上一个Mapping文件，这样从低版本的数据库升级上来，可以保证每个版本都不会出错，都不会导致用户升级之后就出现闪退的问题。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-5f8fc071ece9ce46.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;比如上图，每个数据库之间都会对应一个Mapping文件，V0ToV1,V1ToV2,V2ToV3,V3ToV4,V4ToV5,每个Mapping都必须要。   &lt;/p&gt;
+
+&lt;p&gt;试想，如果用户实在V3的老版本上，由于appstore的更新规则，每次更新都直接更新到最新，那么用户更新之后就会直接到V5，如果缺少了中间的V3ToV4,V4ToV5，中的任意一个，那么V3的用户都无法升级到V5上来，都会闪退。所以这里就看出了每个版本之间都要加上Mapping文件的重要性了。这样任意低版本的用户，任何时刻都可以通过Mapping文件，随意升级到最新版，而且不会闪退了！  &lt;/p&gt;
+
+&lt;p&gt;接下来再说说Mapping文件打开是些什么东西。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-1a6b8a6d7c7aacff.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;Mapping文件打开对应的就是Source源实体属性，迁移到Target目标实体属性的映射，上面是属性，下面是关系的映射。$source就是代表的源实体&lt;/p&gt;
+
+&lt;p&gt;写到这里，就可以很清楚的区分一下到目前为止，Core Data轻量级迁移和手动创建Mapping进行迁移，这2种方法的异同点了。我简单总结一下：
+1.Core Data轻量级迁移是适用于添加新表，添加新的实体，添加新的实体属性，等简单的，系统能自己推断出来的迁移方式。
+2.手动创建Mapping适用于更加复杂的数据迁移&lt;/p&gt;
+
+&lt;p&gt;举个例子吧，假设我最初有一张很抽象的表，叫Object表，用来存储东西的一些属性，里面假设有name，width，height。突然我有一天有新需求了，需要在Object表里面新增几个字段，比如说colour，weight等，由于这个都是简单的新增，不涉及到数据的转移，这时候用轻量级迁移就可以了。    &lt;/p&gt;
+
+&lt;p&gt;不过突然有一个程序又有新需求了，需要增加2张表，一个是Human表，一个是Animal表，需要把当初抽象定义的Object表更加具体化。这时就需要把Object里面的人都抽出来，放到新建的Human表里，动物也都抽出来放到新建的Animal表里。由于新建的2张表都会有name属性，如果这个时候进行轻量级的迁移，系统可能推断不出到底哪些name要到Human表里，哪里要Animal表了。再者，还有一些属性在Human表里面有，在Animal表里面没有。这是时候就必须手动添加一个Mapping Model文件了，手动指定哪些属性是源实体的属性，应该映射到目标实体的哪个属性上面去。这种更加精细的迁移方式，就只能用手动添加Mapping Model来完成了，毕竟iOS系统不知道你的需求和想法。  &lt;/p&gt;
+
+&lt;h4&gt;三.通过代码实现数据迁移&lt;/h4&gt;
+
+&lt;p&gt;这个通过代码进行迁移主要是在数据迁移过程中，如果你还想做一些什么其他事情，比如说你想清理一下垃圾数据，实时展示数据迁移的进度，等等，那就需要在这里来实现了。  &lt;/p&gt;
+
+&lt;p&gt;首先，我们需要检查一下该存储区存不存在，再把存储区里面的model metadata进行比较，检查一下是否兼容，如果不能兼容，那么就需要我们进行数据迁移了。&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;- (BOOL)isMigrationNecessaryForStore:(NSURL*)storeUrl
+{
+    NSLog(@&amp;quot;Running %@ &amp;#39;%@&amp;#39;&amp;quot;, self.class, NSStringFromSelector(_cmd));
+    
+    if (![[NSFileManager defaultManager] fileExistsAtPath:[self storeURL].path])
+    {
+        NSLog(@&amp;quot;SKIPPED MIGRATION: Source database missing.&amp;quot;);
+        return NO;
+    }
+    
+    NSError *error = nil;
+    NSDictionary *sourceMetadata =
+    [NSPersistentStoreCoordinator metadataForPersistentStoreOfType:NSSQLiteStoreType
+                                                               URL:storeUrl error:&amp;amp;error];
+    NSManagedObjectModel *destinationModel = _coordinator.managedObjectModel;
+    
+    if ([destinationModel isConfiguration:nil compatibleWithStoreMetadata:sourceMetadata])
+    {
+        NSLog(@&amp;quot;SKIPPED MIGRATION: Source is already compatible&amp;quot;);
+        return NO;
+    }
+    
+    return YES;
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;当上面函数返回YES，我们就需要合并了，那接下来就是下面的函数了&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;- (BOOL)migrateStore:(NSURL*)sourceStore {
+    
+    NSLog(@&amp;quot;Running %@ &amp;#39;%@&amp;#39;&amp;quot;, self.class, NSStringFromSelector(_cmd));
+    BOOL success = NO;
+    NSError *error = nil;
+    
+    // STEP 1 - 收集 Source源实体, Destination目标实体 和 Mapping Model文件
+    NSDictionary *sourceMetadata = [NSPersistentStoreCoordinator
+                                    metadataForPersistentStoreOfType:NSSQLiteStoreType
+                                    URL:sourceStore
+                                    error:&amp;amp;error];
+    
+    NSManagedObjectModel *sourceModel =
+    [NSManagedObjectModel mergedModelFromBundles:nil
+                                forStoreMetadata:sourceMetadata];
+    
+    NSManagedObjectModel *destinModel = _model;
+    
+    NSMappingModel *mappingModel =
+    [NSMappingModel mappingModelFromBundles:nil
+                             forSourceModel:sourceModel
+                           destinationModel:destinModel];
+    
+    // STEP 2 - 开始执行 migration合并, 前提是 mapping model 不是空，或者存在
+    if (mappingModel) {
+        NSError *error = nil;
+        NSMigrationManager *migrationManager =
+        [[NSMigrationManager alloc] initWithSourceModel:sourceModel
+                                       destinationModel:destinModel];
+        [migrationManager addObserver:self
+                           forKeyPath:@&amp;quot;migrationProgress&amp;quot;
+                              options:NSKeyValueObservingOptionNew
+                              context:NULL];
+        
+        NSURL *destinStore =
+        [[self applicationStoresDirectory]
+         URLByAppendingPathComponent:@&amp;quot;Temp.sqlite&amp;quot;];
+        
+        success =
+        [migrationManager migrateStoreFromURL:sourceStore
+                                         type:NSSQLiteStoreType options:nil
+                             withMappingModel:mappingModel
+                             toDestinationURL:destinStore
+                              destinationType:NSSQLiteStoreType
+                           destinationOptions:nil
+                                        error:&amp;amp;error];
+        if (success)
+        {
+            // STEP 3 - 用新的migrated store替换老的store
+            if ([self replaceStore:sourceStore withStore:destinStore])
+            {
+                NSLog(@&amp;quot;SUCCESSFULLY MIGRATED %@ to the Current Model&amp;quot;,
+                          sourceStore.path);
+                [migrationManager removeObserver:self
+                                      forKeyPath:@&amp;quot;migrationProgress&amp;quot;];
+            }
+        }
+        else
+        {
+            NSLog(@&amp;quot;FAILED MIGRATION: %@&amp;quot;,error);
+        }
+    }
+    else
+    {
+        NSLog(@&amp;quot;FAILED MIGRATION: Mapping Model is null&amp;quot;);
+    }
+    
+    return YES; // migration已经完成
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;上面的函数中，如果迁移进度有变化，会通过观察者，observeValueForKeyPath来告诉用户进度，这里可以监听该进度，如果没有完成，可以来禁止用户执行某些操作&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+- (void)observeValueForKeyPath:(NSString *)keyPath
+                      ofObject:(id)object
+                        change:(NSDictionary *)change
+                       context:(void *)context {
+    
+    if ([keyPath isEqualToString:@&amp;quot;migrationProgress&amp;quot;]) {
+        
+        dispatch_async(dispatch_get_main_queue(), ^{
+            
+            float progress =
+            [[change objectForKey:NSKeyValueChangeNewKey] floatValue];
+          
+            int percentage = progress * 100;
+            NSString *string =
+            [NSString stringWithFormat:@&amp;quot;Migration Progress: %i%%&amp;quot;,
+             percentage];
+            NSLog(@&amp;quot;%@&amp;quot;,string);
+
+        });
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;当然，这个合并数据迁移的操作肯定是用一个多线程异步的执行，免得造成用户界面卡顿，再加入下面的方法，我们来异步执行&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+- (void)performBackgroundManagedMigrationForStore:(NSURL*)storeURL
+{
+    NSLog(@&amp;quot;Running %@ &amp;#39;%@&amp;#39;&amp;quot;, self.class, NSStringFromSelector(_cmd));
+    
+    dispatch_async(
+                   dispatch_get_global_queue( DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
+                       BOOL done = [self migrateStore:storeURL];
+                       if(done) {
+                           dispatch_async(dispatch_get_main_queue(), ^{
+                               NSError *error = nil;
+                               _store =
+                               [_coordinator addPersistentStoreWithType:NSSQLiteStoreType
+                                                          configuration:nil
+                                                                    URL:[self storeURL]
+                                                                options:nil
+                                                                  error:&amp;amp;error];
+                               if (!_store) {
+                                   NSLog(@&amp;quot;Failed to add a migrated store. Error: %@&amp;quot;,
+                                         error);abort();}
+                               else {
+                                   NSLog(@&amp;quot;Successfully added a migrated store: %@&amp;quot;,
+                                         _store);}
+                           });
+                       }
+                   });
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;到这里，数据迁移都完成了，不过目前还有一个问题就是，我们应该何时去执行该迁移的操作，更新完毕之后？appDelegate一进来？都不好，最好的方法还是在把当前存储区添加到coordinator之前，我们就执行好数据迁移！&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;- (void)loadStore
+{
+    NSLog(@&amp;quot;Running %@ &amp;#39;%@&amp;#39;&amp;quot;, self.class, NSStringFromSelector(_cmd));
+    
+    if (_store) {return;} // 不要再次加载了，因为已经加载过了
+    
+    BOOL useMigrationManager = NO;
+    if (useMigrationManager &amp;amp;&amp;amp;
+        [self isMigrationNecessaryForStore:[self storeURL]])
+    {
+        [self performBackgroundManagedMigrationForStore:[self storeURL]];
+    }
+    else
+    {
+        NSDictionary *options =
+        @{
+          NSMigratePersistentStoresAutomaticallyOption:@YES
+          ,NSInferMappingModelAutomaticallyOption:@YES
+          ,NSSQLitePragmasOption: @{@&amp;quot;journal_mode&amp;quot;: @&amp;quot;DELETE&amp;quot;}
+          };
+        NSError *error = nil;
+        _store = [_coordinator addPersistentStoreWithType:NSSQLiteStoreType
+                                            configuration:nil
+                                                      URL:[self storeURL]
+                                                  options:options
+                                                    error:&amp;amp;error];
+        if (!_store)
+        {
+            NSLog(@&amp;quot;Failed to add store. Error: %@&amp;quot;, error);abort();
+        }
+        else
+        {
+            NSLog(@&amp;quot;Successfully added store: %@&amp;quot;, _store);
+        }
+    }
+
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;这样就完成了数据迁移了，并且还能显示出迁移进度，在迁移中还可以自定义一些操作，比如说清理垃圾数据，删除一些不用的表，等等。&lt;/p&gt;
+
+&lt;h4&gt;结束&lt;/h4&gt;
+
+&lt;p&gt;好了，到此，Core Data数据迁移的几种方式我就和大家分享完了，如果文中有不对的地方，欢迎大家提出来，我们一起交流进步！&lt;/p&gt;
+</description>
+        <pubDate>Mon, 09 May 2016 00:35:00 +0800</pubDate>
+        <link>http://vno.onevcat.com/2016/05/iOS-Core-Data-%E6%95%B0%E6%8D%AE%E8%BF%81%E7%A7%BB-%E6%8C%87%E5%8D%97/</link>
+        <guid isPermaLink="true">http://vno.onevcat.com/2016/05/iOS-Core-Data-%E6%95%B0%E6%8D%AE%E8%BF%81%E7%A7%BB-%E6%8C%87%E5%8D%97/</guid>
+        
+        <category>iOS</category>
+        
+        
+        <category>iOS</category>
+        
+      </item>
+    
+      <item>
+        <title>永远到底有多远</title>
+        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-436c49257ef8552f.jpeg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;永远有多远？­&lt;/p&gt;
+
+&lt;p&gt;­&lt;/p&gt;
+
+&lt;p&gt;闭上眼睛回忆一下，­&lt;/p&gt;
+
+&lt;p&gt;可曾记得几年前，几十年前你所相信所喜欢的一切？­&lt;/p&gt;
+
+&lt;p&gt;­&lt;/p&gt;
+
+&lt;p&gt;那时曾经的你也许会觉得­&lt;/p&gt;
+
+&lt;p&gt;周杰伦的音乐是世界上最好的音乐­&lt;/p&gt;
+
+&lt;p&gt;《街霸》是世界上最好玩的游戏­&lt;/p&gt;
+
+&lt;p&gt;金庸的武侠是世界上最好看的小说­&lt;/p&gt;
+
+&lt;p&gt;只要自己努力，将来必定会大展宏图成就一番事业­&lt;/p&gt;
+
+&lt;p&gt;这些，都是我们曾坚信的永远。­&lt;/p&gt;
+
+&lt;p&gt;­     &lt;/p&gt;
+
+&lt;p&gt;我们都曾雄心勃勃，深信自己总有一天会改变这个世界­&lt;/p&gt;
+
+&lt;p&gt;但随着时光的流逝你却悲哀地发现­&lt;/p&gt;
+
+&lt;p&gt;到头来，却只是你我被世界改变­&lt;/p&gt;
+
+&lt;p&gt;永远，永远。­&lt;/p&gt;
+
+&lt;p&gt;我们经常会将这个词随口挂在嘴边，但谁知道­&lt;/p&gt;
+
+&lt;p&gt;永远有多远？­&lt;/p&gt;
+
+&lt;p&gt;你曾向往永远，张指丈量，也许就只是那么一点点­&lt;/p&gt;
+
+&lt;p&gt;一点，一点，一点···­&lt;/p&gt;
+
+&lt;p&gt;构成我们人生的，就是这密密麻麻连成一线­&lt;/p&gt;
+
+&lt;p&gt;名为“现在”的点。­&lt;/p&gt;
+
+&lt;p&gt;与其眺望远在天际的永远­&lt;/p&gt;
+
+&lt;p&gt;不如努力做好这一点一点­&lt;/p&gt;
+
+&lt;p&gt;­&lt;/p&gt;
+
+&lt;p&gt;只有现在，没有永远。&lt;/p&gt;
+</description>
+        <pubDate>Sun, 08 May 2016 20:19:00 +0800</pubDate>
+        <link>http://vno.onevcat.com/2016/05/%E6%B0%B8%E8%BF%9C%E5%88%B0%E5%BA%95%E6%9C%89%E5%A4%9A%E8%BF%9C/</link>
+        <guid isPermaLink="true">http://vno.onevcat.com/2016/05/%E6%B0%B8%E8%BF%9C%E5%88%B0%E5%BA%95%E6%9C%89%E5%A4%9A%E8%BF%9C/</guid>
+        
+        <category>随笔</category>
+        
+        
+        <category>随笔</category>
+        
+      </item>
+    
+      <item>
+        <title>Remote debugging on iOS with Safari Web Inspector</title>
+        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-421c26dcd9c36f3b.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;之前在公司调试Hybrid其实很蛋疼。。都是本地打开zip包，运行js，然后调试，每次都要找到zip，比较麻烦，后来发现了这个远程调试的方法，直接插上手机就可以调试了，不用那么麻烦了，而且可以直接在手机上看到实时的效果。&lt;/p&gt;
+
+&lt;p&gt;后来发现有一些Js前端开发还不会这个方法，今天就分享出来，大家都看看，有啥问题请多指点。&lt;/p&gt;
+
+&lt;p&gt;1.首先iPhone连接上Mac，点击信任，确保itunes连接成功，然后打开iPhone的“设置” - “Safari” - &amp;quot;高级&amp;quot; -  打开“JavaScript” 和 “Web检查器”&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-9ec6c25df1dedaa5.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-a1f93269e8cc2fa7.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;2.打开Mac上的Safari，选择“偏好设置” - “高级” - &amp;quot;在菜单栏中显示“开发”菜单&amp;quot;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-cab218d03bdafb3d.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;3.打开iPhone上的Safari或者运行PhoneGap程序，到某一个界面，回到Mac上的Safari上，选择“开发”，然后选择你的iPhone，就可以查看到那个一个Web界面了&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-92c19e242295d732.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+</description>
+        <pubDate>Tue, 03 May 2016 14:38:00 +0800</pubDate>
+        <link>http://vno.onevcat.com/2016/05/Remote-debugging-on-iOS-with-Safari-Web-Inspector/</link>
+        <guid isPermaLink="true">http://vno.onevcat.com/2016/05/Remote-debugging-on-iOS-with-Safari-Web-Inspector/</guid>
+        
+        <category>iOS</category>
+        
+        
+        <category>iOS</category>
+        
+      </item>
+    
+      <item>
+        <title>iOS Hybrid 框架 ——PhoneGap</title>
+        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-65440c02af82bd8d.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;h4&gt;前言&lt;/h4&gt;
+
+&lt;p&gt;Hybrid App（混合模式移动应用）是指介于web-app、native-app这两者之间的app，兼具“Native App良好用户交互体验的优势”和“Web App跨平台开发的优势”。&lt;/p&gt;
+
+&lt;p&gt;Hybrid App按网页语言与程序语言的混合，通常分为三种类型：多View混合型，单View混合型，Web主体型，3种类型比较如下：&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-101b71b37fb36dad.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;今天我来谈谈Web主体型中Hybrid框架里面比较有名的PhoneGap&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-8578bb25ee8b09b3.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;h4&gt;一.Cordova&lt;/h4&gt;
+
+&lt;p&gt;说到PhoneGap，就不得不说到Cordova&lt;/p&gt;
+
+&lt;p&gt;Cordova 是一个可以让 JS 与原生代码(包括 Android 的 java，iOS 的 Objective-C 等)互相通信的一个库，并且提供了一系列的插件类，比如 JS 直接操作本地数据库的插件类。&lt;/p&gt;
+
+&lt;p&gt;Cordova的设计概念，是在APP上透过Web控件来呈现Web页面，让Web开发人员可以操作熟悉的语言、工具来开发APP.  &lt;/p&gt;
+
+&lt;p&gt;为了让Web页面能够满足更多的APP功能需求，Cordova提供了Plugin机制，让Web页面能够挂载并调用Native开发技术所开发的功能模块&lt;/p&gt;
+
+&lt;p&gt;Cordova在系统中的层级应该是这样子的:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-22b52111118a47b6.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;h4&gt;二.Js 与 Objective-C 通信&lt;/h4&gt;
+
+&lt;p&gt;Js 使用了两种方式来与 Objective-C 通信，一种是使用 XMLHttpRequest 发起请求的方式，另一种则是通过设置透明的 iframe 的 src 属性。&lt;/p&gt;
+
+&lt;p&gt;我接下来说的主要是第二种方式，iframe bridge。
+通过在 Js 端创建一个透明的 iframe，设置这个 ifame 的 src 为自定义的协议，而 ifame 的 src 更改时，UIWebView 会先回调其 delegate 的 webView:shouldStartLoadWithRequest:navigationType: 方法&lt;/p&gt;
+
+&lt;p&gt;说的还是很抽象的，来实际看一段代码&lt;/p&gt;
+
+&lt;p&gt;在cordova.js 里面，是这样子实现的&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;function iOSExec() {
+    ...
+    if (!isInContextOfEvalJs &amp;amp;&amp;amp; commandQueue.length == 1)  {
+        // 如果支持 XMLHttpRequest，则使用 XMLHttpRequest 方式
+        if (bridgeMode != jsToNativeModes.IFRAME_NAV) {
+            // This prevents sending an XHR when there is already one being sent.
+            // This should happen only in rare circumstances (refer to unit tests).
+            if (execXhr &amp;amp;&amp;amp; execXhr.readyState != 4) {
+                execXhr = null;
+            }
+            // Re-using the XHR improves exec() performance by about 10%.
+            execXhr = execXhr || new XMLHttpRequest();
+            // Changing this to a GET will make the XHR reach the URIProtocol on 4.2.
+            // For some reason it still doesn&amp;#39;t work though...
+            // Add a timestamp to the query param to prevent caching.
+            execXhr.open(&amp;#39;HEAD&amp;#39;, &amp;quot;/!gap_exec?&amp;quot; + (+new Date()), true);
+            if (!vcHeaderValue) {
+                vcHeaderValue = /.*\((.*)\)/.exec(navigator.userAgent)[1];
+            }
+            execXhr.setRequestHeader(&amp;#39;vc&amp;#39;, vcHeaderValue);
+            execXhr.setRequestHeader(&amp;#39;rc&amp;#39;, ++requestCount);
+            if (shouldBundleCommandJson()) {
+                // 设置请求的数据
+                execXhr.setRequestHeader(&amp;#39;cmds&amp;#39;, iOSExec.nativeFetchMessages());
+            }
+            // 发起请求
+            execXhr.send(null);
+        } else {
+            // 如果不支持 XMLHttpRequest，则使用透明 iframe 的方式，设置 iframe 的 src 属性
+            execIframe = execIframe || createExecIframe();
+            execIframe.src = &amp;quot;gap://ready&amp;quot;;
+        }
+    }
+    ...
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;iOS这边对应的要在WebView里面写响应的方法&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+// UIWebView 加载 URL 前回调的方法，返回 YES，则开始加载此 URL，返回 NO，则忽略此 URL
+- (BOOL)webView:(UIWebView*)theWebView
+              shouldStartLoadWithRequest:(NSURLRequest*)request
+              navigationType:(UIWebViewNavigationType)navigationType
+{
+    NSURL* url = [request URL];
+    
+    /*
+     * Execute any commands queued with cordova.exec() on the JS side.
+     * The part of the URL after gap:// is irrelevant.
+     */
+    // 判断是否 Cordova 的请求，对于 JS 代码中 execIframe.src = &amp;quot;gap://ready&amp;quot; 这句
+    if ([[url scheme] isEqualToString:@&amp;quot;gap&amp;quot;]) {
+        // 获取请求的数据，并对数据进行分析、处理
+        [_commandQueue fetchCommandsFromJs];
+        return NO;
+    }
+    ...
+}
+
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;这样就完成了Js和OC的通信了&lt;/p&gt;
+
+&lt;h4&gt;三.Objective-C 与 Js 通信&lt;/h4&gt;
+
+&lt;p&gt;首先OC获取Js的请求数据&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;- (void)fetchCommandsFromJs
+{
+    // Grab all the queued commands from the JS side.
+    NSString* queuedCommandsJSON = [_viewController.webView
+                                    stringByEvaluatingJavaScriptFromString:
+                                    @&amp;quot;cordova.require(&amp;#39;cordova/exec&amp;#39;).nativeFetchMessages()&amp;quot;];
+    
+    [self enqueCommandBatch:queuedCommandsJSON];
+    if ([queuedCommandsJSON length] &amp;gt; 0) {
+        CDV_EXEC_LOG(@&amp;quot;Exec: Retrieved new exec messages by request.&amp;quot;);
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;然后OC处理Js传过来的请求&lt;/p&gt;
+
+&lt;p&gt;OC再把处理结果返回Js&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;NSString *ret = [((HFNativeFunction*)strongSelf.actionDict[funcName]) doCall:argArr];
+        NSString *js = [NSString stringWithFormat:@&amp;quot;if(typeof %@ == &amp;#39;string&amp;#39;) { paf.nativeInvocationObject=%@;} else {   paf.nativeInvocationObject=JSON.stringify(%@);} &amp;quot;, ret, ret, ret];
+        DLog(@&amp;quot;\n\njs call fun=%@ ret=%@\n\n&amp;quot;, funcName, ret);
+        [self.webView stringByEvaluatingJavaScriptFromString: js];
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;h4&gt;四.Cordova - Js工作原理&lt;/h4&gt;
+
+&lt;p&gt;Cordova JS 端请求方法的格式：  &lt;/p&gt;
+
+&lt;p&gt;// successCallback : 成功回调方法&lt;br&gt;
+// failCallback    : 失败回调方法&lt;br&gt;
+// server          : 所要请求的服务名字&lt;br&gt;
+// action          : 所要请求的服务具体操作&lt;br&gt;
+// actionArgs      : 请求操作所带的参数  &lt;/p&gt;
+
+&lt;p&gt;cordova.exec(successCallback, failCallback, service, action, actionArgs);&lt;/p&gt;
+
+&lt;p&gt;传进来的这五个参数并不是直接传送给原生代码的，Cordova JS 端会做以下的处理：&lt;/p&gt;
+
+&lt;p&gt;1.会为每个请求生成一个叫 callbackId 的唯一标识：这个参数需传给 Objective-C 端，Objective-C 处理完后，会把 callbackId 连同处理结果一起返回给 JS 端。 &lt;/p&gt;
+
+&lt;p&gt;2.以 callbackId 为 key，{success:successCallback, fail:failCallback} 为 value，把这个键值对保存在 JS 端的字典里，successCallback 与 failCallback 这两个参数不需要传给 Objective-C 端，Objective-C 返回结果时带上 callbackId，JS 端就可以根据 callbackId 找到回调方法。&lt;/p&gt;
+
+&lt;p&gt;3.每次 JS 请求，最后发到 Objective-C 的数据包括：callbackId, service, action, actionArgs。&lt;/p&gt;
+
+&lt;p&gt;Js处理请求&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;function iOSExec() {
+    ...
+    // 生成一个 callbackId 的唯一标识，并把此标志与成功、失败回调方法一起保存在 JS 端
+    // Register the callbacks and add the callbackId to the positional
+    // arguments if given.
+    if (successCallback || failCallback) {
+        callbackId = service + cordova.callbackId++;
+        cordova.callbacks[callbackId] =
+        {success:successCallback, fail:failCallback};
+    }
+    
+    actionArgs = massageArgsJsToNative(actionArgs);
+    
+    // 把 callbackId，service，action，actionArgs 保持到 commandQueue 中
+    // 这四个参数就是最后发给原生代码的数据
+    var command = [callbackId, service, action, actionArgs];
+    commandQueue.push(JSON.stringify(command));
+    ...
+}
+
+// 获取请求的数据，包括 callbackId, service, action, actionArgs
+iOSExec.nativeFetchMessages = function() {
+    // Each entry in commandQueue is a JSON string already.
+    if (!commandQueue.length) {
+        return &amp;#39;&amp;#39;;
+    }
+    var json = &amp;#39;[&amp;#39; + commandQueue.join(&amp;#39;,&amp;#39;) + &amp;#39;]&amp;#39;;
+    commandQueue.length = 0;
+    return json;
+};
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;h4&gt;五.Cordova - OC工作原理&lt;/h4&gt;
+
+&lt;p&gt;Native OC拿到 callbackId、service、action 及 actionArgs 后，会做以下的处理：&lt;/p&gt;
+
+&lt;p&gt;1.根据 service 参数找到对应的插件类&lt;/p&gt;
+
+&lt;p&gt;2.根据 action 参数找到插件类中对应的处理方法，并把 actionArgs 作为处理方法请求参数的一部分传给处理方法&lt;/p&gt;
+
+&lt;p&gt;3.处理完成后，把处理结果及 callbackId 返回给 JS 端，JS 端收到后会根据 callbackId 找到回调方法，并把处理结果传给回调方法&lt;/p&gt;
+
+&lt;p&gt;Objective-C 返回结果给 JS 端&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;
+- (void)sendPluginResult:(CDVPluginResult*)result callbackId:(NSString*)callbackId
+{
+    CDV_EXEC_LOG(@&amp;quot;Exec(%@): Sending result. Status=%@&amp;quot;, callbackId, result.status);
+    // This occurs when there is are no win/fail callbacks for the call.
+    if ([@&amp;quot;INVALID&amp;quot; isEqualToString : callbackId]) {
+        return;
+    }
+    int status = [result.status intValue];
+    BOOL keepCallback = [result.keepCallback boolValue];
+    NSString* argumentsAsJSON = [result argumentsAsJSON];
+    
+    // 将请求的处理结果及 callbackId 通过调用 JS 方法返回给 JS 端
+    NSString* js = [NSString stringWithFormat:
+                    @&amp;quot;cordova.require(&amp;#39;cordova/exec&amp;#39;).nativeCallback(&amp;#39;%@&amp;#39;,%d,%@,%d)&amp;quot;,
+                    callbackId, status, argumentsAsJSON, keepCallback];
+    
+    [self evalJsHelper:js];
+}
+
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;举个具体的例子：&lt;/p&gt;
+
+&lt;p&gt;1.将收到的json转换成Command&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;// Execute the commands one-at-a-time.
+     NSArray* jsonEntry = [commandBatch dequeue];
+     if ([commandBatch count] == 0) {
+                  [_queue removeObjectAtIndex:0];
+      }
+     HFCDVInvokedUrlCommand* command = [HFCDVInvokedUrlCommand commandFromJson:jsonEntry];
+     HF_CDV_EXEC_LOG(@&amp;quot;Exec(%@): Calling %@.%@&amp;quot;, command.callbackId, command.className, command.methodName);
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;2.OC 执行&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;- (BOOL)execute:(HFCDVInvokedUrlCommand*)command
+{
+    if ((command.className == nil) || (command.methodName == nil)) {
+        DLog(@&amp;quot;ERROR: Classname and/or methodName not found for command.&amp;quot;);
+        return NO;
+    }
+    
+    if ([command.className isEqualToString:@&amp;quot;DeviceReadyDummyClass&amp;quot;] &amp;amp;&amp;amp;
+        [command.methodName isEqualToString:@&amp;quot;deviceReady&amp;quot;]) {
+        [[NSNotificationCenter defaultCenter]postNotificationName:k_NOTIF_DEVICE_READY object:_viewController];
+        return YES;
+    }
+
+    // Fetch an instance of this class
+    HFCDVPlugin* obj = [_viewController.commandDelegate getCommandInstance:command.className];
+
+    if (!([obj isKindOfClass:[HFCDVPlugin class]])) {
+        DLog(@&amp;quot;ERROR: Plugin &amp;#39;%@&amp;#39; not found, or is not a HFCDVPlugin. Check your plugin mapping in config.xml.&amp;quot;, command.className);
+        return NO;
+    }
+    BOOL retVal = YES;
+    double started = [[NSDate date] timeIntervalSince1970] * 1000.0;
+    // Find the proper selector to call.
+    NSString* methodName = [NSString stringWithFormat:@&amp;quot;%@:&amp;quot;, command.methodName];
+    SEL normalSelector = NSSelectorFromString(methodName);
+    if ([obj respondsToSelector:normalSelector]) {
+        // [obj performSelector:normalSelector withObject:command];
+        ((void (*)(id, SEL, id))objc_msgSend)(obj, normalSelector, command);
+    } else {
+        // There&amp;#39;s no method to call, so throw an error.
+        DLog(@&amp;quot;ERROR: Method &amp;#39;%@&amp;#39; not defined in Plugin &amp;#39;%@&amp;#39;&amp;quot;, methodName, command.className);
+        retVal = NO;
+    }
+    double elapsed = [[NSDate date] timeIntervalSince1970] * 1000.0 - started;
+    if (elapsed &amp;gt; 10) {
+        DLog(@&amp;quot;THREAD WARNING: [&amp;#39;%@&amp;#39;] took &amp;#39;%f&amp;#39; ms. Plugin should use a background thread.&amp;quot;, command.className, elapsed);
+    }
+    return retVal;
+}
+
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;h4&gt;六.回调方法&lt;/h4&gt;
+
+&lt;p&gt;Js端拿到数据根据 callbackId 回调&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;// 根据 callbackId 及是否成功标识，找到回调方法，并把处理结果传给回调方法
+callbackFromNative: function(callbackId, success, status, args, keepCallback) {
+    var callback = cordova.callbacks[callbackId];
+    if (callback) {
+        if (success &amp;amp;&amp;amp; status == cordova.callbackStatus.OK) {
+            callback.success &amp;amp;&amp;amp; callback.success.apply(null, args);
+        } else if (!success) {
+            callback.fail &amp;amp;&amp;amp; callback.fail.apply(null, args);
+        }
+        
+        // Clear callback if not expecting any more results
+        if (!keepCallback) {
+            delete cordova.callbacks[callbackId];
+        }
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;</description>
+        <pubDate>Mon, 02 May 2016 13:56:00 +0800</pubDate>
+        <link>http://vno.onevcat.com/2016/05/iOS-Hybrid-%E6%A1%86%E6%9E%B6-PhoneGap/</link>
+        <guid isPermaLink="true">http://vno.onevcat.com/2016/05/iOS-Hybrid-%E6%A1%86%E6%9E%B6-PhoneGap/</guid>
+        
+        <category>iOS</category>
+        
+        
+        <category>iOS</category>
+        
+      </item>
+    
+      <item>
+        <title>2016年3月iOS面试总结</title>
+        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-ee50133a21e35335.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;p&gt;今年3月中下旬因为个人原因，换了一份工作，期间面试了有4，5家，基本都是D轮或者上市公司，也从他们的面试笔试中看到了自己的一些不足，于是就想写出来和大家分享一下，如果能帮到正在面试的同学更好。从面试题中，其实可以看到一些行业的发展，以及总体人才需求是怎样的了。&lt;/p&gt;
+
+&lt;h4&gt;一.笔试题&lt;/h4&gt;
+
+&lt;p&gt;笔试基本都有一两道基础题，比如说UITableView的重用机制，ARC的基本原理，如何避免retain cycle，谈谈对MVC的理解，iOS内存管理机制。这些大家应该都很清楚了。笔试的内容有几种有选择题，问答题，难一点的就是多选题了。我面试了一家就是给了10道多选题，多选，少选，错选都不行，当时做完以后就感觉不是很好，有些题目题干就是一下哪些是对的，然后ABCD依次给4个不同的概念，这种一道题相当于考了4个点。总之遇到这种“恶心”的多选题也不要太慌，静下心来一一甄别应该能拿到不错的成绩。&lt;/p&gt;
+
+&lt;p&gt;接下来我说几个我当时答的不怎么好的题目，我当时记了一下，和大家分享一下。&lt;/p&gt;
+
+&lt;h5&gt;1.进程和线程的区别和联系&lt;/h5&gt;
+
+&lt;p&gt;这个其实是操作系统的问题，当时一下子把我问的懵了，后来仔细回想了一下，加上自己的理解就答了，下面说说稍微完整的答案，大家可以准备准备，再问这种问题就可以完美作答了。&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;进程是具有一定独立功能的程序关于某个数据集合上的一次运行活动,进程是系统进行资源分配和调度的一个独立单位. 线程是进程的一个实体,是CPU调度和分派的基本单位,它是比进程更小的能独立运行的基本单位.线程自己基本上不拥有系统资源,只拥有一点在运行中必不可少的资源(如程序计数器,一组寄存器和栈),但是它可与同属一个进程的其他的线程共享进程所拥有的全部资源. &lt;/p&gt;
+
+&lt;p&gt;一个线程可以创建和撤销另一个线程;同一个进程中的多个线程之间可以并发执行.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;h5&gt;2.并行和并发的区别&lt;/h5&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;并行是指两个或者多个事件在同一时刻发生；
+并发是指两个或多个事件在同一时间间隔内发生。&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;h5&gt;3.谈谈你对Block和delegate的理解&lt;/h5&gt;
+
+&lt;p&gt;我当时是这么答的，delegate的回调更多的面向过程，而block则是面向结果的。如果你需要得到一条多步进程的通知，你应该使用delegation。而当你只是希望得到你请求的信息（或者获取信息时的错误提示），你应该使用block。（如果你结合之前的3个结论，你会发现delegate可以在所有事件中维持state，而多个独立的block却不能）&lt;/p&gt;
+
+&lt;h5&gt;4.谈谈&lt;strong&gt;instancetype和id的异同&lt;/strong&gt;&lt;/h5&gt;
+
+&lt;p&gt;1、相同点
+都可以作为方法的返回类型&lt;/p&gt;
+
+&lt;p&gt;2、不同点
+①instancetype可以返回和方法所在类相同类型的对象，id只能返回未知类型的对象；②instancetype只能作为返回值，不能像id那样作为参数&lt;/p&gt;
+
+&lt;h5&gt;5.category中能不能使用声明属性？为什么？如果能，怎么实现？&lt;/h5&gt;
+
+&lt;p&gt;这种问题一问，我当时就感觉肯定能实现的，但是实在不知道怎么做，后来回来查了一下，才知道是用到了Runtime的知识了。贴一下答案&lt;/p&gt;
+
+&lt;p&gt;给分类（Category）添加属性
+利用Runtime实现getter/setter 方法&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;@interface ClassName (CategoryName)
+@property (nonatomic, strong) NSString *str;
+@end
+
+//实现文件
+#import &amp;quot;ClassName + CategoryName.h&amp;quot;
+#import &amp;lt;objc/runtime.h&amp;gt;
+
+static void *strKey = &amp;amp;strKey;
+@implementation ClassName (CategoryName)
+
+-(void)setStr:(NSString *)str
+{
+    objc_setAssociatedObject(self, &amp;amp; strKey, str, OBJC_ASSOCIATION_COPY);
+}
+
+-(NSString *)str
+{
+    return objc_getAssociatedObject(self, &amp;amp;strKey);
+}
+
+@end
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;h5&gt;6.isKindOfClass和isMemberOfClass的区别&lt;/h5&gt;
+
+&lt;p&gt;这个题目简单，但是就是当时紧张的情况下，别答反了。&lt;/p&gt;
+
+&lt;p&gt;isKindOfClass来确定一个对象是否是一个类的成员，或者是派生自该类的成员
+isMemberOfClass只能确定一个对象是否是当前类的成员&lt;/p&gt;
+
+&lt;h5&gt;7.block里面的如何防止retain cycle&lt;/h5&gt;
+
+&lt;p&gt;使用弱引用打断block里面的retain cycle
+MRC中__ &lt;em&gt;block _&lt;/em&gt;是不会引起retain；但在ARC中__ &lt;em&gt;block _&lt;/em&gt;则会引起retain。ARC中应该使用__ &lt;em&gt;weak _&lt;/em&gt;或__unsafe_unretained弱引用&lt;/p&gt;
+
+&lt;h5&gt;8.iOS多线程有哪几种实现方法？GCD中有哪些队列？分别是并行还是串行？&lt;/h5&gt;
+
+&lt;p&gt;iOS中多线程编程工具主要3有：
+1.NSThread
+2.NSOperation
+3.GCD&lt;/p&gt;
+
+&lt;p&gt;dispatch queue分为下面3种：而系统默认就有一串行队列main_queue和并行队列global_queue：&lt;/p&gt;
+
+&lt;p&gt;GCD中有三种队列类型：
+&lt;strong&gt;The main queue:&lt;/strong&gt; 与主线程功能相同。实际上，提交至main queue的任务会在主线程中执行。main queue可以调用dispatch_get_main_queue()来获得。因为main queue是与主线程相关的，所以这是一个串行队列。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Global queues:&lt;/strong&gt; 全局队列是并发队列，并由整个进程共享。进程中存在三个全局队列：高、中（默认）、低三个优先级队列。可以调用dispatch_get_global_queue函数传入优先级来访问队列。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;用户队列:&lt;/strong&gt; 用户队列 (GCD并不这样称呼这种队列, 但是没有一个特定的名字来形容这种队列，所以我们称其为用户队列) 是用函数 dispatch_queue_create
+ 创建的队列. 这些队列是串行的。正因为如此，它们可以用来完成同步机制, 有点像传统线程中的mutex。&lt;/p&gt;
+
+&lt;h5&gt;9.谈谈load和initialize的区别&lt;/h5&gt;
+
+&lt;p&gt;这个题目当时问出来，真的是一下子就傻了，平时虽然用的多，但是真的没有注意比较过他们俩，看来平时学习还是多要问问所以然！&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-6eb65787e732b3f6.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;h5&gt;10.Core Data是数据库么？有哪些重要的类？&lt;/h5&gt;
+
+&lt;p&gt;我当时一看问到是不是的问题，我就留神，感觉应该不是常理的，当时仔细想了想，Core Data确实不是一个数据库，只是把表和OC对象进行的映射，当时并不是进进映射那么简单，底层还是用的Sqlite3进行存储的，所以Core Data不是数据库。&lt;/p&gt;
+
+&lt;p&gt;有以下6个重要的类：
+(1)NSManagedObjectContext（被管理的数据上下文）
+操作实际内容（操作持久层）
+作用：插入数据，查询数据，删除数据
+(2)NSManagedObjectModel（被管理的数据模型）
+数据库所有表格或数据结构，包含各实体的定义信息
+作用：添加实体的属性，建立属性之间的关系
+操作方法：视图编辑器，或代码
+(3)NSPersistentStoreCoordinator（持久化存储助理）
+相当于数据库的连接器
+作用：设置数据存储的名字，位置，存储方式，和存储时机
+(4)NSManagedObject（被管理的数据记录）
+相当于数据库中的表格记录
+(5)NSFetchRequest（获取数据的请求）
+相当于查询语句
+(6)NSEntityDescription（实体结构）
+相当于表格结构&lt;/p&gt;
+
+&lt;p&gt;以上是我3月份面试遇到的问到的我一下子没有答全或者没答好的问题，大神全部都会的话请忽略哈。然后还有2个开放性的问题，那基本就是完全考验实力和自己理解的深度了。一个是谈谈你对Runtime的理解，另一个是谈谈你对Runloop的理解，由于我个人这两个理解都不是很深，这里就不贴我的理解了。大家如果也感觉欠缺的，就赶紧去网上多看看吧！&lt;/p&gt;
+
+&lt;h4&gt;二.机试&lt;/h4&gt;
+
+&lt;p&gt;这个环节基本都是大公司，或者是复试的时候会出现，因为上机打代码确实很很快区分出谁好谁坏，当然我也面了一家这样的公司，就给一张白纸，全程都是手写代码，这就完全是考验基本功了，因为没了代码补全，没有了编译器告诉你哪里错了，一切都要靠自己的基本功来了。&lt;/p&gt;
+
+&lt;p&gt;机试基本就是靠靠算法题了。当然也有算法题在笔试的最后几道题出现，那就看公司面试怎么安排的。&lt;/p&gt;
+
+&lt;p&gt;2年前我也是面试iOS，当时对算法和 数据结构要求很低的，很多面试基本都不问这些，今年面试多了这些问题，也让我眼前一亮，也感叹，2年技术发展之快，面试如今都会涉及到算法，不会算法和数据结构的程序员的道路会越走越窄。&lt;/p&gt;
+
+&lt;p&gt;算法题，我遇到的都不难，毕竟不是BAT那种公司，简单的就是直接要你写一个算法出来，稍微高级点的就是有一个背景，然后要你解决问题，其实就是和ACM题目一样的，不过就是没有那么复杂。我贴几段问的最多的算法，太难的题只能考自己的算法功底了。&lt;/p&gt;
+&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;二分查找 θ(logn)
+
+递归方法
+int binarySearch1(int a[] , int low , int high , int findNum)
+{    
+      int mid = ( low + high ) / 2;       
+      if (low &amp;gt; high)        
+            return -1;   
+     else   
+     {        
+              if (a[mid] &amp;gt; findNum)          
+                    return binarySearch1(a, low, mid - 1, findNum);        
+              else if (a[mid] &amp;lt; findNum)            
+                    return binarySearch1(a, mid + 1, high, findNum);                    
+              else            
+                    return mid;   
+    }
+}
+
+非递归方法
+int binarySearch2(int a[] , int low , int high , int findNum)
+{    
+       while (low &amp;lt;= high)
+      {
+            int mid = ( low + high) / 2;   //此处一定要放在while里面
+            if (a[mid] &amp;lt; findNum)           
+                low = mid + 1;        
+            else if (a[mid] &amp;gt; findNum)            
+                high = mid - 1;       
+             else           
+                return mid;    
+    }       
+    return  -1;
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;&lt;figure class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;冒泡排序   θ(n^2)
+void bubble_sort(int a[], int n)
+{
+    int i, j, temp;
+    for (j = 0; j &amp;lt; n - 1; j++)
+        for (i = 0; i &amp;lt; n - 1 - j; i++) //外层循环每循环一次就能确定出一个泡泡（最大或者最小），所以内层循环不用再计算已经排好的部分
+        {
+            if(a[i] &amp;gt; a[i + 1])
+            {
+                temp = a[i];
+                a[i] = a[i + 1];
+                a[i + 1] = temp;
+            }
+        }
+}
+
+快速排序  调用方法  quickSort(a,0,n);  θ(nlogn)
+void quickSort (int a[] , int low , int high)
+{
+    if (high &amp;lt; low + 2)
+        return;
+    int start = low;
+    int end = high;
+    int temp;
+    
+    while (start &amp;lt; end)
+    {
+        while ( ++start &amp;lt; high &amp;amp;&amp;amp; a[start] &amp;lt;= a[low]);//找到第一个比a[low]数值大的位子start
+
+        while ( --end  &amp;gt; low  &amp;amp;&amp;amp; a[end]  &amp;gt;= a[low]);//找到第一个比a[low]数值小的位子end
+
+        //进行到此，a[end] &amp;lt; a[low] &amp;lt; a[start],但是物理位置上还是low &amp;lt; start &amp;lt; end，因此接下来交换a[start]和a[end],于是[low,start]这个区间里面全部比a[low]小的，[end,hight]这个区间里面全部都是比a[low]大的
+        
+        if (start &amp;lt; end)
+        {
+            temp = a[start];
+            a[start]=a[end];
+            a[end]=temp;
+        }
+        //在GCC编译器下，该写法无法达到交换的目的，a[start] ^= a[end] ^= a[start] ^= a[end];编译器的问题
+    }
+    //进行到此，[low,end]区间里面的数都比a[low]小的,[end,higt]区间里面都是比a[low]大的，把a[low]放到中间即可
+
+    //在GCC编译器下，该写法无法达到交换的目的，a[low] ^= a[end] ^= a[low] ^= a[end];编译器的问题
+    
+    temp = a[low];
+    a[low]=a[end];
+    a[end]=temp;
+    
+    //现在就分成了3段了，由最初的a[low]枢纽分开的
+    quickSort(a, low, end);
+    quickSort(a, start, high);
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/figure&gt;
+&lt;p&gt;注释我也写上了，这些算法基本上简单的算法题都能应对了。&lt;/p&gt;
+
+&lt;p&gt;数据结构的题目我就遇到了链表翻转，实现一个栈的结构，先进后出的，树先跟，中跟，后跟遍历，图的DFS和BFS。代码就不贴了，太长了。如果有忘记的，可以再去翻翻回顾一下。&lt;/p&gt;
+
+&lt;h4&gt;三.面试&lt;/h4&gt;
+
+&lt;p&gt;面试基本都是问你之前做过什么项目啦，遇到了哪些问题了，自己如何解决的。谈谈对XXX的看法等等这些问题，只要平时认真完成项目，其实面试反而问的东西更好答，因为都是关于你项目的，这些你最了解和清楚了。&lt;/p&gt;
+
+&lt;p&gt;好了，到此就是2016年3月上海地区除了BAT公司，招聘iOS开发工程师的行情了，比2年前，最大的体会就是面试面更广了，要求更高了。现在要求除了会OC，还要懂算法和数据结构，还有要么会ReactNative，或者PhoneGap一系列混合开发的框架，或者熟悉Swift，程序员要一直跟上主流才能不能被时代淘汰。才能具有竞争力。这也是我面试了这些公司的感悟，活到老学到老！最后希望大家都和我交流交流，我也是个iOS菜鸟，请大家多多指教！&lt;/p&gt;
+</description>
+        <pubDate>Thu, 28 Apr 2016 23:56:00 +0800</pubDate>
+        <link>http://vno.onevcat.com/2016/04/2016%E5%B9%B43%E6%9C%88iOS%E9%9D%A2%E8%AF%95%E6%80%BB%E7%BB%93/</link>
+        <guid isPermaLink="true">http://vno.onevcat.com/2016/04/2016%E5%B9%B43%E6%9C%88iOS%E9%9D%A2%E8%AF%95%E6%80%BB%E7%BB%93/</guid>
+        
+        <category>面试总结</category>
+        
+        
+        <category>面试总结</category>
+        
+      </item>
+    
+      <item>
+        <title>搭建Phabricator我遇到的那些坑</title>
+        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-8641ab1b36a28f69.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot;&gt;&lt;/p&gt;
+
+&lt;h4&gt;一.可能会用到的命令&lt;/h4&gt;
+
+&lt;p&gt;1.重启phd守护线程
+先进入到Fabricator文件夹下面，然后 $./bin/phd/ log&lt;/p&gt;
+
+&lt;p&gt;2.删除一个代码仓库  $ ./bin/remove destroy rMOBILE(代码库的前缀名字)&lt;/p&gt;
+
+&lt;p&gt;3.重启mysql数据库
+sudo launchctl unload -F /Library/LaunchDaemons/com.oracle.oss.mysql.mysqld.plist
+sudo launchctl load -F /Library/LaunchDaemons/com.oracle.oss.mysql.mysqld.plist&lt;/p&gt;
+
+&lt;p&gt;4.重启apache服务器命令
+sudo /usr/sbin/apachectl restart
+sudo apachectl -k restart&lt;/p&gt;
+
+&lt;h4&gt;二.可能会用到的一些坑&lt;/h4&gt;
+
+&lt;p&gt;1.Mac如果出现“sudo: /etc/sudoers is owned by uid 501, should be 0 ”问题解决办法
+先启用root账户
+在 OS X 中启用和使用“root”用户&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;OS X Lion (10.7) 和更高版本&lt;/strong&gt;
+从 Apple 菜单中选取“系统偏好设置”。
+从“显示”菜单中选取“用户与群组”。
+点按锁图标并使用管理员帐户进行鉴定。
+点按“登录选项”。
+点按右下方的“编辑”或“加入”按钮。
+点按“打开目录实用工具”按钮。
+点按“目录实用工具”窗口中的锁图标。
+输入管理员帐户名称和密码，然后点按“好”。
+从“编辑”菜单中选取“启用 Root 用户”。
+在“密码”和“验证”栏中输入您想要使用的 root 密码，然后点按“好”。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Mac OS X Snow Leopard (10.6.x)&lt;/strong&gt;
+从 Apple 菜单中选取“系统偏好设置”。
+从“显示”菜单中选取“帐户”。
+点按锁图标并使用管理员帐户进行鉴定。
+点按“登录选项”。
+点按右下方的“编辑”或“加入”按钮。
+点按“打开目录实用工具”按钮。
+点按“目录实用工具”窗口中的锁图标。
+输入管理员帐户名称和密码，然后点按“好”。
+从“编辑”菜单中选取“启用 Root 用户”。
+在“密码”和“验证”栏中输入您想要使用的 root 密码，然后点按“好”。&lt;/p&gt;
+
+&lt;p&gt;2.Mac如果出现sudo命令无法使用，然后root账户登录进去，更改sudoers文件的权限，步骤如下：
+$cd  /etc
+$ls -al （查看所有文件以及所属组权限）
+$chgrp wheel sudoers
+$chown root /etc/sudoers
+再就可以退出root账户重新登录其他账户，并且可以使用sudo命令了。&lt;/p&gt;
+
+&lt;p&gt;3.Mac如何进入Mysql ，以下是命令行方式，图形化方式就是用MySQLWorkBench软件&lt;/p&gt;
+
+&lt;p&gt;$ cd /usr/local/mysql/bin
+$ ls -l
+$ mysql -h localhost -u root -p
+Enter password:&lt;/p&gt;
+
+&lt;p&gt;然后登陆进去了，就会出现下面这个界面&lt;/p&gt;
+
+&lt;p&gt;Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 225
+Server version: 5.7.10 MySQL Community Server (GPL)&lt;/p&gt;
+
+&lt;p&gt;Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.&lt;/p&gt;
+
+&lt;p&gt;Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.&lt;/p&gt;
+
+&lt;p&gt;Type &amp;#39;help;&amp;#39; or &amp;#39;\h&amp;#39; for help. Type &amp;#39;\c&amp;#39; to clear the current input statement.&lt;/p&gt;
+
+&lt;p&gt;mysql&amp;gt; show databases;   (注意这里的命令一定都要带分号！)&lt;/p&gt;
+
+&lt;p&gt;4.phpize命令失败
+进入php-protobuf 页面 phpize 如下
+grep: /usr/include/php/main/php.h: No such file or directorygrep: /usr/include/php/Zend/zend_modules.h: No such file or directorygrep: /usr/include/php/Zend/zend_extensions.h: No such file or directoryConfiguring for:PHP Api Version: Zend Module Api No: Zend Extension Api No:&lt;/p&gt;
+
+&lt;p&gt;google之
+解决方法：
+sudo ln -s/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk/usr/include/ /usr/include&lt;/p&gt;
+
+&lt;p&gt;执行之
+ln: /usr/iclude: Operation not permitted&lt;/p&gt;
+
+&lt;p&gt;报这个错误
+/usr/ 下是没有include 这个文件夹的
+还有mkdir include 创建不了文件夹 一样报Operation not permitted&lt;/p&gt;
+
+&lt;p&gt;真正的解决办法是：
+sudo ln -s/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk/usr/include/ /usr/include&lt;/p&gt;
+
+&lt;p&gt;链接失败原因 Mac OS X10.11加强了系统保护 /usr 木有操作权限&lt;/p&gt;
+
+&lt;p&gt;暂时停用系统保护的方法：
+按下开机键时即刻按住 command R（“R”字母键），中间的苹果标志及进度条出现后放开按键，等待恢复安装界面和 “OS X 实用工具”窗口出现后，点击顶部菜单栏的 “实用工具”，在其下拉菜单点选运行 “终端”，在终端闪动字符的位置直接输入“csrutil disable”并回车，重新启动电脑。&lt;/p&gt;
+
+&lt;p&gt;当然也可以直接用XAMPP 中的phpize&lt;/p&gt;
+
+&lt;h4&gt;三.后期维护&lt;/h4&gt;
+
+&lt;p&gt;主要步骤：
+1.停止服务器，停止守护进程 
+2.git更新3个依赖组件 ,3个必须升级到相同的最新版
+3.更新sql数据库 ，此时很有可能出错，因为表有可能变了数据结构导致表结构变化，需要修复 
+4.开启守护线程，升级完成一定要重启一次！&lt;/p&gt;
+
+&lt;p&gt;具体命令如下：
+Stop the webserver (including php-fpm, if you use it).&lt;/p&gt;
+
+&lt;p&gt;Stop the daemons, with phabricator/bin/phd stop.&lt;/p&gt;
+
+&lt;p&gt;Run git pull in libphutil/, arcanist/ and phabricator/.&lt;/p&gt;
+
+&lt;p&gt;Run phabricator/bin/storage upgrade.&lt;/p&gt;
+
+&lt;p&gt;Start the daemons, with phabricator/bin/phd start.&lt;/p&gt;
+
+&lt;p&gt;Restart the webserver (and php-fpm, if you stopped it earlier).&lt;/p&gt;
+</description>
+        <pubDate>Mon, 25 Apr 2016 17:57:00 +0800</pubDate>
+        <link>http://vno.onevcat.com/2016/04/%E6%90%AD%E5%BB%BAPhabricator%E6%88%91%E9%81%87%E5%88%B0%E7%9A%84%E9%82%A3%E4%BA%9B%E5%9D%91/</link>
+        <guid isPermaLink="true">http://vno.onevcat.com/2016/04/%E6%90%AD%E5%BB%BAPhabricator%E6%88%91%E9%81%87%E5%88%B0%E7%9A%84%E9%82%A3%E4%BA%9B%E5%9D%91/</guid>
+        
+        <category>Code Review</category>
+        
+        
+        <category>Code</category>
+        
+        <category>Review</category>
+        
+      </item>
+    
+  </channel>
+</rss>

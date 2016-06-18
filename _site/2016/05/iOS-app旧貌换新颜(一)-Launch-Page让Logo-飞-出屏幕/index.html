@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <title>iOS app旧貌换新颜(一)—Launch Page让Logo&quot;飞&quot;出屏幕</title>
+  <meta name="description" content="">
+  <meta name="author" content="Wei Wang">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="iOS app旧貌换新颜(一)—Launch Page让Logo&quot;飞&quot;出屏幕">
+  <meta name="twitter:description" content="">
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="iOS app旧貌换新颜(一)—Launch Page让Logo&quot;飞&quot;出屏幕">
+  <meta property="og:description" content="">
+  
+  <link rel="icon" type="image/png" href="/assets/images/favicon.png" />
+  <link href="/assets/images/favicon.png" rel="shortcut icon" type="image/png">
+  
+  <link rel="stylesheet" href="/css/main.css">
+  <link href="//netdna.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
+
+  <link rel="canonical" href="http://vno.onevcat.com/2016/05/iOS-app%E6%97%A7%E8%B2%8C%E6%8D%A2%E6%96%B0%E9%A2%9C(%E4%B8%80)-Launch-Page%E8%AE%A9Logo-%E9%A3%9E-%E5%87%BA%E5%B1%8F%E5%B9%95/">
+  <link rel="alternate" type="application/rss+xml" title="Halfrost's Field" href="http://vno.onevcat.com/feed.xml">
+  
+  <meta name="google-site-verification" content="1-1ZlHoRvM0T2FqPbW2S-qLgYXN6rsn52kErlMPd_gw" />
+  
+</head>
+
+
+  <body>
+
+    <span class="mobile btn-mobile-menu">
+        <i class="fa fa-list btn-mobile-menu__icon"></i>
+        <i class="fa fa-angle-up btn-mobile-close__icon hidden"></i>
+    </span>
+    
+    <header class="panel-cover panel-cover--collapsed" style="background-image: url('/assets/images/background-cover.jpg')">
+  <div class="panel-main">
+
+    <div class="panel-main__inner panel-inverted">
+    <div class="panel-main__content">
+
+        <a href="/#blog" title="前往 Halfrost's Field 的主页" class="blog-button"><img src="/assets/images/avatar.jpg" width="80" alt="Halfrost's Field logo" class="panel-cover__logo logo" /></a>
+        <h1 class="panel-cover__title panel-title"><a href="/#blog" title="link to homepage for Halfrost's Field" class="blog-button">Halfrost's Field</a></h1>
+        
+        <span class="panel-cover__subtitle panel-subtitle">一缕殇流，化隐半边冰霜</span>
+        
+        <hr class="panel-cover__divider" />
+        <p class="panel-cover__description">嗨，我是于德志 (@halfrost)，一名来自中国的 iOS 开发者，已退役 acmer 。现居上海。吾笃信：德不孤，必有志，技不疏，必有朋。</p>
+        <hr class="panel-cover__divider panel-cover__divider--secondary" />
+        
+        
+        
+        <div class="navigation-wrapper">
+          <div>
+            <nav class="cover-navigation cover-navigation--primary">
+              <ul class="navigation">
+                <li class="navigation__item"><a href="/#blog" title="Visit blog" class="blog-button">博客</a></li>
+                
+                  <li class="navigation__item"><a href="http://about.halfrost.com" target="_blank" title="关于">关于</a></li>
+                
+              </ul>
+            </nav>
+          </div>
+          
+          <div><nav class="cover-navigation navigation--social">
+  <ul class="navigation">
+
+    
+    <!-- jianshu-->
+    <li class="navigation__item">
+      <a href="http://jianshu.com/users/12201cdd5d7a/latest_articles" title="@halfrost 的简书" target="_blank">
+        <i class='social fa fa-book'></i>
+        <span class="label">jianshu</span>
+      </a>
+    </li>
+    
+
+  
+  <!-- Weibo -->
+  <li class="navigation__item">
+    <a href="http://weibo.com/halfrost" title="@halfrost 的微博" target="_blank">
+      <i class='social fa fa-weibo'></i>
+      <span class="label">Weibo</span>
+    </a>
+  </li>
+  
+
+  
+  <!-- Github -->
+  <li class="navigation__item">
+    <a href="https://github.com/halfrost" title="@halfrost 的 Github" target="_blank">
+      <i class='social fa fa-github'></i>
+      <span class="label">Github</span>
+    </a>
+  </li>
+  
+
+  
+
+  
+
+  <!-- RSS -->
+  <li class="navigation__item">
+    <a href="/feed.xml" rel="author" title="RSS" target="_blank">
+      <i class='social fa fa-rss'></i>
+      <span class="label">RSS</span>
+    </a>
+  </li>
+
+  
+  <!-- Email -->
+  <li class="navigation__item">
+    <a href="mailto:ydz627@gamil.com" title="Contact me">
+      <i class='social fa fa-envelope'></i>
+      <span class="label">Email</span>
+    </a>
+  </li>
+  
+
+  </ul>
+</nav>
+</div>
+        </div>
+      </div>
+    </div>
+    
+    
+    <div class="panel-cover--overlay cover-black"></div>
+    
+  </div>
+</header>
+
+
+    <div class="content-wrapper">
+        <div class="content-wrapper__inner">
+            <article class="post-container post-container--single" itemscope itemtype="http://schema.org/BlogPosting">
+  <header class="post-header">
+    <div class="post-meta">
+      <time datetime="2016-05-25 06:56:00 +0800" itemprop="datePublished" class="post-meta__date date">2016-05-25</time> &#8226; <span class="post-meta__tags tags">iOS</span>
+    </div>
+    <h1 class="post-title">iOS app旧貌换新颜(一)—Launch Page让Logo"飞"出屏幕</h1>
+  </header>
+
+  <section class="post">
+    <p><img src="http://upload-images.jianshu.io/upload_images/1194012-cf3e37d486bf7c51.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt=""></p>
+
+<h4>前言</h4>
+
+<p>当今是个看脸的世界，一个app的颜值可能会决定用户的使用次数，icon的颜值更可能决定了用户是否回去下载，如果太丑，放在手机桌面都难看，那用户很可能就直接卸载了。所以漂亮的界面UI + 合理的用户体验UX/UE也会很大程度决定用户的黏性。最近由于公司的app准备美化一下界面，提升性能，所以我就想把美化过程中可以和大家分享的东西都整理整理，拿出来也和大家一起分享学习。这个“旧貌换新颜”我就写成一个系列吧，相信美化的道路是永无止境的！(场外音:自己又给自己开了一个巨坑)</p>
+
+<h4>一.灵感的来源</h4>
+
+<p>也许有些人看了文章的标题并不一定完全懂是啥意思，其实设计这个的来源源自于我在微博上看到的一个动图，很生动，形象。
+<img src="http://upload-images.jianshu.io/upload_images/1194012-2c82a315c04b2a63.gif?imageMogr2/auto-orient/strip" alt=""></p>
+
+<p>一个呆萌的大叔点开Twitter客户端，启动界面有一个动效，就是他们的logo直接“飞”出屏幕，打在了他的脸上。这个效果我当时看了就觉得很有趣。很多应用每次启动之后都是直接进去，或者先展示一个几秒的广告页。其实要是加一个这种启动特性，感觉也挺不错。</p>
+
+<h4>二.动画原理</h4>
+
+<p>接下来说一下上面那个启动特效的原理，其实原理很简单:app在启动之后，先加载一个View，上面放了我们的logo，然后在做一个放大的UIView的动画就好了。接下来看看我的做法吧。</p>
+
+<h4>三.准备工具</h4>
+
+<p>PS + AI 或者 Sketch + PaintCode
+这个可能有人问了，怎么突然还需要这些作图的工具。其实大家也可以加载一个logo图片放在view上，一样可以实现。不过老板觉得加载一张图片如果太高清会占app大小，能尽量程序画出来的，就让程序画出来。对于不规则复杂的图形，就只好用上面这一套组合工具了。</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-4ce2d7bca595f60e.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="">PS主要是把logo抠出来</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-1a7156da405557e4.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="">
+<img src="http://upload-images.jianshu.io/upload_images/1194012-f570354c4b17de1c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="">AI和Sketch是为了把抠出来的logo用钢笔工具，进行描点，导出路径。</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-5a872f4388f8c95c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="">最后PaintCode就是把路径转换成UIBezierPath(PaintCode这个软件很厉害，可以直接把SVG里面的路径直接转换成对应的Swift或者Objective-C代码)(后来我发现其实只要用PaintCode一个软件就可以完成上面所有功能了，它也可以直接用钢笔工具画路径)</p>
+
+<h4>四.开始制作</h4>
+
+<p>1.首先用PS把Logo图抠出来，保存成图片。
+2.然后打开Sketch，导入刚刚的Logo图片。</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-93cc2ee749ecde12.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt=""></p>
+
+<p>3.选择左上角的“Insert”-“Vector”钢笔工具，依次连接Logo图标的各个顶点
+<img src="http://upload-images.jianshu.io/upload_images/1194012-4504387610269f31.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="">
+4.然后在每段顶点之间，加新的锚点，钢笔工具会出现+号。在软件的右侧，会出现下面这个面板</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-b4faccaa7e9955c4.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="">
+通过拖拉这些你加出来的点，可以使路径完全吻合Logo复杂的外形。拖过一番拖拽之后，就应该成下面这个图的样子了。
+<img src="http://upload-images.jianshu.io/upload_images/1194012-a10c6a94f30c1d49.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt=""></p>
+
+<p>5.接下来我们就选择左边面板上面有一个Page面板
+<img src="http://upload-images.jianshu.io/upload_images/1194012-195b264d904142c8.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="">
+选一下刚刚描出来的Path，右下角会出现一个Export面板</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-692ee827e904a2a4.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt=""></p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-f90a1583f99ecc95.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt=""></p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-2c9e94dcdd68baba.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt=""></p>
+
+<p>这个时候我们选择导出SVG文件</p>
+
+<blockquote>
+<p>SVG<a href="http://baike.baidu.com/pic/SVG/63178/0/4e83cb62211a2be5e7113acd?fr=lemma&amp;ct=single"><img src="http://upload-images.jianshu.io/upload_images/1194012-50421760e6be23df.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="svg logo"></a>可缩放矢量图形（Scalable Vector Graphics）是基于
+可扩展标记语言（XML），用于描述二维矢量图形的一种图形格式。SVG是W3C(&quot;World Wide Web ConSortium&quot; 即 &quot; 国际互联网标准组织&quot;)在2000年8月制定的一种新的二维矢量图形格式，也是规范中的网络矢量图形标准。SVG严格遵从XML语法，并用文本格式的描述性语言来描述图像内容，因此是一种和图像分辨率无关的矢量图形格式</p>
+</blockquote>
+
+<p>其实这里有一个小插曲，绘制路径的时候，其实我用的是AI描点的，之后导出SVG给PaintCode，居然不识别我的路径。后来网上问了问，大神要我换Sketch试试，然后就行了。后来我比较了一下Sketch和AI导出的SVG有什么不同，才发现，我之前AI导出的，加了几个图层，把路径盖住了。用AI绘制路径的方法和Sketch的差不多，如下图。
+<img src="http://upload-images.jianshu.io/upload_images/1194012-c41cf3802e3c5b9f.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt=""></p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-37b8ee89ce46e689.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt=""></p>
+
+<p>6.把之前导出的SVG文件导入到PaintCode中，下面会自动生成Objective-C代码
+<img src="http://upload-images.jianshu.io/upload_images/1194012-e13e918ec6ce6c5b.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt=""></p>
+
+<p>把生成的这些代码复制出来。</p>
+<figure class="highlight"><pre><code class="language-text" data-lang="text">//// Color Declarations
+UIColor* color1 = [UIColor colorWithRed: 0.521 green: 0.521 blue: 0.521 alpha: 1];
+
+//// Bezier Drawing
+
+
+//// Page-1
+{
+    //// Bezier 2 Drawing
+    UIBezierPath* bezier2Path = UIBezierPath.bezierPath;
+    [bezier2Path moveToPoint: CGPointMake(552.37, 9.09)];
+    [bezier2Path addCurveToPoint: CGPointMake(519.07, 26.69) controlPoint1: CGPointMake(552.37, 9.09) controlPoint2: CGPointMake(538.05, 18.98)];
+    [bezier2Path addCurveToPoint: CGPointMake(480.56, 38.26) controlPoint1: CGPointMake(500.1, 34.4) controlPoint2: CGPointMake(480.56, 38.26)];
+    [bezier2Path addCurveToPoint: CGPointMake(439.19, 9.09) controlPoint1: CGPointMake(480.56, 38.26) controlPoint2: CGPointMake(467.44, 22.55)];
+    [bezier2Path addCurveToPoint: CGPointMake(368.15, 2.85) controlPoint1: CGPointMake(410.93, -4.38) controlPoint2: CGPointMake(368.15, 2.85)];
+    [bezier2Path addCurveToPoint: CGPointMake(316.47, 30.92) controlPoint1: CGPointMake(368.15, 2.85) controlPoint2: CGPointMake(340.52, 7.85)];
+    [bezier2Path addCurveToPoint: CGPointMake(281.09, 86.36) controlPoint1: CGPointMake(292.42, 53.99) controlPoint2: CGPointMake(290.08, 59.09)];
+    [bezier2Path addCurveToPoint: CGPointMake(279.09, 144.27) controlPoint1: CGPointMake(272.1, 113.63) controlPoint2: CGPointMake(279.09, 144.27)];
+    [bezier2Path addCurveToPoint: CGPointMake(181.55, 124.87) controlPoint1: CGPointMake(279.09, 144.27) controlPoint2: CGPointMake(224.85, 139.76)];
+    [bezier2Path addCurveToPoint: CGPointMake(101.23, 83.11) controlPoint1: CGPointMake(138.25, 109.98) controlPoint2: CGPointMake(101.23, 83.11)];
+    [bezier2Path addLineToPoint: CGPointMake(38.19, 22.55)];
+    [bezier2Path addCurveToPoint: CGPointMake(21.56, 66.97) controlPoint1: CGPointMake(38.19, 22.55) controlPoint2: CGPointMake(24, 45.21)];
+    [bezier2Path addCurveToPoint: CGPointMake(28.04, 113.2) controlPoint1: CGPointMake(19.12, 88.74) controlPoint2: CGPointMake(28.04, 113.2)];
+    [bezier2Path addCurveToPoint: CGPointMake(45.34, 151.3) controlPoint1: CGPointMake(28.04, 113.2) controlPoint2: CGPointMake(34.12, 134.96)];
+    [bezier2Path addCurveToPoint: CGPointMake(72.71, 178.32) controlPoint1: CGPointMake(56.55, 167.65) controlPoint2: CGPointMake(72.71, 178.32)];
+    [bezier2Path addCurveToPoint: CGPointMake(45.34, 173.23) controlPoint1: CGPointMake(72.71, 178.32) controlPoint2: CGPointMake(57.6, 176.78)];
+    [bezier2Path addCurveToPoint: CGPointMake(21.56, 163.51) controlPoint1: CGPointMake(33.08, 169.68) controlPoint2: CGPointMake(21.56, 163.51)];
+    [bezier2Path addCurveToPoint: CGPointMake(28.04, 210.73) controlPoint1: CGPointMake(21.56, 163.51) controlPoint2: CGPointMake(20.58, 191.27)];
+    [bezier2Path addCurveToPoint: CGPointMake(53.47, 246.86) controlPoint1: CGPointMake(35.49, 230.2) controlPoint2: CGPointMake(53.47, 246.86)];
+    [bezier2Path addCurveToPoint: CGPointMake(80.14, 268.29) controlPoint1: CGPointMake(53.47, 246.86) controlPoint2: CGPointMake(65.25, 259.74)];
+    [bezier2Path addCurveToPoint: CGPointMake(113.46, 281.28) controlPoint1: CGPointMake(95.04, 276.83) controlPoint2: CGPointMake(113.46, 281.28)];
+    [bezier2Path addCurveToPoint: CGPointMake(86.11, 286.04) controlPoint1: CGPointMake(113.46, 281.28) controlPoint2: CGPointMake(98.18, 285.95)];
+    [bezier2Path addCurveToPoint: CGPointMake(62.93, 281.67) controlPoint1: CGPointMake(74.03, 286.13) controlPoint2: CGPointMake(62.93, 281.67)];
+    [bezier2Path addCurveToPoint: CGPointMake(80.14, 317.03) controlPoint1: CGPointMake(62.93, 281.67) controlPoint2: CGPointMake(71.12, 304.22)];
+    [bezier2Path addCurveToPoint: CGPointMake(103.91, 339.84) controlPoint1: CGPointMake(89.17, 329.83) controlPoint2: CGPointMake(103.91, 339.84)];
+    [bezier2Path addCurveToPoint: CGPointMake(135.88, 359.44) controlPoint1: CGPointMake(103.91, 339.84) controlPoint2: CGPointMake(119.59, 353.53)];
+    [bezier2Path addCurveToPoint: CGPointMake(170.93, 364.15) controlPoint1: CGPointMake(152.16, 365.34) controlPoint2: CGPointMake(170.93, 364.15)];
+    [bezier2Path addCurveToPoint: CGPointMake(135.88, 386.44) controlPoint1: CGPointMake(170.93, 364.15) controlPoint2: CGPointMake(153.54, 376.98)];
+    [bezier2Path addCurveToPoint: CGPointMake(101.13, 401.54) controlPoint1: CGPointMake(118.21, 395.9) controlPoint2: CGPointMake(101.13, 401.54)];
+    [bezier2Path addCurveToPoint: CGPointMake(53.47, 412.64) controlPoint1: CGPointMake(101.13, 401.54) controlPoint2: CGPointMake(81.16, 409.59)];
+    [bezier2Path addCurveToPoint: CGPointMake(0.29, 412.64) controlPoint1: CGPointMake(25.78, 415.7) controlPoint2: CGPointMake(0.29, 412.64)];
+    [bezier2Path addCurveToPoint: CGPointMake(72.71, 447.67) controlPoint1: CGPointMake(0.29, 412.64) controlPoint2: CGPointMake(36.62, 435.16)];
+    [bezier2Path addCurveToPoint: CGPointMake(149.39, 464.31) controlPoint1: CGPointMake(108.8, 460.17) controlPoint2: CGPointMake(149.39, 464.31)];
+    [bezier2Path addCurveToPoint: CGPointMake(249.01, 457.71) controlPoint1: CGPointMake(149.39, 464.31) controlPoint2: CGPointMake(196.6, 469.56)];
+    [bezier2Path addCurveToPoint: CGPointMake(352.07, 418.46) controlPoint1: CGPointMake(301.42, 445.86) controlPoint2: CGPointMake(352.07, 418.46)];
+    [bezier2Path addCurveToPoint: CGPointMake(414.45, 370.11) controlPoint1: CGPointMake(352.07, 418.46) controlPoint2: CGPointMake(388.26, 396.31)];
+    [bezier2Path addCurveToPoint: CGPointMake(458.34, 312.2) controlPoint1: CGPointMake(440.64, 343.92) controlPoint2: CGPointMake(458.34, 312.2)];
+    [bezier2Path addCurveToPoint: CGPointMake(489.68, 246.86) controlPoint1: CGPointMake(458.34, 312.2) controlPoint2: CGPointMake(476.64, 284.33)];
+    [bezier2Path addCurveToPoint: CGPointMake(509.39, 165.55) controlPoint1: CGPointMake(502.73, 209.38) controlPoint2: CGPointMake(509.39, 165.55)];
+    [bezier2Path addLineToPoint: CGPointMake(510.48, 117.41)];
+    [bezier2Path addCurveToPoint: CGPointMake(542.8, 90.45) controlPoint1: CGPointMake(510.48, 117.41) controlPoint2: CGPointMake(526.7, 107.34)];
+    [bezier2Path addCurveToPoint: CGPointMake(569.12, 56.54) controlPoint1: CGPointMake(558.9, 73.55) controlPoint2: CGPointMake(569.12, 56.54)];
+    [bezier2Path addLineToPoint: CGPointMake(537.79, 66.97)];
+    [bezier2Path addLineToPoint: CGPointMake(503.61, 73.55)];
+    [bezier2Path addCurveToPoint: CGPointMake(537.79, 43.14) controlPoint1: CGPointMake(503.61, 73.55) controlPoint2: CGPointMake(528.94, 56.27)];
+    [bezier2Path addCurveToPoint: CGPointMake(552.37, 9.09) controlPoint1: CGPointMake(546.63, 30.01) controlPoint2: CGPointMake(552.37, 9.09)];
+    [bezier2Path closePath];
+    bezier2Path.miterLimit = 4;
+
+    bezier2Path.usesEvenOddFillRule = YES;
+
+    [color1 setStroke];
+    bezier2Path.lineWidth = 1;
+    [bezier2Path stroke];
+}
+
+</code></pre></figure>
+<p>小插曲:当我全部忙活完这些以后，我才发现PaintCode也有钢笔工具</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-8f2308c103a3639d.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="">
+也就是说只用一个PaintCode就可以完成所有想做的事情了，不需要Sketch或者AI去画路径了。PaintCode自己就可以画路径，导出OC或者Swift代码了。</p>
+
+<p>7.现在我们回到Xcode工程中。添加一个UIView用来显示Logo。并且把Layer加到View的Layer中</p>
+<figure class="highlight"><pre><code class="language-text" data-lang="text">-(void)addLayerToLaunchView
+{
+    //self.launchView是我添加的一个显示Logo的UIVIew
+    CAShapeLayer *layer = [[CAShapeLayer alloc]init];
+    layer.path = [self setBezierPath].CGPath;
+    layer.bounds = CGPathGetBoundingBox(layer.path);
+    
+    self.launchView.backgroundColor = [UIColor blueColor];
+    layer.position = CGPointMake(self.view.layer.bounds.size.width / 2, self.view.layer.bounds.size.height/ 2);
+    layer.fillColor = [UIColor whiteColor].CGColor;
+    [self.launchView.layer addSublayer:layer];
+}
+</code></pre></figure><figure class="highlight"><pre><code class="language-text" data-lang="text">
+-(UIBezierPath *)setBezierPath
+{
+    //  这里面加入的就是刚刚PaintCode粘贴出来的代码
+}
+</code></pre></figure>
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-7a0cc3fd94a481c1.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt=""></p>
+
+<p>8.给这个View添加动画。仔细观察我文章开头的那个呆萌大叔打开Twitter的Gif图，动画效果是先把鸟缩小，然后再变大</p>
+<figure class="highlight"><pre><code class="language-text" data-lang="text">
+- (void)startLaunch
+{
+    [UIView animateWithDuration:0.2 animations:^{
+        // 这里先把View缩小
+        self.launchView.frame = CGRectMake(0, 0, 50, 50);
+        self.launchView.center = self.view.center;
+    } completion:^(BOOL finished) {
+        [UIView animateWithDuration:0.3 animations:^{
+            // 这里要把View放大
+            self.launchView.frame = CGRectMake(0, 0, 5000, 5000);
+            self.launchView.center = self.view.center;
+            self.alpha = 0;
+        } completion:^(BOOL finished) {
+            [self.launchView removeFromSuperview];
+        }];;
+    }];
+}
+</code></pre></figure>
+<p>接下来运行工程就可以实现应用启动的时候，让Logo&quot;飞&quot;起来的效果啦。</p>
+
+<p>这是我把这个效果做到app中的效果：</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-613695775b65dd57.gif?imageMogr2/auto-orient/strip" alt=""></p>
+
+<h4>结尾</h4>
+
+<p>这个效果其实适用很多app，如果公司也没有强制要加入广告页，等等其他页面，
+可以考虑在启动之后加上这些动画来增加app的用户体验。优秀的过场动画能让app更加鲜活，充满活力！</p>
+
+  </section>
+</article>
+
+<section class="read-more">
+   
+   
+   <div class="read-more-item">
+       <span class="read-more-item-dim">最近的文章</span>
+       <h2 class="post-list__post-title post-title"><a href="/2016/06/%E6%89%8B%E6%8A%8A%E6%89%8B%E6%95%99%E4%BD%A0%E4%BB%8ECore-Data%E8%BF%81%E7%A7%BB%E5%88%B0Realm/" title="link to 手把手教你从Core Data迁移到Realm">手把手教你从Core Data迁移到Realm</a></h2>
+       <p class="excerpt">前言看了这篇文章的标题，也许有些人还不知道Realm是什么，那么我先简单介绍一下这个新生的数据库。号称是用来替代SQLite 和 Core Data的。Realm有以下优点：1. 使用方便Realm并不是基于SQLite的对象关系映射数据库。它是使用自己的持久化引擎，为简单和速度而生。用户们说，他们在数分钟之内就上手了Realm，构建一个app只需要数小时，每个app开发时间至少节约数周的时间。快Realm比其他的对象关系映射型数据库(Object Relational Mapping)，...&hellip;</p>
+       <div class="post-list__meta"><time datetime="2016-06-03 00:02:00 +0800" class="post-list__meta--date date">2016-06-03</time> &#8226; <span class="post-list__meta--tags tags">iOS</span><a class="btn-border-small" href=/2016/06/%E6%89%8B%E6%8A%8A%E6%89%8B%E6%95%99%E4%BD%A0%E4%BB%8ECore-Data%E8%BF%81%E7%A7%BB%E5%88%B0Realm/>继续阅读</a></div>
+   </div>
+   
+   
+   
+   
+   <div class="read-more-item">
+       <span class="read-more-item-dim">更早的文章</span>
+       <h2 class="post-list__post-title post-title"><a href="/2016/05/%E5%BE%AE%E4%BF%A1,QQ%E8%BF%99%E7%B1%BBIM-app%E6%80%8E%E4%B9%88%E5%81%9A-%E8%B0%88%E8%B0%88Websocket/" title="link to 微信,QQ这类IM app怎么做——谈谈Websocket">微信,QQ这类IM app怎么做——谈谈Websocket</a></h2>
+       <p class="excerpt">前言关于我和WebSocket的缘：我从大二在计算机网络课上听老师讲过之后，第一次使用就到了毕业之后的第一份工作。直到最近换了工作，到了一家是含有IM社交聊天功能的app的时候，我觉得我现在可以谈谈我对WebSocket/Socket的一些看法了。要想做IM聊天app，就不得不理解WebSocket和Socket的原理了，听我一一道来。目录1.WebSocket使用场景2.WebSocket诞生由来3.谈谈WebSocket协议原理4.WebSocket 和 Socket的区别与联系5.i...&hellip;</p>
+       <div class="post-list__meta"><time datetime="2016-05-15 18:55:00 +0800" class="post-list__meta--date date">2016-05-15</time> &#8226; <span class="post-list__meta--tags tags">iOS</span><a class="btn-border-small" href=/2016/05/%E5%BE%AE%E4%BF%A1,QQ%E8%BF%99%E7%B1%BBIM-app%E6%80%8E%E4%B9%88%E5%81%9A-%E8%B0%88%E8%B0%88Websocket/>继续阅读</a></div>
+   </div>
+   
+</section>
+
+<section class="post-comments">
+  
+    <div id="disqus_thread"></div>
+    <script>
+    
+    var disqus_config = function () {
+        this.page.url = "http://vno.onevcat.com/2016/05/iOS-app%E6%97%A7%E8%B2%8C%E6%8D%A2%E6%96%B0%E9%A2%9C(%E4%B8%80)-Launch-Page%E8%AE%A9Logo-%E9%A3%9E-%E5%87%BA%E5%B1%8F%E5%B9%95/";
+        this.page.identifier = "/2016/05/iOS-app%E6%97%A7%E8%B2%8C%E6%8D%A2%E6%96%B0%E9%A2%9C(%E4%B8%80)-Launch-Page%E8%AE%A9Logo-%E9%A3%9E-%E5%87%BA%E5%B1%8F%E5%B9%95/";
+    };
+
+    var disqus_shortname = 'halfrostsfield';
+    
+    (function() { // DON'T EDIT BELOW THIS LINE
+        var d = document, s = d.createElement('script');
+        s.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>要查看<a href="http://disqus.com/?ref_noscript"> Disqus </a>评论，请启用 JavaScript</noscript>
+    
+  
+  
+  
+  
+</section>
+
+
+            <section class="footer">
+    <footer>
+    	<span class="footer__copyright">本站点采用<a href="http://creativecommons.org/licenses/by-nc-sa/4.0/">知识共享 署名-非商业性使用-相同方式共享 4.0 国际 许可协议</a></span>
+        <span class="footer__copyright">由 <a href="https://jekyllrb.com">Jekyll</a> 于 2016-06-19 生成，感谢<a href="https://pages.github.com"> GitHub Pages</a> 强力驱动</span>
+        <span class="footer__copyright">本站由 <a href="http://halfrost.com">@halfrost</a> 创建，采用 <a href="https://github.com/onevcat/vno-jekyll">Vno - Jekyll</a> 作为主题，您可以在 GitHub 找到<a href="https://github.com/onevcat/OneV-s-Den">本站源码</a> - &copy; 2016</span>
+    </footer>
+</section>
+
+        </div>
+    </div>
+    
+    <script type="text/javascript" src="//code.jquery.com/jquery-1.11.3.min.js"></script>
+
+<script type="text/javascript" src="/js/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+<script type="text/javascript" src="/js/main.js"></script>
+
+
+
+    
+  </body>
+
+</html>

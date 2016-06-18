@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <title>搭建Phabricator我遇到的那些坑</title>
+  <meta name="description" content="">
+  <meta name="author" content="Wei Wang">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="搭建Phabricator我遇到的那些坑">
+  <meta name="twitter:description" content="">
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="搭建Phabricator我遇到的那些坑">
+  <meta property="og:description" content="">
+  
+  <link rel="icon" type="image/png" href="/assets/images/favicon.png" />
+  <link href="/assets/images/favicon.png" rel="shortcut icon" type="image/png">
+  
+  <link rel="stylesheet" href="/css/main.css">
+  <link href="//netdna.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
+
+  <link rel="canonical" href="http://vno.onevcat.com/2016/04/%E6%90%AD%E5%BB%BAPhabricator%E6%88%91%E9%81%87%E5%88%B0%E7%9A%84%E9%82%A3%E4%BA%9B%E5%9D%91/">
+  <link rel="alternate" type="application/rss+xml" title="Halfrost's Field" href="http://vno.onevcat.com/feed.xml">
+  
+  <meta name="google-site-verification" content="1-1ZlHoRvM0T2FqPbW2S-qLgYXN6rsn52kErlMPd_gw" />
+  
+</head>
+
+
+  <body>
+
+    <span class="mobile btn-mobile-menu">
+        <i class="fa fa-list btn-mobile-menu__icon"></i>
+        <i class="fa fa-angle-up btn-mobile-close__icon hidden"></i>
+    </span>
+    
+    <header class="panel-cover panel-cover--collapsed" style="background-image: url('/assets/images/background-cover.jpg')">
+  <div class="panel-main">
+
+    <div class="panel-main__inner panel-inverted">
+    <div class="panel-main__content">
+
+        <a href="/#blog" title="前往 Halfrost's Field 的主页" class="blog-button"><img src="/assets/images/avatar.jpg" width="80" alt="Halfrost's Field logo" class="panel-cover__logo logo" /></a>
+        <h1 class="panel-cover__title panel-title"><a href="/#blog" title="link to homepage for Halfrost's Field" class="blog-button">Halfrost's Field</a></h1>
+        
+        <span class="panel-cover__subtitle panel-subtitle">一缕殇流，化隐半边冰霜</span>
+        
+        <hr class="panel-cover__divider" />
+        <p class="panel-cover__description">嗨，我是于德志 (@halfrost)，一名来自中国的 iOS 开发者，已退役 acmer 。现居上海。吾笃信：德不孤，必有志，技不疏，必有朋。</p>
+        <hr class="panel-cover__divider panel-cover__divider--secondary" />
+        
+        
+        
+        <div class="navigation-wrapper">
+          <div>
+            <nav class="cover-navigation cover-navigation--primary">
+              <ul class="navigation">
+                <li class="navigation__item"><a href="/#blog" title="Visit blog" class="blog-button">博客</a></li>
+                
+                  <li class="navigation__item"><a href="http://about.halfrost.com" target="_blank" title="关于">关于</a></li>
+                
+              </ul>
+            </nav>
+          </div>
+          
+          <div><nav class="cover-navigation navigation--social">
+  <ul class="navigation">
+
+    
+    <!-- jianshu-->
+    <li class="navigation__item">
+      <a href="http://jianshu.com/users/12201cdd5d7a/latest_articles" title="@halfrost 的简书" target="_blank">
+        <i class='social fa fa-book'></i>
+        <span class="label">jianshu</span>
+      </a>
+    </li>
+    
+
+  
+  <!-- Weibo -->
+  <li class="navigation__item">
+    <a href="http://weibo.com/halfrost" title="@halfrost 的微博" target="_blank">
+      <i class='social fa fa-weibo'></i>
+      <span class="label">Weibo</span>
+    </a>
+  </li>
+  
+
+  
+  <!-- Github -->
+  <li class="navigation__item">
+    <a href="https://github.com/halfrost" title="@halfrost 的 Github" target="_blank">
+      <i class='social fa fa-github'></i>
+      <span class="label">Github</span>
+    </a>
+  </li>
+  
+
+  
+
+  
+
+  <!-- RSS -->
+  <li class="navigation__item">
+    <a href="/feed.xml" rel="author" title="RSS" target="_blank">
+      <i class='social fa fa-rss'></i>
+      <span class="label">RSS</span>
+    </a>
+  </li>
+
+  
+  <!-- Email -->
+  <li class="navigation__item">
+    <a href="mailto:ydz627@gamil.com" title="Contact me">
+      <i class='social fa fa-envelope'></i>
+      <span class="label">Email</span>
+    </a>
+  </li>
+  
+
+  </ul>
+</nav>
+</div>
+        </div>
+      </div>
+    </div>
+    
+    
+    <div class="panel-cover--overlay cover-black"></div>
+    
+  </div>
+</header>
+
+
+    <div class="content-wrapper">
+        <div class="content-wrapper__inner">
+            <article class="post-container post-container--single" itemscope itemtype="http://schema.org/BlogPosting">
+  <header class="post-header">
+    <div class="post-meta">
+      <time datetime="2016-04-25 17:57:00 +0800" itemprop="datePublished" class="post-meta__date date">2016-04-25</time> &#8226; <span class="post-meta__tags tags">Code Review</span>
+    </div>
+    <h1 class="post-title">搭建Phabricator我遇到的那些坑</h1>
+  </header>
+
+  <section class="post">
+    <p><img src="http://upload-images.jianshu.io/upload_images/1194012-8641ab1b36a28f69.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt=""></p>
+
+<h4>一.可能会用到的命令</h4>
+
+<p>1.重启phd守护线程
+先进入到Fabricator文件夹下面，然后 $./bin/phd/ log</p>
+
+<p>2.删除一个代码仓库  $ ./bin/remove destroy rMOBILE(代码库的前缀名字)</p>
+
+<p>3.重启mysql数据库
+sudo launchctl unload -F /Library/LaunchDaemons/com.oracle.oss.mysql.mysqld.plist
+sudo launchctl load -F /Library/LaunchDaemons/com.oracle.oss.mysql.mysqld.plist</p>
+
+<p>4.重启apache服务器命令
+sudo /usr/sbin/apachectl restart
+sudo apachectl -k restart</p>
+
+<h4>二.可能会用到的一些坑</h4>
+
+<p>1.Mac如果出现“sudo: /etc/sudoers is owned by uid 501, should be 0 ”问题解决办法
+先启用root账户
+在 OS X 中启用和使用“root”用户</p>
+
+<p><strong>OS X Lion (10.7) 和更高版本</strong>
+从 Apple 菜单中选取“系统偏好设置”。
+从“显示”菜单中选取“用户与群组”。
+点按锁图标并使用管理员帐户进行鉴定。
+点按“登录选项”。
+点按右下方的“编辑”或“加入”按钮。
+点按“打开目录实用工具”按钮。
+点按“目录实用工具”窗口中的锁图标。
+输入管理员帐户名称和密码，然后点按“好”。
+从“编辑”菜单中选取“启用 Root 用户”。
+在“密码”和“验证”栏中输入您想要使用的 root 密码，然后点按“好”。</p>
+
+<p><strong>Mac OS X Snow Leopard (10.6.x)</strong>
+从 Apple 菜单中选取“系统偏好设置”。
+从“显示”菜单中选取“帐户”。
+点按锁图标并使用管理员帐户进行鉴定。
+点按“登录选项”。
+点按右下方的“编辑”或“加入”按钮。
+点按“打开目录实用工具”按钮。
+点按“目录实用工具”窗口中的锁图标。
+输入管理员帐户名称和密码，然后点按“好”。
+从“编辑”菜单中选取“启用 Root 用户”。
+在“密码”和“验证”栏中输入您想要使用的 root 密码，然后点按“好”。</p>
+
+<p>2.Mac如果出现sudo命令无法使用，然后root账户登录进去，更改sudoers文件的权限，步骤如下：
+$cd  /etc
+$ls -al （查看所有文件以及所属组权限）
+$chgrp wheel sudoers
+$chown root /etc/sudoers
+再就可以退出root账户重新登录其他账户，并且可以使用sudo命令了。</p>
+
+<p>3.Mac如何进入Mysql ，以下是命令行方式，图形化方式就是用MySQLWorkBench软件</p>
+
+<p>$ cd /usr/local/mysql/bin
+$ ls -l
+$ mysql -h localhost -u root -p
+Enter password:</p>
+
+<p>然后登陆进去了，就会出现下面这个界面</p>
+
+<p>Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 225
+Server version: 5.7.10 MySQL Community Server (GPL)</p>
+
+<p>Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.</p>
+
+<p>Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.</p>
+
+<p>Type &#39;help;&#39; or &#39;\h&#39; for help. Type &#39;\c&#39; to clear the current input statement.</p>
+
+<p>mysql&gt; show databases;   (注意这里的命令一定都要带分号！)</p>
+
+<p>4.phpize命令失败
+进入php-protobuf 页面 phpize 如下
+grep: /usr/include/php/main/php.h: No such file or directorygrep: /usr/include/php/Zend/zend_modules.h: No such file or directorygrep: /usr/include/php/Zend/zend_extensions.h: No such file or directoryConfiguring for:PHP Api Version: Zend Module Api No: Zend Extension Api No:</p>
+
+<p>google之
+解决方法：
+sudo ln -s/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk/usr/include/ /usr/include</p>
+
+<p>执行之
+ln: /usr/iclude: Operation not permitted</p>
+
+<p>报这个错误
+/usr/ 下是没有include 这个文件夹的
+还有mkdir include 创建不了文件夹 一样报Operation not permitted</p>
+
+<p>真正的解决办法是：
+sudo ln -s/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk/usr/include/ /usr/include</p>
+
+<p>链接失败原因 Mac OS X10.11加强了系统保护 /usr 木有操作权限</p>
+
+<p>暂时停用系统保护的方法：
+按下开机键时即刻按住 command R（“R”字母键），中间的苹果标志及进度条出现后放开按键，等待恢复安装界面和 “OS X 实用工具”窗口出现后，点击顶部菜单栏的 “实用工具”，在其下拉菜单点选运行 “终端”，在终端闪动字符的位置直接输入“csrutil disable”并回车，重新启动电脑。</p>
+
+<p>当然也可以直接用XAMPP 中的phpize</p>
+
+<h4>三.后期维护</h4>
+
+<p>主要步骤：
+1.停止服务器，停止守护进程 
+2.git更新3个依赖组件 ,3个必须升级到相同的最新版
+3.更新sql数据库 ，此时很有可能出错，因为表有可能变了数据结构导致表结构变化，需要修复 
+4.开启守护线程，升级完成一定要重启一次！</p>
+
+<p>具体命令如下：
+Stop the webserver (including php-fpm, if you use it).</p>
+
+<p>Stop the daemons, with phabricator/bin/phd stop.</p>
+
+<p>Run git pull in libphutil/, arcanist/ and phabricator/.</p>
+
+<p>Run phabricator/bin/storage upgrade.</p>
+
+<p>Start the daemons, with phabricator/bin/phd start.</p>
+
+<p>Restart the webserver (and php-fpm, if you stopped it earlier).</p>
+
+  </section>
+</article>
+
+<section class="read-more">
+   
+   
+   <div class="read-more-item">
+       <span class="read-more-item-dim">最近的文章</span>
+       <h2 class="post-list__post-title post-title"><a href="/2016/04/2016%E5%B9%B43%E6%9C%88iOS%E9%9D%A2%E8%AF%95%E6%80%BB%E7%BB%93/" title="link to 2016年3月iOS面试总结">2016年3月iOS面试总结</a></h2>
+       <p class="excerpt">今年3月中下旬因为个人原因，换了一份工作，期间面试了有4，5家，基本都是D轮或者上市公司，也从他们的面试笔试中看到了自己的一些不足，于是就想写出来和大家分享一下，如果能帮到正在面试的同学更好。从面试题中，其实可以看到一些行业的发展，以及总体人才需求是怎样的了。一.笔试题笔试基本都有一两道基础题，比如说UITableView的重用机制，ARC的基本原理，如何避免retain cycle，谈谈对MVC的理解，iOS内存管理机制。这些大家应该都很清楚了。笔试的内容有几种有选择题，问答题，难一点的...&hellip;</p>
+       <div class="post-list__meta"><time datetime="2016-04-28 23:56:00 +0800" class="post-list__meta--date date">2016-04-28</time> &#8226; <span class="post-list__meta--tags tags">面试总结</span><a class="btn-border-small" href=/2016/04/2016%E5%B9%B43%E6%9C%88iOS%E9%9D%A2%E8%AF%95%E6%80%BB%E7%BB%93/>继续阅读</a></div>
+   </div>
+   
+   
+   
+   
+   <div class="read-more-item">
+       <span class="read-more-item-dim">更早的文章</span>
+       <h2 class="post-list__post-title post-title"><a href="/2016/04/Code-review-Phabricator-Use-guide-introduce/" title="link to Code review - Phabricator Use guide introduce">Code review - Phabricator Use guide introduce</a></h2>
+       <p class="excerpt">前言今天给大家分享一下我之前在公司搭建的一个Code Review服务器的一些心得吧。由于现在移动互联网更新迭代速度很快，分布版本的速度基本上决定了创业公司的生命，所以代码质量在决定产品质量上也体现出尤其重要的地位。目录1.Phabricator Summary2.pre-push code review tool —— Differential3.code repository browse tool — Diffusion4.post-push code review tool —— ...&hellip;</p>
+       <div class="post-list__meta"><time datetime="2016-04-24 17:57:00 +0800" class="post-list__meta--date date">2016-04-24</time> &#8226; <span class="post-list__meta--tags tags">Code Review</span><a class="btn-border-small" href=/2016/04/Code-review-Phabricator-Use-guide-introduce/>继续阅读</a></div>
+   </div>
+   
+</section>
+
+<section class="post-comments">
+  
+    <div id="disqus_thread"></div>
+    <script>
+    
+    var disqus_config = function () {
+        this.page.url = "http://vno.onevcat.com/2016/04/%E6%90%AD%E5%BB%BAPhabricator%E6%88%91%E9%81%87%E5%88%B0%E7%9A%84%E9%82%A3%E4%BA%9B%E5%9D%91/";
+        this.page.identifier = "/2016/04/%E6%90%AD%E5%BB%BAPhabricator%E6%88%91%E9%81%87%E5%88%B0%E7%9A%84%E9%82%A3%E4%BA%9B%E5%9D%91/";
+    };
+
+    var disqus_shortname = 'halfrostsfield';
+    
+    (function() { // DON'T EDIT BELOW THIS LINE
+        var d = document, s = d.createElement('script');
+        s.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>要查看<a href="http://disqus.com/?ref_noscript"> Disqus </a>评论，请启用 JavaScript</noscript>
+    
+  
+  
+  
+  
+</section>
+
+
+            <section class="footer">
+    <footer>
+    	<span class="footer__copyright">本站点采用<a href="http://creativecommons.org/licenses/by-nc-sa/4.0/">知识共享 署名-非商业性使用-相同方式共享 4.0 国际 许可协议</a></span>
+        <span class="footer__copyright">由 <a href="https://jekyllrb.com">Jekyll</a> 于 2016-06-19 生成，感谢<a href="https://pages.github.com"> GitHub Pages</a> 强力驱动</span>
+        <span class="footer__copyright">本站由 <a href="http://halfrost.com">@halfrost</a> 创建，采用 <a href="https://github.com/onevcat/vno-jekyll">Vno - Jekyll</a> 作为主题，您可以在 GitHub 找到<a href="https://github.com/onevcat/OneV-s-Den">本站源码</a> - &copy; 2016</span>
+    </footer>
+</section>
+
+        </div>
+    </div>
+    
+    <script type="text/javascript" src="//code.jquery.com/jquery-1.11.3.min.js"></script>
+
+<script type="text/javascript" src="/js/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+<script type="text/javascript" src="/js/main.js"></script>
+
+
+
+    
+  </body>
+
+</html>
