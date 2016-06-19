@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>Halfrost&#39;s Field</title>
+    <title>Halfrost&#39;s Field | 冰霜之地</title>
     <description>嗨，我是于德志 (@halfrost)，一名来自中国的 iOS 开发者，已退役 acmer 。现居上海。吾笃信：德不孤，必有志，技不疏，必有朋。</description>
     <link>http://vno.onevcat.com/</link>
     <atom:link href="http://vno.onevcat.com/feed.xml" rel="self" type="application/rss+xml"/>
-    <pubDate>Sun, 19 Jun 2016 03:12:34 +0800</pubDate>
-    <lastBuildDate>Sun, 19 Jun 2016 03:12:34 +0800</lastBuildDate>
+    <pubDate>Sun, 19 Jun 2016 13:57:40 +0800</pubDate>
+    <lastBuildDate>Sun, 19 Jun 2016 13:57:40 +0800</lastBuildDate>
     <generator>Jekyll v3.1.6</generator>
     
       <item>
