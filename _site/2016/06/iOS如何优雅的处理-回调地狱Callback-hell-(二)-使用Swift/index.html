@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <title>iOS如何优雅的处理“回调地狱Callback hell”(二)——使用Swift</title>
+  <meta name="description" content="">
+  <meta name="author" content="Wei Wang">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="iOS如何优雅的处理“回调地狱Callback hell”(二)——使用Swift">
+  <meta name="twitter:description" content="">
+
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="iOS如何优雅的处理“回调地狱Callback hell”(二)——使用Swift">
+  <meta property="og:description" content="">
+
+  <link rel="icon" type="image/ico" href="/assets/images/favicon.ico" />
+  <link href="/assets/images/favicon.ico" rel="shortcut icon" type="image/ico">
+
+  <link rel="stylesheet" href="/css/main.css">
+  <link href="//netdna.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
+
+  <link rel="canonical" href="http://vno.onevcat.com/2016/06/iOS%E5%A6%82%E4%BD%95%E4%BC%98%E9%9B%85%E7%9A%84%E5%A4%84%E7%90%86-%E5%9B%9E%E8%B0%83%E5%9C%B0%E7%8B%B1Callback-hell-(%E4%BA%8C)-%E4%BD%BF%E7%94%A8Swift/">
+  <link rel="alternate" type="application/rss+xml" title="Halfrost's Field | 冰霜之地" href="http://vno.onevcat.com/feed.xml">
+
+  <meta name="google-site-verification" content="1-1ZlHoRvM0T2FqPbW2S-qLgYXN6rsn52kErlMPd_gw" />
+
+</head>
+
+
+  <body>
+
+    <span class="mobile btn-mobile-menu">
+        <i class="fa fa-list btn-mobile-menu__icon"></i>
+        <i class="fa fa-angle-up btn-mobile-close__icon hidden"></i>
+    </span>
+    
+    <header class="panel-cover panel-cover--collapsed" style="background-image: url('/assets/images/background-cover.jpg')">
+  <div class="panel-main">
+
+    <div class="panel-main__inner panel-inverted">
+    <div class="panel-main__content">
+
+        <a href="/#blog" title="前往 Halfrost's Field | 冰霜之地 的主页" class="blog-button"><img src="/assets/images/avatar.jpg" width="80" alt="Halfrost's Field | 冰霜之地 logo" class="panel-cover__logo logo" /></a>
+        <h1 class="panel-cover__title panel-title"><a href="/#blog" title="link to homepage for Halfrost's Field | 冰霜之地" class="blog-button">Halfrost's Field | 冰霜之地</a></h1>
+        
+        <span class="panel-cover__subtitle panel-subtitle">一缕殇流，化隐半边冰霜</span>
+        
+        <hr class="panel-cover__divider" />
+        <p class="panel-cover__description">嗨，我是于德志 (@halfrost)，一名来自中国的 iOS 开发者，已退役 acmer 。现居上海。吾笃信：德不孤，必有志，技不疏，必有朋。</p>
+        <hr class="panel-cover__divider panel-cover__divider--secondary" />
+        
+        
+        
+        <div class="navigation-wrapper">
+          <div>
+            <nav class="cover-navigation cover-navigation--primary">
+              <ul class="navigation">
+                <li class="navigation__item"><a href="/#blog" title="Visit blog" class="blog-button">博客</a></li>
+                
+                  <li class="navigation__item"><a href="http://about.halfrost.com" target="_blank" title="关于">关于</a></li>
+                
+              </ul>
+            </nav>
+          </div>
+          
+          <div><nav class="cover-navigation navigation--social">
+  <ul class="navigation">
+
+    
+    <!-- jianshu-->
+    <li class="navigation__item">
+      <a href="http://jianshu.com/users/12201cdd5d7a/latest_articles" title="@halfrost 的简书" target="_blank">
+        <i class='social fa fa-book'></i>
+        <span class="label">jianshu</span>
+      </a>
+    </li>
+    
+
+  
+  <!-- Weibo -->
+  <li class="navigation__item">
+    <a href="http://weibo.com/halfrost" title="@halfrost 的微博" target="_blank">
+      <i class='social fa fa-weibo'></i>
+      <span class="label">Weibo</span>
+    </a>
+  </li>
+  
+
+  
+  <!-- Github -->
+  <li class="navigation__item">
+    <a href="https://github.com/halfrost" title="@halfrost 的 Github" target="_blank">
+      <i class='social fa fa-github'></i>
+      <span class="label">Github</span>
+    </a>
+  </li>
+  
+
+  
+
+  
+
+  <!-- RSS -->
+  <li class="navigation__item">
+    <a href="/feed.xml" rel="author" title="RSS" target="_blank">
+      <i class='social fa fa-rss'></i>
+      <span class="label">RSS</span>
+    </a>
+  </li>
+
+  
+  <!-- Email -->
+  <li class="navigation__item">
+    <a href="mailto:ydz627@gamil.com" title="Contact me">
+      <i class='social fa fa-envelope'></i>
+      <span class="label">Email</span>
+    </a>
+  </li>
+  
+
+  </ul>
+</nav>
+</div>
+        </div>
+      </div>
+    </div>
+    
+    
+    <div class="panel-cover--overlay cover-black"></div>
+    
+  </div>
+</header>
+
+
+    <div class="content-wrapper">
+        <div class="content-wrapper__inner">
+            <article class="post-container post-container--single" itemscope itemtype="http://schema.org/BlogPosting">
+  <header class="post-header">
+    <div class="post-meta">
+      <time datetime="2016-06-22 22:45:00 +0800" itemprop="datePublished" class="post-meta__date date">2016-06-22</time> &#8226; <span class="post-meta__tags tags">iOS</span>
+    </div>
+    <h1 class="post-title">iOS如何优雅的处理“回调地狱Callback hell”(二)——使用Swift</h1>
+  </header>
+
+  <section class="post">
+    <p><img src="http://upload-images.jianshu.io/upload_images/1194012-a590ae3efef185d3.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<h4 id="section">前言</h4>
+<p>在上篇中，我谈到了可以用promise来解决Callback hell的问题，这篇我们换一种方式一样可以解决这个问题。</p>
+
+<p>我们先分析一下为何promise能解决多层回调嵌套的问题，经过上篇的分析，我总结也一下几点：</p>
+
+<p>1.promise封装了所有异步操作，把异步操作封装成了一个“盒子”。<br />
+2.promise提供了Monad，then相当于flatMap。<br />
+3.promise的函数返回对象本身，于是就可形成链式调用</p>
+
+<p>好了，既然这些能优雅的解决callback hell，那么我们只要能做到这些，也一样可以完成任务。到这里大家可能就已经恍然大悟了，Swift就是完成这个任务的最佳语言！Swift支持函数式编程，分分钟就可以完成promise的基本功能。</p>
+
+<h4 id="swiftcallback-hell">一.利用Swift特性处理回调Callback hell</h4>
+
+<p>我们还是以上篇的例子来举例，先来描述一下场景：
+假设有这样一个提交按钮，当你点击之后，就会提交一次任务。当你点下按钮的那一刻，首先要先判断是否有权限提交，没有权限就弹出错误。有权限提交之后，还要请求一次，判断当前任务是否已经存在，如果存在，弹出错误。如果不存在，这个时候就可以安心提交任务了。</p>
+
+<p>那么代码如下：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>func requestAsyncOperation(request : String , success : String -&gt; Void , failure : NSError -&gt; Void)
+{
+    WebRequestAPI.fetchDataAPI(request, success : { result in
+        WebOtherRequestAPI.fetchOtherDataAPI ( result ,  success : {OtherResult in
+            [self fulfillData:OtherResult];
+            
+            let finallyTheParams = self.transformResult(OtherResult)
+            TaskAPI.fetchOtherDataAPI ( finallyTheParams , success : { TaskResult in
+                
+                let finallyTaskResult = self.transformTaskResult(TaskResult)
+                
+                success(finallyTaskResult)
+                },
+                failure:{ TaskError in
+                    failure(TaskError)
+                }
+                
+            )
+            },failure : { ExistError in
+                failure(ExistError)
+            }
+        )
+        } , failure : { AuthorityError in
+            failure(AuthorityError)
+        }
+    )
+}
+</code></pre>
+</div>
+
+<p>接下来我们就来优雅的解决上述看上去不好维护的Callback hell。</p>
+
+<p>1.首先我们要封装异步操作，把异步操作封装到Async中，顺带把返回值也一起封装成Result。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+enum Result &lt;T&gt; {
+    case Success(T)
+    case Failure(ErrorType)
+}
+
+struct Async&lt;T&gt; {
+    let trunk:(Result&lt;T&gt;-&gt;Void)-&gt;Void
+    init(function:(Result&lt;T&gt;-&gt;Void)-&gt;Void) {
+        trunk = function
+    }
+    func execute(callBack:Result&lt;T&gt;-&gt;Void) {
+        trunk(callBack)
+    }
+}
+
+</code></pre>
+</div>
+
+<p>2.封装Monad，提供Map和flatMap操作。顺带返回值也返回Async，以方便后面可以继续链式调用。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>// Monad
+extension Async{
+
+
+    func map&lt;U&gt;(f: T throws-&gt; U) -&gt; Async&lt;U&gt; {
+        return flatMap{ .unit(try f($0)) }
+    }
+
+    func flatMap&lt;U&gt;(f:T throws-&gt; Async&lt;U&gt;) -&gt; Async&lt;U&gt; {
+        return Async&lt;U&gt;{ cont in
+            self.execute{
+                switch $0.map(f){
+                case .Success(let async):
+                    async.execute(cont)
+                case .Failure(let error):
+                    cont(.Failure(error))
+                }
+            }
+        }
+    }
+}
+</code></pre>
+</div>
+<p>这是我们把异步的过程就封装成一个盒子了，盒子里面有Map，flatMap操作，flatMap对应的其实就是promise的then</p>
+
+<p>3.我们可以把flatMap名字直接换成then，那么之前那30多行的代码就会简化成下面这样：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+func requestAsyncOperation(request : String ) -&gt; Async &lt;String&gt;
+{
+    return fetchDataAPI(request)
+           .then(fetchOtherDataAPI)
+           .map(transformResult)
+           .then(fetchOtherDataAPI)
+           .map(transformTaskResult)
+}
+</code></pre>
+</div>
+<p>基本上和用promise一样的效果。这样就不用PromiseKit库，利用promise思想的精髓，优雅的完美的处理了回调地狱。这也得益于Swift语言的优点。</p>
+
+<p>文章至此，虽然已经解决了问题了，不过还没有结束，我们还可以继续再进一步讨论一些东西。</p>
+
+<h4 id="section-1">二.进一步的讨论</h4>
+<p>1.@noescape，throws，rethrows关键字
+flatMap还有这种写法：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>func flatMap&lt;U&gt; (@noescape f: T throws -&gt; Async&lt;U&gt;)rethrows -&gt; Async&lt;U&gt; 
+</code></pre>
+</div>
+
+<p>@noescape 从字面上看，就知道是“不会逃走”的意思，这个关键字专门用于修饰函数闭包这种参数类型的，当出现这个参数时，它表示该闭包不会跳出这个函数调用的生命期：即函数调用完之后，这个闭包的生命期也结束了。
+在苹果官方文档上是这样写的：
+&gt;A new @noescape attribute may be used on closure parameters to functions. This indicates that the parameter is only ever called (or passed as an @noescape parameter in a call), which means that it cannot outlive the lifetime of the call. This enables some minor performance optimizations, but more importantly disables the self. requirement in closure arguments.</p>
+
+<p>那什么时候一个闭包参数会跳出函数的生命期呢？</p>
+
+<p>引用唐巧大神的解释：
+&gt;在函数实现内，将一个闭包用 dispatch_async
+嵌套，这样这个闭包就会在另外一个线程中存在，从而跳出了当前函数的生命期。这样做主要是可以帮助编译器做性能的优化。</p>
+
+<p>throws关键字是代表该闭包可能会抛出异常。
+rethrows关键字是代表这个闭包如果抛出异常，仅可能是因为传递给它的闭包的调用导致了异常。</p>
+
+<p>2.继续说说上面例子里面的Result，和Async一样，我们也可以继续封装Result，也加上map和flatMap方法。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+func ==&lt;T:Equatable&gt;(lhs:Result&lt;T&gt;, rhs:Result&lt;T&gt;) -&gt; Bool{
+    if case (.Success(let l), .Success(let r)) = (lhs, rhs){
+        return l == r
+    }
+    return false
+}
+
+extension Result{
+
+    func map&lt;U&gt;(f:T throws-&gt; U) -&gt; Result&lt;U&gt; {
+        return flatMap{.unit(try f($0))}
+    }
+
+    func flatMap&lt;U&gt;(f:T throws-&gt; Result&lt;U&gt;) -&gt; Result&lt;U&gt; {
+        switch self{
+        case .Success(let value):
+            do{
+                return try f(value)
+            }catch let e{
+                return .Failure(e)
+            }
+        case .Failure(let e):
+            return .Failure(e)
+        }
+    }
+}
+</code></pre>
+</div>
+
+<p>3.上面我们已经把Async和Result封装了map方法，所以他们也可以叫做<strong>函子(Functor)</strong>。接下来可以继续封装，把他们都封装成<strong>适用函子(Applicative Functor)</strong>和<strong>单子(Monad)</strong></p>
+
+<p><strong>适用函子(Applicative Functor)</strong>根据定义：
+对于任意一个函子F，如果能支持以下运算，该函子就是一个适用函子：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>func pure&lt;A&gt;(value:A) -&gt;F&lt;A&gt;
+
+func &lt;*&gt;&lt;A,B&gt;(f:F&lt;A - &gt; B&gt;, x:F&lt;A&gt;) -&gt;F&lt;B&gt;
+</code></pre>
+</div>
+
+<p>以Async为例，我们为它加上这两个方法</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+extension Async{
+
+    static func unit(x:T) -&gt; Async&lt;T&gt; {
+        return Async{ $0(.Success(x)) }
+    }
+
+    func map&lt;U&gt;(f: T throws-&gt; U) -&gt; Async&lt;U&gt; {
+        return flatMap{ .unit(try f($0)) }
+    }
+
+    func flatMap&lt;U&gt;(f:T throws-&gt; Async&lt;U&gt;) -&gt; Async&lt;U&gt; {
+        return Async&lt;U&gt;{ cont in
+            self.execute{
+                switch $0.map(f){
+                case .Success(let async):
+                    async.execute(cont)
+                case .Failure(let error):
+                    cont(.Failure(error))
+                }
+            }
+        }
+    }
+
+    func apply&lt;U&gt;(af:Async&lt;T throws-&gt; U&gt;) -&gt; Async&lt;U&gt; {
+        return af.flatMap(map)
+    }
+}
+</code></pre>
+</div>
+
+<p>unit和apply就是上面定义中的两个方法。接下来我们在看看Monad的定义。</p>
+
+<p><strong>单子(Monad)</strong>根据定义：
+对于任意一个类型构造体F定义了下面两个函数，它就是一个单子Monad：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>func pure&lt;A&gt;(value:A) -&gt;F&lt;A&gt;
+
+func flatMap&lt;A,B&gt;(x:F&lt;A&gt;)-&gt;(A-&gt;F&lt;B&gt;)-&gt;F&lt;B&gt;
+</code></pre>
+</div>
+
+<p>还是以Async为例，此时的Async已经有了unit和flatMap满足定义了，这个时候，就可以说Async已经是一个Monad了。</p>
+
+<p>至此，我们就把Async和Result都变成了<strong>适用函子(Applicative Functor)</strong>和<strong>单子(Monad)</strong>了。</p>
+
+<p>4.再说说运算符。
+flatMap函数有时候会被定义为一个运算符»=。由于它会将第一个参数的计算结果绑定到第二个参数的输入上面，这个运算符也会被称为“绑定(bind)”运算.</p>
+
+<p>为了方便，那我们就把上面的4个操作都定义成运算符吧。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>func unit&lt;T&gt; (x:T) -&gt; Async&lt;T&gt; {
+    return Async{$0(.Success(x))}
+}
+
+func &lt;^&gt; &lt;T, U&gt; (f: T throws-&gt; U, async: Async&lt;T&gt;) -&gt; Async&lt;U&gt; {
+    return async.map(f)
+}
+
+func &gt;&gt;= &lt;T, U&gt; (async:Async&lt;T&gt;, f:T throws-&gt; Async&lt;U&gt;) -&gt; Async&lt;U&gt; {
+    return async.flatMap(f)
+}
+
+func &lt;*&gt; &lt;T, U&gt; (af: Async&lt;T throws-&gt; U&gt;, async:Async&lt;T&gt;) -&gt; Async&lt;U&gt; {
+    return async.apply(af)
+}
+</code></pre>
+</div>
+<p>按照顺序，第二个对应的就是原来的map函数，第三个对应的就是原来的flatMap函数。</p>
+
+<p>5.说到运算符，我们这里还可以继续回到文章最开始的地方去讨论一下那段回调地狱的代码。上面我们通过map和flatMap成功的展开了Callback hell，其实这里还有另外一个方法可以解决问题，那就是用自定义运算符。这里我们用不到适用函子的&lt;*&gt;，有些问题就可能用到它。还是回到上述问题，这里我们用Monad里面的运算符来解决回调地狱。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+func requestAsyncOperation(request : String ) -&gt; Async &lt;String&gt;
+{
+    return fetchDataAPI(request) &gt;&gt;= (fetchOtherDataAPI) &lt;^&gt;(transformResult) &gt;&gt;= (fetchOtherDataAPI) &lt;^&gt; (transformTaskResult)
+}
+</code></pre>
+</div>
+
+<p>通过运算符，最终原来的40多行代码变成了最后一行了！当然，我们中间封装了一些操作。</p>
+
+<h4 id="section-2">三.总结</h4>
+<p>经过上篇和本篇的讨论，优雅的处理”回调地狱Callback hell”的方法有以下几种:<br />
+1.使用PromiseKit<br />
+2.使用Swift的map和flatMap封装异步操作(思想和promise差不多)<br />
+3.使用Swift自定义运算符展开回调嵌套</p>
+
+<p>目前为止，我能想到的处理方法还有2种：<br />
+4.使用Reactive cocoa<br />
+5.使用RxSwift</p>
+
+<p>下篇或者下下篇可能应该就是讨论RAC和RxSwift如果优雅的处理回调地狱了。如果大家还有什么其他方法能优雅的解决这个问题，也欢迎大家提出来，一起讨论，相互学习！</p>
+
+  </section>
+</article>
+
+<section class="read-more">
+   
+   
+   <div class="read-more-item">
+       <span class="read-more-item-dim">最近的文章</span>
+       <h2 class="post-list__post-title post-title"><a href="/2016/06/WWDC2016-Session%E7%AC%94%E8%AE%B0-iOS-10-%E6%8E%A8%E9%80%81Notification%E6%96%B0%E7%89%B9%E6%80%A7/" title="link to WWDC2016 Session笔记 - iOS 10  推送Notification新特性">WWDC2016 Session笔记 - iOS 10  推送Notification新特性</a></h2>
+       <p class="excerpt">前言在今年6月14号苹果WWDC开发者大会上，苹果带来了新的iOS系统——iOS 10。苹果为iOS 10带来了十大项更新。苹果高级副总裁Craig Federighi称此次对iOS的更新是“苹果史上最大的iOS更新”。  新的屏幕通知查看方式：苹果为iOS 10带来了全新的通知查看功能，即抬起iPhone的屏幕，用户就能看到目前的通知和更新情况。  苹果将Siri开放给第三方开发者: 现在用户可以让Siri实现更多的功能，例如让Siri向自己的联系人发送微信信息等。目前Siri可以直接支...&hellip;</p>
+       <div class="post-list__meta"><time datetime="2016-06-26 21:21:00 +0800" class="post-list__meta--date date">2016-06-26</time> &#8226; <span class="post-list__meta--tags tags">iOS</span><a class="btn-border-small" href=/2016/06/WWDC2016-Session%E7%AC%94%E8%AE%B0-iOS-10-%E6%8E%A8%E9%80%81Notification%E6%96%B0%E7%89%B9%E6%80%A7/>继续阅读</a></div>
+   </div>
+   
+   
+   
+   
+   <div class="read-more-item">
+       <span class="read-more-item-dim">更早的文章</span>
+       <h2 class="post-list__post-title post-title"><a href="/2016/06/%E5%A6%82%E4%BD%95%E5%BF%AB%E9%80%9F%E7%BB%99%E8%87%AA%E5%B7%B1%E6%9E%84%E5%BB%BA%E4%B8%80%E4%B8%AA%E6%B8%A9%E9%A6%A8%E7%9A%84_%E5%AE%B6_-%E7%94%A8Jekyll%E6%90%AD%E5%BB%BA%E9%9D%99%E6%80%81%E5%8D%9A%E5%AE%A2/" title="link to 如何快速给自己构建一个温馨的"家"——用Jekyll搭建静态博客">如何快速给自己构建一个温馨的"家"——用Jekyll搭建静态博客</a></h2>
+       <p class="excerpt">前言我相信，每个程序员都有一个愿望，都想有一个属于自己的”家”——属于自己的博客，专属的网站。在自己的“家”中，可以和志同道合的兄弟一起分享和讨论任何技术，谈天说地。更重要的是可以当做自己的技术积累，提升自己实力。那么接下来就来说说我博客搭建过程。目录：  本地搭建Jekyll  开发或者选择Jekyll主题  使用Github Pages服务  申请个人域名  给博客增加访客评论功能  申请”小绿锁”HTTPS  日后维护一.本地搭建KekyllJekyll是什么？它是一个简单静态博客生...&hellip;</p>
+       <div class="post-list__meta"><time datetime="2016-06-21 02:57:00 +0800" class="post-list__meta--date date">2016-06-21</time> &#8226; <span class="post-list__meta--tags tags">Blog</span><a class="btn-border-small" href=/2016/06/%E5%A6%82%E4%BD%95%E5%BF%AB%E9%80%9F%E7%BB%99%E8%87%AA%E5%B7%B1%E6%9E%84%E5%BB%BA%E4%B8%80%E4%B8%AA%E6%B8%A9%E9%A6%A8%E7%9A%84_%E5%AE%B6_-%E7%94%A8Jekyll%E6%90%AD%E5%BB%BA%E9%9D%99%E6%80%81%E5%8D%9A%E5%AE%A2/>继续阅读</a></div>
+   </div>
+   
+</section>
+
+<section class="post-comments">
+  
+    <div id="disqus_thread"></div>
+    <script>
+    
+    var disqus_config = function () {
+        this.page.url = "http://vno.onevcat.com/2016/06/iOS%E5%A6%82%E4%BD%95%E4%BC%98%E9%9B%85%E7%9A%84%E5%A4%84%E7%90%86-%E5%9B%9E%E8%B0%83%E5%9C%B0%E7%8B%B1Callback-hell-(%E4%BA%8C)-%E4%BD%BF%E7%94%A8Swift/";
+        this.page.identifier = "/2016/06/iOS%E5%A6%82%E4%BD%95%E4%BC%98%E9%9B%85%E7%9A%84%E5%A4%84%E7%90%86-%E5%9B%9E%E8%B0%83%E5%9C%B0%E7%8B%B1Callback-hell-(%E4%BA%8C)-%E4%BD%BF%E7%94%A8Swift/";
+    };
+
+    var disqus_shortname = 'halfrostsfield';
+    
+    (function() { // DON'T EDIT BELOW THIS LINE
+        var d = document, s = d.createElement('script');
+        s.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>要查看<a href="http://disqus.com/?ref_noscript"> Disqus </a>评论，请启用 JavaScript</noscript>
+    
+  
+  
+  
+  
+</section>
+
+
+            <section class="footer">
+    <footer>
+      <span class="footer__copyright">友情链接 ：<a href="https://desgard.com/">Guardia · 瓜地</a>    <a href="https://bestswifter.com/">bestswifter</a>  <a href="http://kuailejim.com/">kuailejim</a>  <a href="http://valiantcat.com/">南栀倾寒</a>  <a href="http://www.jianshu.com/users/9c51a213b02e">Martin_Joy</a>  <a href="http://bluelich.com/">bluelich</a>  <a href="http://yuyang.myportfolio.com/">yuy</a>  </span>
+      <br>
+      <br>
+    	<span class="footer__copyright">本站点采用<a href="http://creativecommons.org/licenses/by-nc-sa/4.0/">知识共享 署名-非商业性使用-相同方式共享 4.0 国际 许可协议</a></span>
+        <span class="footer__copyright">由 <a href="https://jekyllrb.com">Jekyll</a> 于 2016-07-18 生成，感谢<a href="https://pages.github.com"> GitHub Pages</a> 强力驱动</span>
+        <span class="footer__copyright">本站由 <a href="http://halfrost.com">@halfrost</a> 创建，采用 <a href="https://github.com/onevcat/vno-jekyll">Vno - Jekyll</a> 作为主题，您可以在 GitHub 找到<a href="https://github.com/onevcat/OneV-s-Den">本站源码</a> - &copy; 2016</span>
+    </footer>
+</section>
+
+        </div>
+    </div>
+    
+    <script type="text/javascript" src="//code.jquery.com/jquery-1.11.3.min.js"></script>
+
+<script type="text/javascript" src="/js/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+<script type="text/javascript" src="/js/main.js"></script>
+
+
+
+    
+  </body>
+
+</html>

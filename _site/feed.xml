@@ -5,9 +5,1073 @@
     <description>嗨，我是于德志 (@halfrost)，一名来自中国的 iOS 开发者，已退役 acmer 。现居上海。吾笃信：德不孤，必有志，技不疏，必有朋。</description>
     <link>http://vno.onevcat.com/</link>
     <atom:link href="http://vno.onevcat.com/feed.xml" rel="self" type="application/rss+xml"/>
-    <pubDate>Tue, 21 Jun 2016 13:18:17 +0800</pubDate>
-    <lastBuildDate>Tue, 21 Jun 2016 13:18:17 +0800</lastBuildDate>
+    <pubDate>Mon, 18 Jul 2016 02:02:59 +0800</pubDate>
+    <lastBuildDate>Mon, 18 Jul 2016 02:02:59 +0800</lastBuildDate>
     <generator>Jekyll v3.1.6</generator>
+    
+      <item>
+        <title>WWDC2016 Session笔记 - iOS 10 UICollectionView新特性</title>
+        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-520084e0dda3ed1e.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h4 id=&quot;section&quot;&gt;前言&lt;/h4&gt;
+&lt;p&gt;关于 iOS 10  UICollectionView的新特性，主要还是体现在如下3个方面&lt;br /&gt;
+1. 顺滑的滑动体验
+现在基本上人人都离不开手机，手机的app也每天都有人在用。一个app的好坏由它的用户体验决定。在可以滑动的视图里面，必须要更加丝滑柔顺才能获得用户的青睐。这些UICollectionView的新特性可以让你们的app比原来更加顺滑，而且这些特性只需要你加入少量的代码即可达到目的。&lt;br /&gt;
+2. 针对self-sizing的改进
+self-sizing的API在iOS8的时候被引进，iOS10中加入更多特性使cell更加容易去适配。&lt;br /&gt;
+3. Interactive reordering重排
+这个功能在iOS9的时候介绍过了，苹果在iOS 10的API里面大大增强了这一功能。&lt;/p&gt;
+
+&lt;p&gt;####目录
+- 1.UICollectionViewCell顺滑的滑动体验
+- 2.UICollectionViewCell的Pre-Fetching预加载
+- 3.UITableViewCell的Pre-Fetching预加载
+- 4.针对self-sizing的改进
+- 5.Interactive Reordering
+- 6.UIRefreshControl&lt;/p&gt;
+
+&lt;h4 id=&quot;uicollectionviewcell&quot;&gt;一. UICollectionViewCell顺滑的滑动体验&lt;/h4&gt;
+&lt;p&gt;众所周知，iOS设备已良好的用户体验赢得了广大的用户群。iOS系统在用户点击屏幕会立即做出响应。而且很大一部分的操作是来自于用户的滑动操作。所以滑动的顺滑是使用户沉浸在app中享受的必要条件。接下来我们就谈谈iOS 10 中增加了那些新特性。&lt;/p&gt;
+
+&lt;p&gt;我们先来看一下之前 UICollectionView 的体验，假设我们每个cell都是简单的蓝色，实际开发app中，cell会比这复杂很多。 我们先生成100个cell。当用户滑动不是很快的时候，还感觉不出来卡顿，当用户大幅度滑动，整个UICollectionView的卡顿就很明显了。如果整个cell的DataSource又是从网络加载的，那就更加卡顿了。效果如下图。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-2357f133fd5961cf.gif?imageMogr2/auto-orient/strip&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;如果这种app上架，用户使用过后，很可能就直接给1星评价了。但是为什么会造成这种问题呢？我们来分析一下，我们模拟一下系统如何处理重用机制的，效果如下图&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-f3aebac8fa099ff6.gif?imageMogr2/auto-orient/strip&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;在上图中，我们可以看出，当cell准备加载进屏幕的时候，整个cell都已经加载完成，等待在屏幕外面了。而且更重要的是，在屏幕外面等待加载的cell是整整一行！这一行的cell都已经加载完数据。这是UICollectionView在用户大幅度滑动时卡顿的根本原因。用专业的术语来说，掉帧。&lt;/p&gt;
+
+&lt;p&gt;接下来我们就来详细的说说掉帧的问题。&lt;/p&gt;
+
+&lt;p&gt;当今的用户是很挑剔的，用户需要一个很顺滑的体验，只要有一点卡顿，很可能一言不合就卸载app了。要想用户感觉不到卡顿，那么我们的app必须帧率达到60帧/秒。用数学换算一下就是每帧16毫秒就必须刷新一次。&lt;/p&gt;
+
+&lt;p&gt;我们用图标来分析一下掉帧的问题。下面会出现2种不同的帧。&lt;/p&gt;
+
+&lt;p&gt;第一种情况，下图是当用户轻微的上下小幅度滑动。这个时候每个cell的加载压力都不大，iOS针对这种情况，已经做了很好的优化了，所以用户感觉不到任何卡顿。这种情况是不会掉帧，用户也希望能使用如此顺滑的app。&lt;br /&gt;
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-61e63f9cf0819c8b.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;第二种情况，当用户大幅度滑动，每个cell加载的压力很大，也许需要网络请求，也许需要读取数据库，而且每次都加载一行cell出来，这样每个cell的加载时间都增加了，加载一行的总时间也就大大增加了，如下图所示。这样，不仅仅当前帧在加载cell，总的时间还会挤压到下一帧的时间里面去。这种情况下，用户就感觉到了卡顿了。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-c1c21562f28f212a.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;我们换种方式在说明一下2种情况下掉帧的情况。我们用下图的标准来衡量一下上面2种情况。下图分为2部分，上面红色的区域，就是表示掉帧的区域，因为高于16ms。红色和绿色区域的分界线就在16ms处。y轴我们表示的是CPU在主线程中花费的时间。x轴表示的是在用户滑动中发生的刷新事件。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-5b3c7220a9742932.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;针对上述掉帧的情况，绘制出实验数据，如下图。值得我们关注的是，曲线是很曲折的，非常的不平滑。当用户大幅度滑动的时候，峰值超过了16ms，当用户慢速滑动的时候，帧率又能保持在比较顺滑的区域。处于绿色区域内的cell加载压力都是很小的。这就是时而掉帧时而顺滑的场景。这种场景下，用户体验是很糟糕的。
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-742100ebb16ca993.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;那怎么解决这么问题的呢？我们来看下图：&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-66aee8c339f703c7.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
+上图中的曲线我们看着就很平缓了，而且这种情况也不会出现掉帧的情况了，每个滑动中的时间都能达到60帧了。这是怎样做到的呢？因为把每个cell的加载事件都平分了，每个cell不会再出现很忙和很闲的两个极端。这样我们就取消了之前的波峰和波谷。从而让该曲线达到近乎水平的直线。&lt;/p&gt;
+
+&lt;p&gt;如何让每个cell都分摊加载任务的压力？这就要谈到新的cell的生命周期了。&lt;/p&gt;
+
+&lt;p&gt;先来看看老的 UICollectionViewCell的声明周期。当用户滑动屏幕，屏幕外有一个cell准备加载显示进来。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-1e6f8e72fba43498.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;这个时候我们把这个cell从reuse队列里面拿出来，然后调用prepareForReuse方法。这个方法就给了cell时间，用来重置cell，重置状态，刷新cell，加载新的数据。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-c26df5728427d953.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;再滑动，我们就会调用cellForItemAtIndexPath方法了。这个方法里面就是我们开发者自定义的填充cell的方式了。这里会填充data model，然后赋值给cell，再把cell返回给iOS系统。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-91a745c8edf6f8e9.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
+当cell马上要进入屏幕的时候，就会调用willDisplayCell的方法。这个方法给了我们app最后一次机会，为cell进入屏幕做最后的准备工作。执行完willDisplayCell之后，cell就进入屏幕了。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-1339cb009c3810bf.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
+当cell完全离开屏幕之后，就会调用didEndDisplayingCell方法。以上就是在iOS10之前的整个UICollectionViewCell的生命周期。&lt;/p&gt;
+
+&lt;p&gt;接下来我们就来看看iOS 10的UICollectionViewCell生命周期是怎么样的。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-67440aea27bca091.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;这里还是和iOS9一样的，当用户滑动UICollectionView的时候，需要一个cell，我们就从reuse队列里面拿出一个cell，并调用prepareForReuse方法。注意调用这个方法的时间，当cell还没有进入屏幕的时候，就已经提前调用这个方法了。注意对比和iOS 9的区别，iOS 9 是在cell上边缘马上进入屏幕的时候才调用方法，而这里，cell整个生命周期都被提前了，提前到cell还在设备外面的时候。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-a17f0da0f0c23533.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;这里还是和之前一样，在cellForItemAtIndexPath中创建cell，填充数据，刷新状态等等操作。注意，这里生命周期也比iOS 9提前了。&lt;/p&gt;
+
+&lt;p&gt;用户继续滑动，这个时候就有不同了！&lt;/p&gt;
+
+&lt;p&gt;这个时候我们并不去调用willDisplayCell方法了！这里遵循的原则是，何时去显示，何时再去调用willDisplayCell。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-84563cde3084c866.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
+当cell要马上就需要显示的时候，我们再调用willDisplayCell方法。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-0f7c0d6a0c5ad1fd.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
+当整个cell要从UICollectionView的可见区域消失的时候，这个时候会调用didEndDisplayingCell方法。接下来发生的事情和iOS9一样，cell会进入重用队列中。&lt;/p&gt;
+
+&lt;p&gt;如果用户想要显示某个cell，在iOS 9 当中，cell只能从重用队列里面取出，再次走一遍生命周期。并调用cellForItemAtIndexPath去创建或者生成一个cell。&lt;/p&gt;
+
+&lt;p&gt;在iOS 10 当中，系统会把cell保持一段时间。在iOS中，如果用户把cell滑出屏幕后，如果突然又想回来，这个时候cell并不需要再走一段的生命周期了。只需要直接调用willDisplayCell就可以了。cell就又会重新出现在屏幕中。这就是iOS 10 的整个UICollectionView的生命周期。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-38285868d022c65d.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-e76c5772fe94b6de.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-d98623c78588707f.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-aec86f77678e3d84.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-0d966174af80472f.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;上面说的iOS 10里面的场景同样适用于多列的情况。 这时我们每次只加载一个cell，而不是每次加载一行的cell。当第一个cell准备好之后再叫第二个cell准备。当2个cell都准备好了之后，接着我们再调用willDisplayCell给每个cell，发送完这个消息之后，cell就会出现在屏幕上了。&lt;/p&gt;
+
+&lt;p&gt;这虽然看起来是一个很小的改动，但是这小小的改动就提升了很多的用户体验！&lt;/p&gt;
+
+&lt;p&gt;让我们来看看上述的改动对滑动的影响&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-c832a32902927e60.gif?imageMogr2/auto-orient/strip&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;滑动比iOS 9流程很多，这里可以看到整个过程都很平缓，不卡顿。&lt;/p&gt;
+
+&lt;p&gt;还是和iOS 9一样，我们来模拟一下系统是如何加载cell的情况。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-561985a86edbd74a.gif?imageMogr2/auto-orient/strip&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;我们可以很明显的看到，iOS 系统是一个个的加载cell的，一个cell加载完之后再去加载下一个cell。这里和iOS 9 的有很大的不同，iOS 9是加载整整一行的cell。&lt;/p&gt;
+
+&lt;p&gt;这是因为我们用了新的 UICollectionViewCell的生命周期。整个app完全没有加一行代码。现在iOS 10是丝滑的滑动体验实在是太棒了！！&lt;/p&gt;
+
+&lt;h4 id=&quot;uicollectionviewcellpre-fetching&quot;&gt;二. UICollectionViewCell的Pre-Fetching预加载&lt;/h4&gt;
+
+&lt;p&gt;当我们编译iOS 10的app的时候，这个Pre-Fetching默认是enable的。当然，如果有一些原因导致你必须用到iOS 10之前老的生命周期，你只需要给collectionView加入新的isPrefetchingEnabled属性即可。如果你不想用到Pre-Fetching，那么把这个属性变成false即可。
+&lt;code class=&quot;highlighter-rouge&quot;&gt;
+collectionView.isPrefetchingEnabled = false
+&lt;/code&gt;&lt;/p&gt;
+
+&lt;p&gt;为了最佳实践一下这个新特性。我们先改变一下我们加载cell的方式。我们把很重的读取数据的操作，所有内容的创建都放到cellForItemAtIndexPath方法里面去完成。保证我们在willDisplayCell 和 didEndDisplayCell这两个方法里面基本不做其他事情。最后，需要注意的是cellForItemAtIndexPath生成的某些cell，可能永远都不会被展示在屏幕上，有这样一种情况，当cell将要展示在屏幕上的时候，用户突然滑动离开了这个界面。&lt;/p&gt;
+
+&lt;p&gt;如果这个时候当你用iOS 10编译出你的app，那么非常顺滑的用户体验就会自动的优化出来。&lt;/p&gt;
+
+&lt;p&gt;UICollectionView的流畅的滑动解决了，那么在UICollectionViewCell在加载的时候所花费的时间，怎么解决呢？？&lt;/p&gt;
+
+&lt;p&gt;UICollectionViewCell加载的时间取决于DataModel。DataModel很可能回去加载图片，来自于网络或者来自于本地的数据库。这些操作大多数都是异步的操作。为了使data加载更快，iOS 10引入了新的API来解决这个问题。&lt;/p&gt;
+
+&lt;p&gt;UICollectionView有2个“小伙伴”，那就是data source和delegate。在iOS 10中，将会迎来第3个“小伙伴”。这个“小伙伴”叫prefetchDataSource。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;protocol UICollectionViewDataSourcePrefetching {
+    func collectionView(_ collectionView: UICollectionView,
+                        prefetchItemsAt indexPaths: [NSIndexPath])
+    optional func collectionView(_ collectionView: UICollectionView,
+                                 cancelPrefetchingForItemsAt indexPaths: [NSIndexPath])
+}
+class UICollectionView : UIScrollView {
+    weak var prefetchDataSource: UICollectionViewDataSourcePrefetching?
+    var isPrefetchingEnabled: Bool
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;这个协议里面只有一个必须要实现的方法——ColletionView prefetchItemsAt indexPaths。这个方法会在prefetchDataSource里面被调用，用来给你异步的预加载数据的。indexPaths数组是有序的，就是接下来item接收数据的顺序，让我们model异步处理数据更加方便。&lt;/p&gt;
+
+&lt;p&gt;在这个协议里面还有第二个方法CollectionView cancelPrefetcingForItemsAt indexPaths，不过这个方法是optional的。我们可以利用这个方法来处理在滑动中取消或者降低提前加载数据的优先级。&lt;/p&gt;
+
+&lt;p&gt;值得说明的是，新增加的这个“小伙伴”prefetchDataSource并不能代替原来的读取数据的方法，这个预加载仅仅只是辅助加载数据，并不能
+删除原来我们读取数据的方法。&lt;/p&gt;
+
+&lt;p&gt;至此，我们来看看从文章开始到现在，UICollectionView的性能提升了多少。我们还是用掉帧的方法来看看UICollectionView的性能。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-5b6b9e2c3350a172.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;上图是iOS 9 UICollectionView的性能，很明显的看见，波峰波谷很明显，并且还掉了8帧，有明显的卡顿现象。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-0f8356b077664bae.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;上图是iOS 10 UICollectionView的性能，我们可以很明显的看到，经过iOS 10的优化，整个曲线很明显平缓了一些，没有极端的波峰掉帧现象。但是依旧存在少量的波峰快到16ms分界线了。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-24bf2be2c051eb80.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;上图是iOS 10 + Pre-Fetching API 之后的性能，已经优化的效果很明显了！整条曲线基本都水平了。近乎完美。但是还是能发现有个别波峰特别高。波峰特别高的地方就是那个cell加载压力大，时间花的比较长导致的。接下来我们继续优化！&lt;/p&gt;
+
+&lt;p&gt;先来总结一下使用Pre-Fetching API需要注意的地方。
+1. 在我们使用Pre-Fetching API的时候，我们一定要保证整个预加载的过程都放在后台线程中进行。合理使用GCD 和 NSOperationQueue处理好多线程。&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;
+    &lt;p&gt;请切记，Pre-Fetching API是一种自适应的技术。何为自适应技术呢？当我们滑动速度很慢的时候，在这种“安静”的时期，Pre-Fetching API会默默的在后台帮我们预加载数据，但是一旦当我们快速滑动，我们需要频繁的刷新，我们不会去执行Pre-Fetching API。&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;最后，用cancelPrefetchingAPI去迎合用户的滑动动作的变换，比如说用户在快速滑动突然发现了有趣的感兴趣的事情，这个时候停下来滑动了，甚至快速反向滑动了，或者点击了事件，进去看详情了，这些时刻我们都应该开启cancelPrefetchingAPI。&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;综上所述，Pre-Fetching API对于提高UICollectionView的性能提升是很有帮助的，而且并不需要加入太多的代码。加入少量的代码就可以获得巨大的性能提升！&lt;/p&gt;
+
+&lt;h4 id=&quot;uitableviewcellpre-fetching&quot;&gt;三. UITableViewCell的Pre-Fetching预加载&lt;/h4&gt;
+
+&lt;p&gt;在iOS 10中，UITableViewCell也跟着UICollectionView一起得到了性能的提升，一样拥有了Pre-Fetching API。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;protocol UITableViewDataSourcePrefetching {
+    func tableView(_ tableView: UITableView, prefetchRowsAt indexPaths: [NSIndexPath])
+    optional func tableView(_ tableView: UITableView, cancelPrefetchingForRowsAt indexPaths:
+                            [NSIndexPath])
+}
+class UITableView : UIScrollView {
+    weak var prefetchDataSource: UITableViewDataSourcePrefetching?
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;这里和上面 UICollectionView一样，会调用TableView prefetchRowsAt indexPaths方法。indexPaths还是一个有序数字，顺序就是列表上可见的顺序。第二个可选的API还是TableView cancelPrefetchingForRowsAt indexPaths，和之前提到的一样，也是用来取消预加载的。性能的提升和UICollectionView一样的，对UITableView的性能提升很大！&lt;/p&gt;
+
+&lt;h4 id=&quot;self-sizing&quot;&gt;四. 针对self-sizing的改进&lt;/h4&gt;
+
+&lt;p&gt;self-sizing API 第一次被引入是在iOS 8，然而现在在iOS 10中得到了一些改进。&lt;/p&gt;
+
+&lt;p&gt;在UICollectionView 中有一个固定的类，叫UICollectionViewFlowLayout，iOS已经在这个类中完全支持了self-sizing。为了能开启这一特性，需要我们开发者为一些不能为0的CGSize的cell设置一下estimated item size。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+layout.estimatedItemSize = CGSize(width:50,height:50)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;这会告诉UICollectionView我们想要开启动态计算内容的布局。&lt;/p&gt;
+
+&lt;p&gt;至今，我们能有3种方法来动态的布局。&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;
+    &lt;p&gt;第一种方法是使用autolayout
+当我们合理的加上了constrain，当cell加载的时候，就会根据内容动态的加载布局。&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;第二种方法，如果你不想使用autolayout的方法，想更加手动的控制它，那么我们就需要重写sizeThatFits()方法。&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;第三种方法，终极的方法是重写preferredLayoutAttributesFittingAttributes()方法。在这个方法里面不仅仅可以提供size的信息，更可以得到alpha和transform的信息。&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;所以想指定cell的大小，就可以用上面3个方法之一。&lt;/p&gt;
+
+&lt;p&gt;但是实际操作中，我们可以发现，有时候设置一个合适的estimated item size，对于我们来说是很困难的事情。如果flow layout可以用数学的方法动态的计算布局，而不是根据我们给的size去布局，那会是件很酷的事情。&lt;/p&gt;
+
+&lt;p&gt;iOS 10中就引入了新的API来解决上述的问题。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;layout.estimatedItemSize = UICollectionViewFlowLayoutAutomaticSize
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;对于开发者，我们需要做的事情，仅仅就是设置好flow layout ，然后给estimatedItemSize设定一个新的常数, 最后UICollectionViewFlowLayout 就会自动计算高度了。&lt;/p&gt;
+
+&lt;p&gt;系统会自动计算好所有的布局，包括已经定下来的size的cell，并且还会动态的给出接下来cell的大小的预测。&lt;/p&gt;
+
+&lt;p&gt;接下来看2个例子就可以很明显看出iOS 10针对self-sizing的改进了。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-8c9bad76b1cf453c.gif?imageMogr2/auto-orient/strip&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;上图可以看到，iOS 9 的布局是针对单个cell计算的，当改变了单个的cell，其他的cell依旧没有变化，还是需要重新计算。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-38a291c2d0daacc0.gif?imageMogr2/auto-orient/strip&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;这里例子就可以很明显的看出差别了。当我们改变了第一个cell的size以后，系统会自动计算出所有的cell的size，并且每一行，每一个section的size都会被动态的计算出来，并且刷新界面！&lt;/p&gt;
+
+&lt;p&gt;以上就是iOS 10针对self-sizing的改进。&lt;/p&gt;
+
+&lt;h4 id=&quot;interactive-reordering&quot;&gt;五. Interactive Reordering&lt;/h4&gt;
+
+&lt;p&gt;谈到重新排列，这是我们就需要类比一下UITableView了，UICollectionView的重新排列就如同UITableView 把cell上下移动，只不过UITableView的重排是针对垂直方向的。&lt;/p&gt;
+
+&lt;p&gt;在iOS 9中，引入了UICollectionView的Interactive Reordering，在今年的iOS 10中，又加入了一些新的API。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-fedd66fb206d0beb.gif?imageMogr2/auto-orient/strip&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;在上图中，我们可以看到，我们即使任意拖动cell，整个界面也会重新排列，并且我们改变了cell的大小，整个 UICollectionView 也会重新动态的布局。&lt;/p&gt;
+
+&lt;p&gt;我们先来看看iOS 9里面的API&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+class UICollectionView : UIScrollView {
+    func beginInteractiveMovementForItem(at indexPath: NSIndexPath) -&amp;gt; Bool
+    func updateInteractiveMovementTargetPosition(_ targetPosition: CGPoint)
+    func endInteractiveMovement()
+    func cancelInteractiveMovement()
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;要想开启interactive movement，我们就需要调用beginInteractiveMovementForItem()方法，其中indexPath代表了我们将要移动走的cell。接着每次手势的刷新，我们都需要刷新cell的位置，去响应我们手指的移动操作。这时我们就需要调用updateInteractiveMovementTargetPosition()方法。我们通过手势来传递坐标的变化。当我们移动结束之后，就会调用endInteractiveMovement()方法。 UICollectionView 就会放下cell，处理完整个layout，此时你也可以重新刷新model或者处理数据model。如果中间突然手势取消了，那么这个时候就应该调用cancelInteractiveMovement()方法。如果我们重新把cell移动一圈之后又放回原位，其实就是取消了移动，那这个时候就应该在cancelInteractiveMovement()方法里面不用去刷新data source。&lt;/p&gt;
+
+&lt;p&gt;在iOS 10中，如果你使用UICollectionViewController，那么这个重排对于你来说会更加的简单。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+class UICollectionViewController : UIViewController {
+    var installsStandardGestureForInteractiveMovement: Bool
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;你只需要把installsStandardGestureForInteractiveMovement这个属性设置为True即可。CollectionViewController会自动为你加入手势，并且自动为你调用上面的方法。&lt;/p&gt;
+
+&lt;p&gt;以上就是去年iOS 9为我们增加的API。&lt;/p&gt;
+
+&lt;p&gt;今年的iOS 10新加入的API是在iOS 9的基础上增加了翻页的功能。&lt;br /&gt;
+UICollectionView继承自UIScrollView，所以只需要你做的是把isPagingEnabled属性设置为True，即可开启分页的功能。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+collectionView.isPagingEnabled = true
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;开启分页之前：&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-843decaf48445ce9.gif?imageMogr2/auto-orient/strip&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;开启分页之后就长这样子：&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-7d2a6304b914cc59.gif?imageMogr2/auto-orient/strip&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;每次移动一次就会以页为单位的翻页。&lt;/p&gt;
+
+&lt;h4 id=&quot;uirefreshcontrol&quot;&gt;六.UIRefreshControl&lt;/h4&gt;
+
+&lt;p&gt;UIRefreshControl现在可以直接在CollectionView里面使用，同样的，也可以直接在UITableView里面使用，并且可以脱离UITableViewController。因为现在RefreshControl成为了ScrollView的一个属性了。&lt;/p&gt;
+
+&lt;p&gt;UIRefreshControl的使用方法很简单，就三步：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+let refreshControl = UIRefreshControl()
+refreshControl.addTarget(self, action: #selector(refreshControlDidFire(_:)),
+                         for: .valueChanged)
+collectionView.refreshControl = refreshControl
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;先创建一个refreshControl，再关联一个action事件，最后把这个新的refreshControl赋给想要的控件的对应的属性即可。&lt;/p&gt;
+
+&lt;h4 id=&quot;section-1&quot;&gt;总结&lt;/h4&gt;
+
+&lt;p&gt;通过以上，我们谈到了以下的知识：&lt;br /&gt;
+1. UICollectionView cell pre-fetching预加载机制&lt;br /&gt;
+2. UICollectionView and UITableView prefetchDataSource 新增的API &lt;br /&gt;
+3. 针对self-sizing cells 的改进&lt;br /&gt;
+4. Interactive reordering&lt;/p&gt;
+
+&lt;p&gt;最后，谈谈我看了iOS 10 UICollectionView的优化的看法吧，原来有些地方用到AsyncDisplayKit优化UICollectionView速度的，现在可以考虑不用第三方库优化了，系统自带的方法可以解决一般性的卡顿的问题了。我感觉iOS 10的UICollectionView才像是一个完整版的，之前的系统优化的都不够。我还是很看好iOS 10的UICollectionView。&lt;/p&gt;
+
+&lt;p&gt;请大家多多指教。&lt;/p&gt;
+</description>
+        <pubDate>Mon, 04 Jul 2016 01:02:00 +0800</pubDate>
+        <link>http://vno.onevcat.com/2016/07/WWDC2016-Session%E7%AC%94%E8%AE%B0-iOS-10-UICollectionView%E6%96%B0%E7%89%B9%E6%80%A7/</link>
+        <guid isPermaLink="true">http://vno.onevcat.com/2016/07/WWDC2016-Session%E7%AC%94%E8%AE%B0-iOS-10-UICollectionView%E6%96%B0%E7%89%B9%E6%80%A7/</guid>
+        
+        <category>iOS</category>
+        
+        
+        <category>Blog</category>
+        
+      </item>
+    
+      <item>
+        <title>WWDC2016 Session笔记 - iOS 10  推送Notification新特性</title>
+        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-520084e0dda3ed1e.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h4 id=&quot;section&quot;&gt;前言&lt;/h4&gt;
+&lt;p&gt;在今年6月14号苹果WWDC开发者大会上，苹果带来了新的iOS系统——iOS 10。苹果为iOS 10带来了十大项更新。苹果高级副总裁Craig Federighi称此次对iOS的更新是“苹果史上最大的iOS更新”。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-4416fe3f0633a60e.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;新的屏幕通知查看方式：苹果为iOS 10带来了全新的通知查看功能，即抬起iPhone的屏幕，用户就能看到目前的通知和更新情况。&lt;/li&gt;
+  &lt;li&gt;苹果将Siri开放给第三方开发者: 现在用户可以让Siri实现更多的功能，例如让Siri向自己的联系人发送微信信息等。目前Siri可以直接支持的应用有微信、WhatsApp以及Uber、滴滴、Skype等。&lt;/li&gt;
+  &lt;li&gt;Siri将会更加智能：Siri将拥有更多对语境的意识。基于用户的地点、日历、联系人、联系地址等，Siri会做出智能建议。Siri将越来越成为一个人工智能机器人，具备深度学习功能。&lt;/li&gt;
+  &lt;li&gt;照片应用更新：基于深度学习技术，iOS 10对照片应用有比较大的更新。iOS 10对照片的搜索能力进一步增强，可以检测到新的人物和景色。未来的iPhone能够将相关的照片组织在一起，比如某次旅行的照片、某个周末的照片，并且能够进行自动编辑。iOS 10照片还新增了一个“记忆”标签。&lt;/li&gt;
+  &lt;li&gt;苹果地图：有点类似Siri和照片的更新，苹果地图也增加了很多预测功能，例如苹果地图能够将提供附近的餐厅建议。苹果地图的界面也得到了重新设计，更加的简洁，并增加了交通实时信息。新的苹果地图还将整合在苹果CarPlay中，将为用户提供turn-by-turn导航功能。和Siri一样，地图也将开放给开发者。&lt;/li&gt;
+  &lt;li&gt;苹果音乐：苹果音乐的界面得到了更新，界面会更加简洁、支持多任务，增加最近播放列表。苹果音乐现在已经有1500万付费用户。&lt;/li&gt;
+  &lt;li&gt;HomeKit：iOS 10新增智能家庭应用，支持一键场景模式，HomeKit可以与Siri相连接。
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-dd5070c430b37cc7.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/li&gt;
+  &lt;li&gt;苹果电话：苹果更新了电话功能，来电时可以区别出骚扰电话。
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-20115aefabb1c770.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/li&gt;
+  &lt;li&gt;iMesseage：在iMessage方面，用户可以直接在文本框内发送视频、链接，分享实时照片。另外，苹果还增添了表情预测功能，打出的文字若和表情相符，将会直接推荐相关表情。&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;以下是我关于关于iOS 10中变化比较大的推送通知的学习笔记。&lt;/p&gt;
+
+&lt;h4 id=&quot;section-1&quot;&gt;目录&lt;/h4&gt;
+&lt;ul&gt;
+  &lt;li&gt;1.Notification User Interface&lt;/li&gt;
+  &lt;li&gt;2.Media Attachments&lt;/li&gt;
+  &lt;li&gt;3.Customize user interface&lt;/li&gt;
+  &lt;li&gt;4.Customize Actions&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h4 id=&quot;notification-user-interface&quot;&gt;一. Notification User Interface&lt;/h4&gt;
+&lt;p&gt;让我们先来看看用户推送在iOS X中的样子，如下图&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-3439e7712872c625.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;上图这是在锁屏界面下的推送。支持抬起手机唤醒功能。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-a74bf10dc32c739b.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
+上图是Banner，可以看到这个推送更加的易读，并且包含更多的内容。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-d9dbd2a57d18d8ac.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;上图是通知中心。从上面三种图可以看到，它们都长一个样。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-55e35bda6f792759.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;在iOS 8 中，我们可以给推送增加用户操作，这样使推送更加具有交互性，并且允许用户去处理用户推送更加的迅速。到了iOS 9 中，苹果又再次增加了快速回复功能，进一步的提高了通知的响应性。开发者可以允许用户通过点击推送，并用文字进行回复。再就到了iOS 10 中，推送变得更加给力。因为在iOS X中，推送对iOS系统来说，是很重要的一部分。在日常使用中，我们会经常和推送打交道。推送是我们和设备进行互动非常重要的方式。&lt;/p&gt;
+
+&lt;p&gt;在iOS X 中，你可以按压推送，推送就会被展开，展示出更加详细的用户界面。展示出来的详细界面对用户来说，提供了更加有用的信息。用户可以通过点击下面的按钮，来处理一些事件，并且推送的详细界面也会跟着用户的操作进行更新UI界面。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-28f89dc9b23bb018.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;iOS 8 中iMessage支持了快速回复功能，但是你只能看见一条信息，并且你也只能回复一条信息。但是在iOS X中，你可以展开推送，这个时候你就可以看到整个对话的内容了。你可以等待你的朋友回复，你再回复他，并且可以回复很多条。&lt;/p&gt;
+
+&lt;p&gt;以上就是iOS X的强大功能。以上的所有功能都能通过iOS X的新API来实现。所有的新特性都能在我们开发者开发的app里面有所体现。&lt;/p&gt;
+
+&lt;h4 id=&quot;media-attachments&quot;&gt;二. Media Attachments&lt;/h4&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-51beb1aaef4af5ed.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;如果经常使用iMessage的朋友们，就会经常收到一些信息，附带了一些照片或者视频，所以推送中能附带这些多媒体是非常重要的。如果推送中包含了这些多媒体信息，可以使用户不用打开app，不用下载就可以快速浏览到内容。众所周知，推送通知中带了push payload，及时去年苹果已经把payload的size提升到了4k bites，但是这么小的容量也无法使用户能发送一张高清的图片，甚至把这张图的缩略图包含在推送通知里面，也不一定放的下去。在iOS X中，我们可以使用新特性来解决这个问题。我们可以通过新的service extensions来解决这个问题。&lt;/p&gt;
+
+&lt;p&gt;为了能去下载service extension 里面的attachment，我们必须去按照如下的要求去设置你的推送通知，使你的推送通知是动态可变的。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;err&quot;&gt; &lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt; &lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;aps:&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;err&quot;&gt; &lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt; &lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt; &lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt; &lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;alert&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;{……&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;err&quot;&gt; &lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt; &lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt; &lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt; &lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;mutable-content&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;err&quot;&gt; &lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt; &lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;err&quot;&gt; &lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt; &lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;my-attachment&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;https://example.com/phtos.jpg&quot;&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;在上面代码中，可以看到加载了一个mutable-content 的flag，然后我们就可以引用一个链接，把你想加入到推送里面的attachments加入到里面来。在上面的例子里面，我们就加入了一个URL。更复杂的，你甚至可以去加入一个identifier来标示你想加入到推送里面的内容，这个identifier是你app知道的，app能通过拿到identifier，然后知道去你自己的服务器哪里去下载内容。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-ba7069e754c5bcf8.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;通过设置完上述的部分，推送就被推送到了每个设备的Service Extension那里了。在每个设备里面的Service Extension里面，就可以下载任意想要的attachment了。然后推送就会带着下载好的attachment推送到手机并显示出来了。&lt;/p&gt;
+
+&lt;p&gt;如果来设置Service Extension呢？来看看如下的代码：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+// Adding an attachment to a user notification
+
+public class NotificationService: UNNotificationServiceExtension {
+    override public func didReceive(_ request: UNNotificationRequest, withContentHandler contentHandler: (UNNotificationContent) -&amp;gt; Void)
+    {
+        let fileURL = // ...
+        let attachment = UNNotificationAttachment(identifier: &quot;image&quot;,
+                                                  url: fileURL,
+                                                  options: nil)
+        let content = request.content.mutableCopy as! UNMutableNotificationContent 
+        content.attachments = [ attachment ]
+        contentHandler(content)
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;首先定义了一个didReceive的方法，用来接收request，后面跟着withContentHandler的回调函数。
+这个NotificationServiceExtension会在收到推送之后，被调用，然后在这个方法里面去下载自己的attachment。下载可以通过URL，或者任何你喜欢的方式。当下载完成之后，就可以创建attachment对象了。创建完UNMutableNotificationContent，我们就可以把这个加入到推送的content中了。最后，通过contentHandler回调，把它传递给iOS系统，iOS 系统就会展示给用户。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-a02ca43edd228bc1.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;通过以上的设置，我们就能在推送中看到丰富的媒体信息了。用户并不需要去打开app，也不用去点击下载。&lt;/p&gt;
+
+&lt;p&gt;简单的概述一下Media Attachments：&lt;br /&gt;
+1. 新特性使推送支持附带Media Attachments。本地推送和远程推送同时都可支持。&lt;br /&gt;
+2. attachment支持图片，音频，视频，系统会自动提供一套可自定义化的UI，专门针对这3种内容。&lt;br /&gt;
+3. 在service extension里面去下载attachment，但是需要注意，service extension会限制下载的时间，并且下载的文件大小也会同样被限制。这里毕竟是一个推送，而不是把所有的内容都推送给用户。所以你应该去推送一些缩小比例之后的版本。比如图片，推送里面附带缩略图，当用户打开app之后，再去下载完整的高清图。视频就附带视频的关键帧或者开头的几秒，当用户打开app之后再去下载完整视频。&lt;br /&gt;
+4. 把下载完成的attachment加入到notification中。  &lt;br /&gt;
+5. 推送里面包含的attachment这些文件，是由系统帮你管理的，系统会把这些文件放在单独的一个地方，然后统一管理。&lt;br /&gt;
+6. 额外说明一点，推送的attachment的图片还可以包含GIF图。&lt;/p&gt;
+
+&lt;p&gt;通过以上可以看出，Media Attachments非常的酷，它为我们提供了更加丰富的推送内容。&lt;/p&gt;
+
+&lt;p&gt;接下来我们再来看看如何自定义推送的用户界面&lt;/p&gt;
+
+&lt;h4 id=&quot;customize-user-interface&quot;&gt;三. Customize user interface&lt;/h4&gt;
+
+&lt;p&gt;要想创建一个自定义的用户界面，需要用到Notification content extension。&lt;/p&gt;
+
+&lt;p&gt;先来说说下面这个例子的应用场景：&lt;/p&gt;
+
+&lt;p&gt;比如有个朋友在日历中给我了一个聚会的邀请，这个时候就来了推送，推送里面的内容就是包含了聚会的时间地点信息，推送下面有三个按钮，接受，谢绝。下面的例子都以此为例。&lt;/p&gt;
+
+&lt;p&gt;Notification content extension允许开发者加入自定义的界面，在这个界面里面，你可以绘制任何你想要的东西。但是有一个最重要的限制就是，这个自定义的界面没有交互。它们不能接受点击事件，用户并不能点击它们。但是推送通知还是可以继续与用户进行交互，因为用户可以使用notificaiton的actions。extension可以处理这些actions。&lt;/p&gt;
+
+&lt;p&gt;接下来我们就来说说如何自定义界面&lt;/p&gt;
+
+&lt;h5 id=&quot;section-2&quot;&gt;1.   推送的四部分&lt;/h5&gt;
+
+&lt;p&gt;先来看一个日历的推送例子：&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-15b9cc813f3c40cf.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;上图，整个推送分4段。用户可以通过点击Header里面的icon来打开app，点击取消来取消显示推送。Header的UI是系统提供的一套标准的UI。这套UI会提供给所有的推送通知。&lt;/p&gt;
+
+&lt;p&gt;Header下面是自定义内容，这里就是显示的Notification content extension。在这里，就可以显示任何你想绘制的内容了。你可以展示任何额外的有用的信息给用户。&lt;/p&gt;
+
+&lt;p&gt;content extension下面就是default content。这里是系统的界面。这里的系统界面就是上面推送里面payload里面附带的内容。这也就是iOS 9 之前的推送的样子。&lt;/p&gt;
+
+&lt;p&gt;最下面一段就是notification action了。在这一段，用户可以触发一些操作。并且这些操作还会相应的反映到上面的自定义的推送界面content extension中。&lt;/p&gt;
+
+&lt;h5 id=&quot;notification-content-extension&quot;&gt;2.创建Notification content extension&lt;/h5&gt;
+
+&lt;p&gt;接下来我们就来看看如何创建一个Notification content extension&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-b8b69cdab7aee38e.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;第一件事就是去创建一个新的target。创建好了之后，Xcode会自动帮我们生成一个template。template会在新的target里面生成3个文件，一个新的ViewController，main Interface storyboard，info.plist。info.plist中就是可以定义化一些target的配置。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-bffc21df9faf33e9.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;打开Notification content extension的ViewController&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+// Minimal Content Extension
+class NotificationViewController: UIViewController, UNNotificationContentExtension {
+    @IBOutlet var label: UILabel?
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        // Do any required interface initialization here.
+    }
+    func didReceive(_ notification: UNNotification) {
+        label?.text = notification.request.content.body
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;我们会发现，这个ViewController是UIViewController的子类，其实就是一个很普通的ViewController，和我们平时使用的没有啥两样。后面是UNNotificationContentExtension的protocol，这里是系统要求你必须实现的协议。&lt;/p&gt;
+
+&lt;p&gt;UNNotificationContentExtension只有一个required的方法，就是didReceive方法。当推送到达你的设备之后，这个didReceive方法会随着ViewController的生命周期的方法 ，一起被调用。当开发者给推送加上expands的时候，一旦推送送达以后，这时会接到所有的ViewController生命周期的方法，和didReceive方法。这样，我们就可以接收notification object ，接着更新UI。&lt;/p&gt;
+
+&lt;h5 id=&quot;target&quot;&gt;3. 配置target&lt;/h5&gt;
+&lt;p&gt;接下来，我们需要做的是，告诉iOS系统，推送送达之后，iOS系统如何找到你自定义的Notification content extension。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-9cafc7af30c557d8.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Notification content extension和我们注册notification actions一样，注册的相同的category。这个例子中，我们使用event-invite。值得提到的一点是，这里的extension是可以为一个数组的，里面可以为多个category，这样做的目的是多个category共用同一套UI。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-33d02a0c6572c81b.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;上图中，event-invite 和 event-update就共用了一套UI。这样我们就可以把他们打包到一个extension里面来。但是不同的category是独立的，他们可以相应不同的actions。&lt;/p&gt;
+
+&lt;p&gt;通过以上设置，iOS系统就知道了我们的target了。&lt;/p&gt;
+
+&lt;h5 id=&quot;ui&quot;&gt;4. 自定义用户UI界面&lt;/h5&gt;
+
+&lt;p&gt;接下来我们来自定义UI界面。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+// Notification Content Extension
+class NotificationViewController: UIViewController, UNNotificationContentExtension {
+    @IBOutlet var eventTitle: UILabel!
+    @IBOutlet var eventDate: UILabel!
+    @IBOutlet var eventLocation: UILabel!
+    @IBOutlet var eventMessage: UILabel!
+    
+    func didReceive(_ notification: UNNotification) {
+        let content = notification.request.content
+        
+        eventTitle.text = content.title
+        eventDate.text = content.subtitle
+        eventMessage.text = content.body
+        
+        if let location = content.userInfo[&quot;location&quot;] as? String {
+            eventLocation.text = location
+        }
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;上述代码中，我们在stroyboard 里面加入了一些labels 。当接收到推送的时候，我们提取出内容，得到我们想要的内容，然后把这些内容设置到label上面去，并展示出来。在content的userinfo里面我们还能加入一些额外的信息，这些信息是标准的payload无法展示的，比如说位置信息等等。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-c1962c798ad01273.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;代码完成之后就是如上的样子，中间就是我们自定义的UIView了。但是这样子会有2个问题。第一个问题就是这个自定义的View实在太大了。大量的空白不需要显示出来。第二个问题就是我们自定义的内容和下面默认的推送内容重复了。我们需要去掉一份。&lt;/p&gt;
+
+&lt;h5 id=&quot;section-3&quot;&gt;5.改进&lt;/h5&gt;
+
+&lt;p&gt;我们先来改进上面说的第二个问题。
+这个问题很简单，其实就是一个plist的设置。我们可以在plist里面把默认的content隐藏。设置如下图。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-b4dc0be29fdce509.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;再来说说第一个问题，界面大小的问题。
+我们可以通过平时我们Resize其他ViewController一样，来Resize这个ViewController。来看看如下的代码。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+// Notification Content Extension
+class NotificationViewController: UIViewController, UNNotificationContentExtension {
+    override func viewDidLoad() {
+        
+        super.viewDidLoad()
+        let size = view.bounds.size
+        
+        preferredContentSize = CGSize(width: size.width, height: size.width / 2)
+    }
+    
+    func didReceive(_ notification: UNNotification) {
+        // ...
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;这里我们也可以加入constraints来做autolayout。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-7f7cc4a4fc88a599.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;解决完上面2个问题，界面就会变成这个样子。看上去比之前好很多了。正常的尺寸，没有多余的空白。没有重复信息。但是这又出现了另外一个问题。当通知展示出来之后，它的大小并不是正常的我们想要的尺寸。iOS系统会去做一个动画来Resize它的大小。如下图，系统会先展现出第一张图，然后紧接着展示第二张图，这个用户体验很差。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-7d887c3b6ec3fe57.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-20779263e0de3c19.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;会出现上面这张图的原因是，在推送送达的那一刻，iOS系统需要知道我们推送界面的最终大小。但是我们自定义的extension在系统打算展示推送通知的那一刻，并还没有启动。所以这个时候，在我们代码都还没有跑起来之前，我们需要告诉iOS系统，我们的View最终要展示的大小。&lt;/p&gt;
+
+&lt;p&gt;现在问题又来了。这些通知会跑在不同的设备上，不同的设备的屏幕尺寸不同。为了解决这个问题，我们需要设置一个content size ratio。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-e7cd9adac20e2730.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;这个属性定义了宽和高的比例。当然设置了这个比例以后，也并不是万能的。因为你并不知道你会接受到多长的content。当你仅仅只设置比例，还是不能完整的展示所有的内容。有些时候如果我们可以知道最终的尺寸，那么我们固定尺寸会更好。&lt;/p&gt;
+
+&lt;h5 id=&quot;section-4&quot;&gt;6. 进一步美化&lt;/h5&gt;
+
+&lt;p&gt;我们可以给这个extension加上Media Attachments。一旦我们加入Media Attachments，我们可以在content extension里面使用这些内容。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+// Notification Content Extension Attachments
+class NotificationViewController: UIViewController, UNNotificationContentExtension {
+    @IBOutlet var eventImage: UIImageView!
+    func didReceive(_ notification: UNNotification) {
+        let content = notification.request.content
+        if let attachment = content.attachments.first {
+            if attachment.url.startAccessingSecurityScopedResource() {
+                eventImage.image = UIImage(contentsOfFile: attachment.url.path!)
+                attachment.url.stopAccessingSecurityScopedResource()
+            }
+        }
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;我们可以提取content的attachments。前文提到过，attachment是由系统管理的，系统会把它们单独的管理，这意味着它们存储在我们sandbox之外。所以这里我们要使用attachment之前，我们需要告诉iOS系统，我们需要使用它，并且在使用完毕之后告诉系统我们使用完毕了。对应上述代码就是startAccessingSecurityScopedResource()和stopAccessingSecurityScopedResource()的操作。当我们获取到了attachment的使用权之后，我们就可以使用那个文件获取我们想要的信息了。&lt;/p&gt;
+
+&lt;p&gt;上述例子中，我们从attachment中获取到图片，并展示到UIImageView中。于是notification就变成下面这个样子了。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-4640a3c616c41b8e.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h4 id=&quot;customize-actions&quot;&gt;四.Customize Actions&lt;/h4&gt;
+
+&lt;p&gt;说道这里，我们不得不说一下iOS8开始引入的action的工作原理：
+默认系统的Action的处理是，当用户点击的按钮，就把action传递给app，与此同时，推送通知会立即消失。这种做法很方便。&lt;/p&gt;
+
+&lt;p&gt;但是还有一种情况，当用户点击了按钮，希望接受一些日历上的邀请，我们需要把这个操作即时的展示在我们自定义的UI上，这是我们就只能用Notification content extension来处理这些用户点击事件了。这个时候，用户点击完按钮，我们把这个action直接传递给extension，而不是传递给app。当actions传递给extension时，它可以延迟推送通知的消失时间。在这段延迟的时间之内，我们就可以处理用户点击按钮的事件了，并且更新UI，一切都处理完成之后，我们再去让推送通知消失掉。&lt;/p&gt;
+
+&lt;p&gt;这里我们可以运用UNNotificationContentExtension协议的第二个方法，这方法是Optional&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+// Intercepting notification action response
+class NotificationViewController: UIViewController, UNNotificationContentExtension {
+    func didReceive(_ response: UNNotificationResponse, completionHandler done: (UNNotificationContentExtensionResponseOption) -&amp;gt; Void) {
+        server.postEventResponse(response.actionIdentifier) {
+            if response.actionIdentifier == &quot;accept&quot; {
+                eventResponse.text = &quot;Going!&quot;
+                eventResponse.textColor = UIColor.green()
+            } else if response.actionIdentifier == &quot;decline&quot; {
+                eventResponse.text = &quot;Not going :(&quot;
+                eventResponse.textColor = UIColor.red()
+            }
+            done(.dismiss)
+        }
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;不用这个方法的时候就可以不声明出来。但是一旦声明了，那么你就需要在这个方法里面处理推送通知里面所有的actions。这就意味着你不能只处理一个action，而不管其他的action。&lt;/p&gt;
+
+&lt;p&gt;在上述代码中，当用户点击了按钮，这个时候我们同步一下服务器信息，当接收到了服务器应答之后，然后我们更新UI。用户点击了“accept”之后，表示接受了这次聚会邀请，于是我们把text的颜色变成绿色。当用户点击了“decline”，表示谢绝，于是我们把text的颜色变成红色。当用户点击之后，更新完界面，我们就让推送通知消失掉。&lt;/p&gt;
+
+&lt;p&gt;这里值得一提的是，如果你还想把这个action传递给app，那么最后的参数应该是这样。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;done(.dismissAndForwardAction)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;参数设置成这样之后，用户的action就会再传递给app。&lt;/p&gt;
+
+&lt;p&gt;如果此时用户还想输入写文字来评论这条推送，我们该如何做？&lt;/p&gt;
+
+&lt;p&gt;这个输入文字的需求是来自于iOS 9 。这个的使用方法和9是相同的。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+// Text Input Action
+private func makeEventExtensionCategory() -&amp;gt; UNNotificationCategory {
+    let commentAction = UNTextInputNotificationAction(
+        identifier: &quot;comment&quot;,
+        title: &quot;Comment&quot;,
+        options: [],
+        textInputButtonTitle: &quot;Send&quot;,
+        textInputPlaceholder: &quot;Type here...&quot;)
+    return UNNotificationCategory(identifier: &quot;event-invite&quot;, actions: [ acceptAction, declineAction, commentAction ],
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;我们可以创建一个UNTextInputNotificationAction，并把它设置到plist里面的Category中。当推送通知到来之后，用户点击了按钮，textfield就会显示出来。同样的处理action代码如下：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+// Text input action response
+class NotificationViewController: UIViewController, UNNotificationContentExtension {
+    func didReceive(_ response: UNNotificationResponse,
+                      completionHandler done: (UNNotificationContentExtensionResponseOption) -&amp;gt; Void) {
+        if let textResponse = response as? UNTextInputNotificationResponse {
+            server.send(textResponse.userText) {
+            }
+        }
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;这个时候当用户点击了评论按钮，就会弹出textfield。&lt;/p&gt;
+
+&lt;p&gt;这里还有一个问题，就是用户点完评论按钮之后，之前的接受和谢绝的按钮就消失了。这个时候用户可能有这个需求，想又评论，又接受或者谢绝。那么我们就需要在下面键盘上加入这两个按钮。如下图这样子。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-68965591c8c9c0c6.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;这里并没有新的API，还是用原来的API。我们可以使用已经存在的UIKit的API去定制输入的input accessory view。它可以让我们开发者加入自定义的按钮。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+// Custom input accessory view
+class NotificationViewController: UIViewController, UNNotificationContentExtension {
+    override func canBecomeFirstResponder() -&amp;gt; Bool {
+        return true
+    }
+    override var inputAccessoryView: UIView { get {
+        return inputView
+        }
+    }
+    func didReceive(_ response: UNNotificationResponse,
+                      completionHandler done: (UNNotificationContentExtensionResponseOption) -&amp;gt; Void) {
+        if response.actionIdentifier == &quot;comment&quot; {
+            becomeFirstResponder()
+            textField.becomeFirstResponder()
+        }
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;解析一下上述的代码。首先我们需要让ViewController BecomeFirstResponder。这里做了2件事情，一是告诉responder chain，我成为了第一响应者，二是告诉iOS系统，我不想使用系统标准的text field。接着就可以创建自定义化的inputAccessoryView。如上图中显示的，带自定义的两个按钮。然后，当extension接受到了用户点击按钮后产生的action，这时自定义的textfield就会变成第一响应者，并且伴随着键盘的弹起。&lt;/p&gt;
+
+&lt;p&gt;注意，这里需要2个becomeFirstResponder，第一个becomeFirstResponder是使viewController变成第一响应者，这样textfield就会出现。第二个becomeFirstResponder是使我们自定义的textfield变成第一响应者，这样键盘才会弹起。&lt;/p&gt;
+
+&lt;h4 id=&quot;section-5&quot;&gt;总结&lt;/h4&gt;
+&lt;p&gt;以上就是iOS X中notification的所有新特性，通过上文，我们学到的以下的知识，总结一下：&lt;br /&gt;
+1. 什么是attachment&lt;br /&gt;
+2. 如何在service extension中使用attachment&lt;br /&gt;
+3. 如何定义content extension的用户UI界面&lt;br /&gt;
+4. 如何响应用户操作action&lt;/p&gt;
+
+&lt;p&gt;最后，请大家多多指教。&lt;/p&gt;
+</description>
+        <pubDate>Sun, 26 Jun 2016 21:21:00 +0800</pubDate>
+        <link>http://vno.onevcat.com/2016/06/WWDC2016-Session%E7%AC%94%E8%AE%B0-iOS-10-%E6%8E%A8%E9%80%81Notification%E6%96%B0%E7%89%B9%E6%80%A7/</link>
+        <guid isPermaLink="true">http://vno.onevcat.com/2016/06/WWDC2016-Session%E7%AC%94%E8%AE%B0-iOS-10-%E6%8E%A8%E9%80%81Notification%E6%96%B0%E7%89%B9%E6%80%A7/</guid>
+        
+        <category>iOS</category>
+        
+        
+        <category>Blog</category>
+        
+      </item>
+    
+      <item>
+        <title>iOS如何优雅的处理“回调地狱Callback hell”(二)——使用Swift</title>
+        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-a590ae3efef185d3.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h4 id=&quot;section&quot;&gt;前言&lt;/h4&gt;
+&lt;p&gt;在上篇中，我谈到了可以用promise来解决Callback hell的问题，这篇我们换一种方式一样可以解决这个问题。&lt;/p&gt;
+
+&lt;p&gt;我们先分析一下为何promise能解决多层回调嵌套的问题，经过上篇的分析，我总结也一下几点：&lt;/p&gt;
+
+&lt;p&gt;1.promise封装了所有异步操作，把异步操作封装成了一个“盒子”。&lt;br /&gt;
+2.promise提供了Monad，then相当于flatMap。&lt;br /&gt;
+3.promise的函数返回对象本身，于是就可形成链式调用&lt;/p&gt;
+
+&lt;p&gt;好了，既然这些能优雅的解决callback hell，那么我们只要能做到这些，也一样可以完成任务。到这里大家可能就已经恍然大悟了，Swift就是完成这个任务的最佳语言！Swift支持函数式编程，分分钟就可以完成promise的基本功能。&lt;/p&gt;
+
+&lt;h4 id=&quot;swiftcallback-hell&quot;&gt;一.利用Swift特性处理回调Callback hell&lt;/h4&gt;
+
+&lt;p&gt;我们还是以上篇的例子来举例，先来描述一下场景：
+假设有这样一个提交按钮，当你点击之后，就会提交一次任务。当你点下按钮的那一刻，首先要先判断是否有权限提交，没有权限就弹出错误。有权限提交之后，还要请求一次，判断当前任务是否已经存在，如果存在，弹出错误。如果不存在，这个时候就可以安心提交任务了。&lt;/p&gt;
+
+&lt;p&gt;那么代码如下：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;func requestAsyncOperation(request : String , success : String -&amp;gt; Void , failure : NSError -&amp;gt; Void)
+{
+    WebRequestAPI.fetchDataAPI(request, success : { result in
+        WebOtherRequestAPI.fetchOtherDataAPI ( result ,  success : {OtherResult in
+            [self fulfillData:OtherResult];
+            
+            let finallyTheParams = self.transformResult(OtherResult)
+            TaskAPI.fetchOtherDataAPI ( finallyTheParams , success : { TaskResult in
+                
+                let finallyTaskResult = self.transformTaskResult(TaskResult)
+                
+                success(finallyTaskResult)
+                },
+                failure:{ TaskError in
+                    failure(TaskError)
+                }
+                
+            )
+            },failure : { ExistError in
+                failure(ExistError)
+            }
+        )
+        } , failure : { AuthorityError in
+            failure(AuthorityError)
+        }
+    )
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;接下来我们就来优雅的解决上述看上去不好维护的Callback hell。&lt;/p&gt;
+
+&lt;p&gt;1.首先我们要封装异步操作，把异步操作封装到Async中，顺带把返回值也一起封装成Result。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+enum Result &amp;lt;T&amp;gt; {
+    case Success(T)
+    case Failure(ErrorType)
+}
+
+struct Async&amp;lt;T&amp;gt; {
+    let trunk:(Result&amp;lt;T&amp;gt;-&amp;gt;Void)-&amp;gt;Void
+    init(function:(Result&amp;lt;T&amp;gt;-&amp;gt;Void)-&amp;gt;Void) {
+        trunk = function
+    }
+    func execute(callBack:Result&amp;lt;T&amp;gt;-&amp;gt;Void) {
+        trunk(callBack)
+    }
+}
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;2.封装Monad，提供Map和flatMap操作。顺带返回值也返回Async，以方便后面可以继续链式调用。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;// Monad
+extension Async{
+
+
+    func map&amp;lt;U&amp;gt;(f: T throws-&amp;gt; U) -&amp;gt; Async&amp;lt;U&amp;gt; {
+        return flatMap{ .unit(try f($0)) }
+    }
+
+    func flatMap&amp;lt;U&amp;gt;(f:T throws-&amp;gt; Async&amp;lt;U&amp;gt;) -&amp;gt; Async&amp;lt;U&amp;gt; {
+        return Async&amp;lt;U&amp;gt;{ cont in
+            self.execute{
+                switch $0.map(f){
+                case .Success(let async):
+                    async.execute(cont)
+                case .Failure(let error):
+                    cont(.Failure(error))
+                }
+            }
+        }
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;这是我们把异步的过程就封装成一个盒子了，盒子里面有Map，flatMap操作，flatMap对应的其实就是promise的then&lt;/p&gt;
+
+&lt;p&gt;3.我们可以把flatMap名字直接换成then，那么之前那30多行的代码就会简化成下面这样：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+func requestAsyncOperation(request : String ) -&amp;gt; Async &amp;lt;String&amp;gt;
+{
+    return fetchDataAPI(request)
+           .then(fetchOtherDataAPI)
+           .map(transformResult)
+           .then(fetchOtherDataAPI)
+           .map(transformTaskResult)
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;基本上和用promise一样的效果。这样就不用PromiseKit库，利用promise思想的精髓，优雅的完美的处理了回调地狱。这也得益于Swift语言的优点。&lt;/p&gt;
+
+&lt;p&gt;文章至此，虽然已经解决了问题了，不过还没有结束，我们还可以继续再进一步讨论一些东西。&lt;/p&gt;
+
+&lt;h4 id=&quot;section-1&quot;&gt;二.进一步的讨论&lt;/h4&gt;
+&lt;p&gt;1.@noescape，throws，rethrows关键字
+flatMap还有这种写法：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;func flatMap&amp;lt;U&amp;gt; (@noescape f: T throws -&amp;gt; Async&amp;lt;U&amp;gt;)rethrows -&amp;gt; Async&amp;lt;U&amp;gt; 
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;@noescape 从字面上看，就知道是“不会逃走”的意思，这个关键字专门用于修饰函数闭包这种参数类型的，当出现这个参数时，它表示该闭包不会跳出这个函数调用的生命期：即函数调用完之后，这个闭包的生命期也结束了。
+在苹果官方文档上是这样写的：
+&amp;gt;A new @noescape attribute may be used on closure parameters to functions. This indicates that the parameter is only ever called (or passed as an @noescape parameter in a call), which means that it cannot outlive the lifetime of the call. This enables some minor performance optimizations, but more importantly disables the self. requirement in closure arguments.&lt;/p&gt;
+
+&lt;p&gt;那什么时候一个闭包参数会跳出函数的生命期呢？&lt;/p&gt;
+
+&lt;p&gt;引用唐巧大神的解释：
+&amp;gt;在函数实现内，将一个闭包用 dispatch_async
+嵌套，这样这个闭包就会在另外一个线程中存在，从而跳出了当前函数的生命期。这样做主要是可以帮助编译器做性能的优化。&lt;/p&gt;
+
+&lt;p&gt;throws关键字是代表该闭包可能会抛出异常。
+rethrows关键字是代表这个闭包如果抛出异常，仅可能是因为传递给它的闭包的调用导致了异常。&lt;/p&gt;
+
+&lt;p&gt;2.继续说说上面例子里面的Result，和Async一样，我们也可以继续封装Result，也加上map和flatMap方法。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+func ==&amp;lt;T:Equatable&amp;gt;(lhs:Result&amp;lt;T&amp;gt;, rhs:Result&amp;lt;T&amp;gt;) -&amp;gt; Bool{
+    if case (.Success(let l), .Success(let r)) = (lhs, rhs){
+        return l == r
+    }
+    return false
+}
+
+extension Result{
+
+    func map&amp;lt;U&amp;gt;(f:T throws-&amp;gt; U) -&amp;gt; Result&amp;lt;U&amp;gt; {
+        return flatMap{.unit(try f($0))}
+    }
+
+    func flatMap&amp;lt;U&amp;gt;(f:T throws-&amp;gt; Result&amp;lt;U&amp;gt;) -&amp;gt; Result&amp;lt;U&amp;gt; {
+        switch self{
+        case .Success(let value):
+            do{
+                return try f(value)
+            }catch let e{
+                return .Failure(e)
+            }
+        case .Failure(let e):
+            return .Failure(e)
+        }
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;3.上面我们已经把Async和Result封装了map方法，所以他们也可以叫做&lt;strong&gt;函子(Functor)&lt;/strong&gt;。接下来可以继续封装，把他们都封装成&lt;strong&gt;适用函子(Applicative Functor)&lt;/strong&gt;和&lt;strong&gt;单子(Monad)&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;适用函子(Applicative Functor)&lt;/strong&gt;根据定义：
+对于任意一个函子F，如果能支持以下运算，该函子就是一个适用函子：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;func pure&amp;lt;A&amp;gt;(value:A) -&amp;gt;F&amp;lt;A&amp;gt;
+
+func &amp;lt;*&amp;gt;&amp;lt;A,B&amp;gt;(f:F&amp;lt;A - &amp;gt; B&amp;gt;, x:F&amp;lt;A&amp;gt;) -&amp;gt;F&amp;lt;B&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;以Async为例，我们为它加上这两个方法&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+extension Async{
+
+    static func unit(x:T) -&amp;gt; Async&amp;lt;T&amp;gt; {
+        return Async{ $0(.Success(x)) }
+    }
+
+    func map&amp;lt;U&amp;gt;(f: T throws-&amp;gt; U) -&amp;gt; Async&amp;lt;U&amp;gt; {
+        return flatMap{ .unit(try f($0)) }
+    }
+
+    func flatMap&amp;lt;U&amp;gt;(f:T throws-&amp;gt; Async&amp;lt;U&amp;gt;) -&amp;gt; Async&amp;lt;U&amp;gt; {
+        return Async&amp;lt;U&amp;gt;{ cont in
+            self.execute{
+                switch $0.map(f){
+                case .Success(let async):
+                    async.execute(cont)
+                case .Failure(let error):
+                    cont(.Failure(error))
+                }
+            }
+        }
+    }
+
+    func apply&amp;lt;U&amp;gt;(af:Async&amp;lt;T throws-&amp;gt; U&amp;gt;) -&amp;gt; Async&amp;lt;U&amp;gt; {
+        return af.flatMap(map)
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;unit和apply就是上面定义中的两个方法。接下来我们在看看Monad的定义。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;单子(Monad)&lt;/strong&gt;根据定义：
+对于任意一个类型构造体F定义了下面两个函数，它就是一个单子Monad：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;func pure&amp;lt;A&amp;gt;(value:A) -&amp;gt;F&amp;lt;A&amp;gt;
+
+func flatMap&amp;lt;A,B&amp;gt;(x:F&amp;lt;A&amp;gt;)-&amp;gt;(A-&amp;gt;F&amp;lt;B&amp;gt;)-&amp;gt;F&amp;lt;B&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;还是以Async为例，此时的Async已经有了unit和flatMap满足定义了，这个时候，就可以说Async已经是一个Monad了。&lt;/p&gt;
+
+&lt;p&gt;至此，我们就把Async和Result都变成了&lt;strong&gt;适用函子(Applicative Functor)&lt;/strong&gt;和&lt;strong&gt;单子(Monad)&lt;/strong&gt;了。&lt;/p&gt;
+
+&lt;p&gt;4.再说说运算符。
+flatMap函数有时候会被定义为一个运算符»=。由于它会将第一个参数的计算结果绑定到第二个参数的输入上面，这个运算符也会被称为“绑定(bind)”运算.&lt;/p&gt;
+
+&lt;p&gt;为了方便，那我们就把上面的4个操作都定义成运算符吧。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;func unit&amp;lt;T&amp;gt; (x:T) -&amp;gt; Async&amp;lt;T&amp;gt; {
+    return Async{$0(.Success(x))}
+}
+
+func &amp;lt;^&amp;gt; &amp;lt;T, U&amp;gt; (f: T throws-&amp;gt; U, async: Async&amp;lt;T&amp;gt;) -&amp;gt; Async&amp;lt;U&amp;gt; {
+    return async.map(f)
+}
+
+func &amp;gt;&amp;gt;= &amp;lt;T, U&amp;gt; (async:Async&amp;lt;T&amp;gt;, f:T throws-&amp;gt; Async&amp;lt;U&amp;gt;) -&amp;gt; Async&amp;lt;U&amp;gt; {
+    return async.flatMap(f)
+}
+
+func &amp;lt;*&amp;gt; &amp;lt;T, U&amp;gt; (af: Async&amp;lt;T throws-&amp;gt; U&amp;gt;, async:Async&amp;lt;T&amp;gt;) -&amp;gt; Async&amp;lt;U&amp;gt; {
+    return async.apply(af)
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;按照顺序，第二个对应的就是原来的map函数，第三个对应的就是原来的flatMap函数。&lt;/p&gt;
+
+&lt;p&gt;5.说到运算符，我们这里还可以继续回到文章最开始的地方去讨论一下那段回调地狱的代码。上面我们通过map和flatMap成功的展开了Callback hell，其实这里还有另外一个方法可以解决问题，那就是用自定义运算符。这里我们用不到适用函子的&amp;lt;*&amp;gt;，有些问题就可能用到它。还是回到上述问题，这里我们用Monad里面的运算符来解决回调地狱。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+func requestAsyncOperation(request : String ) -&amp;gt; Async &amp;lt;String&amp;gt;
+{
+    return fetchDataAPI(request) &amp;gt;&amp;gt;= (fetchOtherDataAPI) &amp;lt;^&amp;gt;(transformResult) &amp;gt;&amp;gt;= (fetchOtherDataAPI) &amp;lt;^&amp;gt; (transformTaskResult)
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;通过运算符，最终原来的40多行代码变成了最后一行了！当然，我们中间封装了一些操作。&lt;/p&gt;
+
+&lt;h4 id=&quot;section-2&quot;&gt;三.总结&lt;/h4&gt;
+&lt;p&gt;经过上篇和本篇的讨论，优雅的处理”回调地狱Callback hell”的方法有以下几种:&lt;br /&gt;
+1.使用PromiseKit&lt;br /&gt;
+2.使用Swift的map和flatMap封装异步操作(思想和promise差不多)&lt;br /&gt;
+3.使用Swift自定义运算符展开回调嵌套&lt;/p&gt;
+
+&lt;p&gt;目前为止，我能想到的处理方法还有2种：&lt;br /&gt;
+4.使用Reactive cocoa&lt;br /&gt;
+5.使用RxSwift&lt;/p&gt;
+
+&lt;p&gt;下篇或者下下篇可能应该就是讨论RAC和RxSwift如果优雅的处理回调地狱了。如果大家还有什么其他方法能优雅的解决这个问题，也欢迎大家提出来，一起讨论，相互学习！&lt;/p&gt;
+</description>
+        <pubDate>Wed, 22 Jun 2016 22:45:00 +0800</pubDate>
+        <link>http://vno.onevcat.com/2016/06/iOS%E5%A6%82%E4%BD%95%E4%BC%98%E9%9B%85%E7%9A%84%E5%A4%84%E7%90%86-%E5%9B%9E%E8%B0%83%E5%9C%B0%E7%8B%B1Callback-hell-(%E4%BA%8C)-%E4%BD%BF%E7%94%A8Swift/</link>
+        <guid isPermaLink="true">http://vno.onevcat.com/2016/06/iOS%E5%A6%82%E4%BD%95%E4%BC%98%E9%9B%85%E7%9A%84%E5%A4%84%E7%90%86-%E5%9B%9E%E8%B0%83%E5%9C%B0%E7%8B%B1Callback-hell-(%E4%BA%8C)-%E4%BD%BF%E7%94%A8Swift/</guid>
+        
+        <category>iOS</category>
+        
+        
+        <category>Blog</category>
+        
+      </item>
     
       <item>
         <title>如何快速给自己构建一个温馨的&quot;家&quot;——用Jekyll搭建静态博客</title>
@@ -2258,604 +3322,6 @@ NSMigratePersistentStoresAutomaticallyOption = YES，那么Core Data会试着把
         
         
         <category>随笔</category>
-        
-      </item>
-    
-      <item>
-        <title>Remote debugging on iOS with Safari Web Inspector</title>
-        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-421c26dcd9c36f3b.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;之前在公司调试Hybrid其实很蛋疼。。都是本地打开zip包，运行js，然后调试，每次都要找到zip，比较麻烦，后来发现了这个远程调试的方法，直接插上手机就可以调试了，不用那么麻烦了，而且可以直接在手机上看到实时的效果。&lt;/p&gt;
-
-&lt;p&gt;后来发现有一些Js前端开发还不会这个方法，今天就分享出来，大家都看看，有啥问题请多指点。&lt;/p&gt;
-
-&lt;p&gt;1.首先iPhone连接上Mac，点击信任，确保itunes连接成功，然后打开iPhone的“设置” - “Safari” - “高级” -  打开“JavaScript” 和 “Web检查器”&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-9ec6c25df1dedaa5.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-a1f93269e8cc2fa7.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;2.打开Mac上的Safari，选择“偏好设置” - “高级” - “在菜单栏中显示“开发”菜单”&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-cab218d03bdafb3d.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;3.打开iPhone上的Safari或者运行PhoneGap程序，到某一个界面，回到Mac上的Safari上，选择“开发”，然后选择你的iPhone，就可以查看到那个一个Web界面了&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-92c19e242295d732.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-</description>
-        <pubDate>Tue, 03 May 2016 14:38:00 +0800</pubDate>
-        <link>http://vno.onevcat.com/2016/05/Remote-debugging-on-iOS-with-Safari-Web-Inspector/</link>
-        <guid isPermaLink="true">http://vno.onevcat.com/2016/05/Remote-debugging-on-iOS-with-Safari-Web-Inspector/</guid>
-        
-        <category>iOS</category>
-        
-        
-        <category>iOS</category>
-        
-      </item>
-    
-      <item>
-        <title>iOS Hybrid 框架 ——PhoneGap</title>
-        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-65440c02af82bd8d.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;h4 id=&quot;section&quot;&gt;前言&lt;/h4&gt;
-
-&lt;p&gt;Hybrid App（混合模式移动应用）是指介于web-app、native-app这两者之间的app，兼具“Native App良好用户交互体验的优势”和“Web App跨平台开发的优势”。&lt;/p&gt;
-
-&lt;p&gt;Hybrid App按网页语言与程序语言的混合，通常分为三种类型：多View混合型，单View混合型，Web主体型，3种类型比较如下：&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-101b71b37fb36dad.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;今天我来谈谈Web主体型中Hybrid框架里面比较有名的PhoneGap&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-8578bb25ee8b09b3.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;h4 id=&quot;cordova&quot;&gt;一.Cordova&lt;/h4&gt;
-&lt;p&gt;说到PhoneGap，就不得不说到Cordova&lt;/p&gt;
-
-&lt;p&gt;Cordova 是一个可以让 JS 与原生代码(包括 Android 的 java，iOS 的 Objective-C 等)互相通信的一个库，并且提供了一系列的插件类，比如 JS 直接操作本地数据库的插件类。&lt;/p&gt;
-
-&lt;p&gt;Cordova的设计概念，是在APP上透过Web控件来呈现Web页面，让Web开发人员可以操作熟悉的语言、工具来开发APP.&lt;/p&gt;
-
-&lt;p&gt;为了让Web页面能够满足更多的APP功能需求，Cordova提供了Plugin机制，让Web页面能够挂载并调用Native开发技术所开发的功能模块&lt;/p&gt;
-
-&lt;p&gt;Cordova在系统中的层级应该是这样子的:&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-22b52111118a47b6.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;h4 id=&quot;js--objective-c-&quot;&gt;二.Js 与 Objective-C 通信&lt;/h4&gt;
-&lt;p&gt;Js 使用了两种方式来与 Objective-C 通信，一种是使用 XMLHttpRequest 发起请求的方式，另一种则是通过设置透明的 iframe 的 src 属性。&lt;/p&gt;
-
-&lt;p&gt;我接下来说的主要是第二种方式，iframe bridge。
-通过在 Js 端创建一个透明的 iframe，设置这个 ifame 的 src 为自定义的协议，而 ifame 的 src 更改时，UIWebView 会先回调其 delegate 的 webView:shouldStartLoadWithRequest:navigationType: 方法&lt;/p&gt;
-
-&lt;p&gt;说的还是很抽象的，来实际看一段代码&lt;/p&gt;
-
-&lt;p&gt;在cordova.js 里面，是这样子实现的&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;function iOSExec() {
-    ...
-    if (!isInContextOfEvalJs &amp;amp;&amp;amp; commandQueue.length == 1)  {
-        // 如果支持 XMLHttpRequest，则使用 XMLHttpRequest 方式
-        if (bridgeMode != jsToNativeModes.IFRAME_NAV) {
-            // This prevents sending an XHR when there is already one being sent.
-            // This should happen only in rare circumstances (refer to unit tests).
-            if (execXhr &amp;amp;&amp;amp; execXhr.readyState != 4) {
-                execXhr = null;
-            }
-            // Re-using the XHR improves exec() performance by about 10%.
-            execXhr = execXhr || new XMLHttpRequest();
-            // Changing this to a GET will make the XHR reach the URIProtocol on 4.2.
-            // For some reason it still doesn&#39;t work though...
-            // Add a timestamp to the query param to prevent caching.
-            execXhr.open(&#39;HEAD&#39;, &quot;/!gap_exec?&quot; + (+new Date()), true);
-            if (!vcHeaderValue) {
-                vcHeaderValue = /.*\((.*)\)/.exec(navigator.userAgent)[1];
-            }
-            execXhr.setRequestHeader(&#39;vc&#39;, vcHeaderValue);
-            execXhr.setRequestHeader(&#39;rc&#39;, ++requestCount);
-            if (shouldBundleCommandJson()) {
-                // 设置请求的数据
-                execXhr.setRequestHeader(&#39;cmds&#39;, iOSExec.nativeFetchMessages());
-            }
-            // 发起请求
-            execXhr.send(null);
-        } else {
-            // 如果不支持 XMLHttpRequest，则使用透明 iframe 的方式，设置 iframe 的 src 属性
-            execIframe = execIframe || createExecIframe();
-            execIframe.src = &quot;gap://ready&quot;;
-        }
-    }
-    ...
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;iOS这边对应的要在WebView里面写响应的方法&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-// UIWebView 加载 URL 前回调的方法，返回 YES，则开始加载此 URL，返回 NO，则忽略此 URL
-- (BOOL)webView:(UIWebView*)theWebView
-              shouldStartLoadWithRequest:(NSURLRequest*)request
-              navigationType:(UIWebViewNavigationType)navigationType
-{
-    NSURL* url = [request URL];
-    
-    /*
-     * Execute any commands queued with cordova.exec() on the JS side.
-     * The part of the URL after gap:// is irrelevant.
-     */
-    // 判断是否 Cordova 的请求，对于 JS 代码中 execIframe.src = &quot;gap://ready&quot; 这句
-    if ([[url scheme] isEqualToString:@&quot;gap&quot;]) {
-        // 获取请求的数据，并对数据进行分析、处理
-        [_commandQueue fetchCommandsFromJs];
-        return NO;
-    }
-    ...
-}
-
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;这样就完成了Js和OC的通信了&lt;/p&gt;
-
-&lt;h4 id=&quot;objective-c--js-&quot;&gt;三.Objective-C 与 Js 通信&lt;/h4&gt;
-
-&lt;p&gt;首先OC获取Js的请求数据&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;- (void)fetchCommandsFromJs
-{
-    // Grab all the queued commands from the JS side.
-    NSString* queuedCommandsJSON = [_viewController.webView
-                                    stringByEvaluatingJavaScriptFromString:
-                                    @&quot;cordova.require(&#39;cordova/exec&#39;).nativeFetchMessages()&quot;];
-    
-    [self enqueCommandBatch:queuedCommandsJSON];
-    if ([queuedCommandsJSON length] &amp;gt; 0) {
-        CDV_EXEC_LOG(@&quot;Exec: Retrieved new exec messages by request.&quot;);
-    }
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;然后OC处理Js传过来的请求&lt;/p&gt;
-
-&lt;p&gt;OC再把处理结果返回Js&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;NSString *ret = [((HFNativeFunction*)strongSelf.actionDict[funcName]) doCall:argArr];
-        NSString *js = [NSString stringWithFormat:@&quot;if(typeof %@ == &#39;string&#39;) { paf.nativeInvocationObject=%@;} else {   paf.nativeInvocationObject=JSON.stringify(%@);} &quot;, ret, ret, ret];
-        DLog(@&quot;\n\njs call fun=%@ ret=%@\n\n&quot;, funcName, ret);
-        [self.webView stringByEvaluatingJavaScriptFromString: js];
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h4 id=&quot;cordova---js&quot;&gt;四.Cordova - Js工作原理&lt;/h4&gt;
-
-&lt;p&gt;Cordova JS 端请求方法的格式：&lt;/p&gt;
-
-&lt;p&gt;// successCallback : 成功回调方法&lt;br /&gt;
-// failCallback    : 失败回调方法&lt;br /&gt;
-// server          : 所要请求的服务名字&lt;br /&gt;
-// action          : 所要请求的服务具体操作&lt;br /&gt;
-// actionArgs      : 请求操作所带的参数&lt;/p&gt;
-
-&lt;p&gt;cordova.exec(successCallback, failCallback, service, action, actionArgs);&lt;/p&gt;
-
-&lt;p&gt;传进来的这五个参数并不是直接传送给原生代码的，Cordova JS 端会做以下的处理：&lt;/p&gt;
-
-&lt;p&gt;1.会为每个请求生成一个叫 callbackId 的唯一标识：这个参数需传给 Objective-C 端，Objective-C 处理完后，会把 callbackId 连同处理结果一起返回给 JS 端。&lt;/p&gt;
-
-&lt;p&gt;2.以 callbackId 为 key，{success:successCallback, fail:failCallback} 为 value，把这个键值对保存在 JS 端的字典里，successCallback 与 failCallback 这两个参数不需要传给 Objective-C 端，Objective-C 返回结果时带上 callbackId，JS 端就可以根据 callbackId 找到回调方法。&lt;/p&gt;
-
-&lt;p&gt;3.每次 JS 请求，最后发到 Objective-C 的数据包括：callbackId, service, action, actionArgs。&lt;/p&gt;
-
-&lt;p&gt;Js处理请求&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;function iOSExec() {
-    ...
-    // 生成一个 callbackId 的唯一标识，并把此标志与成功、失败回调方法一起保存在 JS 端
-    // Register the callbacks and add the callbackId to the positional
-    // arguments if given.
-    if (successCallback || failCallback) {
-        callbackId = service + cordova.callbackId++;
-        cordova.callbacks[callbackId] =
-        {success:successCallback, fail:failCallback};
-    }
-    
-    actionArgs = massageArgsJsToNative(actionArgs);
-    
-    // 把 callbackId，service，action，actionArgs 保持到 commandQueue 中
-    // 这四个参数就是最后发给原生代码的数据
-    var command = [callbackId, service, action, actionArgs];
-    commandQueue.push(JSON.stringify(command));
-    ...
-}
-
-// 获取请求的数据，包括 callbackId, service, action, actionArgs
-iOSExec.nativeFetchMessages = function() {
-    // Each entry in commandQueue is a JSON string already.
-    if (!commandQueue.length) {
-        return &#39;&#39;;
-    }
-    var json = &#39;[&#39; + commandQueue.join(&#39;,&#39;) + &#39;]&#39;;
-    commandQueue.length = 0;
-    return json;
-};
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h4 id=&quot;cordova---oc&quot;&gt;五.Cordova - OC工作原理&lt;/h4&gt;
-
-&lt;p&gt;Native OC拿到 callbackId、service、action 及 actionArgs 后，会做以下的处理：&lt;/p&gt;
-
-&lt;p&gt;1.根据 service 参数找到对应的插件类&lt;/p&gt;
-
-&lt;p&gt;2.根据 action 参数找到插件类中对应的处理方法，并把 actionArgs 作为处理方法请求参数的一部分传给处理方法&lt;/p&gt;
-
-&lt;p&gt;3.处理完成后，把处理结果及 callbackId 返回给 JS 端，JS 端收到后会根据 callbackId 找到回调方法，并把处理结果传给回调方法&lt;/p&gt;
-
-&lt;p&gt;Objective-C 返回结果给 JS 端&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-- (void)sendPluginResult:(CDVPluginResult*)result callbackId:(NSString*)callbackId
-{
-    CDV_EXEC_LOG(@&quot;Exec(%@): Sending result. Status=%@&quot;, callbackId, result.status);
-    // This occurs when there is are no win/fail callbacks for the call.
-    if ([@&quot;INVALID&quot; isEqualToString : callbackId]) {
-        return;
-    }
-    int status = [result.status intValue];
-    BOOL keepCallback = [result.keepCallback boolValue];
-    NSString* argumentsAsJSON = [result argumentsAsJSON];
-    
-    // 将请求的处理结果及 callbackId 通过调用 JS 方法返回给 JS 端
-    NSString* js = [NSString stringWithFormat:
-                    @&quot;cordova.require(&#39;cordova/exec&#39;).nativeCallback(&#39;%@&#39;,%d,%@,%d)&quot;,
-                    callbackId, status, argumentsAsJSON, keepCallback];
-    
-    [self evalJsHelper:js];
-}
-
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;举个具体的例子：&lt;/p&gt;
-
-&lt;p&gt;1.将收到的json转换成Command&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;// Execute the commands one-at-a-time.
-     NSArray* jsonEntry = [commandBatch dequeue];
-     if ([commandBatch count] == 0) {
-                  [_queue removeObjectAtIndex:0];
-      }
-     HFCDVInvokedUrlCommand* command = [HFCDVInvokedUrlCommand commandFromJson:jsonEntry];
-     HF_CDV_EXEC_LOG(@&quot;Exec(%@): Calling %@.%@&quot;, command.callbackId, command.className, command.methodName);
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;2.OC 执行&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;- (BOOL)execute:(HFCDVInvokedUrlCommand*)command
-{
-    if ((command.className == nil) || (command.methodName == nil)) {
-        DLog(@&quot;ERROR: Classname and/or methodName not found for command.&quot;);
-        return NO;
-    }
-    
-    if ([command.className isEqualToString:@&quot;DeviceReadyDummyClass&quot;] &amp;amp;&amp;amp;
-        [command.methodName isEqualToString:@&quot;deviceReady&quot;]) {
-        [[NSNotificationCenter defaultCenter]postNotificationName:k_NOTIF_DEVICE_READY object:_viewController];
-        return YES;
-    }
-
-    // Fetch an instance of this class
-    HFCDVPlugin* obj = [_viewController.commandDelegate getCommandInstance:command.className];
-
-    if (!([obj isKindOfClass:[HFCDVPlugin class]])) {
-        DLog(@&quot;ERROR: Plugin &#39;%@&#39; not found, or is not a HFCDVPlugin. Check your plugin mapping in config.xml.&quot;, command.className);
-        return NO;
-    }
-    BOOL retVal = YES;
-    double started = [[NSDate date] timeIntervalSince1970] * 1000.0;
-    // Find the proper selector to call.
-    NSString* methodName = [NSString stringWithFormat:@&quot;%@:&quot;, command.methodName];
-    SEL normalSelector = NSSelectorFromString(methodName);
-    if ([obj respondsToSelector:normalSelector]) {
-        // [obj performSelector:normalSelector withObject:command];
-        ((void (*)(id, SEL, id))objc_msgSend)(obj, normalSelector, command);
-    } else {
-        // There&#39;s no method to call, so throw an error.
-        DLog(@&quot;ERROR: Method &#39;%@&#39; not defined in Plugin &#39;%@&#39;&quot;, methodName, command.className);
-        retVal = NO;
-    }
-    double elapsed = [[NSDate date] timeIntervalSince1970] * 1000.0 - started;
-    if (elapsed &amp;gt; 10) {
-        DLog(@&quot;THREAD WARNING: [&#39;%@&#39;] took &#39;%f&#39; ms. Plugin should use a background thread.&quot;, command.className, elapsed);
-    }
-    return retVal;
-}
-
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h4 id=&quot;section-1&quot;&gt;六.回调方法&lt;/h4&gt;
-
-&lt;p&gt;Js端拿到数据根据 callbackId 回调&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;// 根据 callbackId 及是否成功标识，找到回调方法，并把处理结果传给回调方法
-callbackFromNative: function(callbackId, success, status, args, keepCallback) {
-    var callback = cordova.callbacks[callbackId];
-    if (callback) {
-        if (success &amp;amp;&amp;amp; status == cordova.callbackStatus.OK) {
-            callback.success &amp;amp;&amp;amp; callback.success.apply(null, args);
-        } else if (!success) {
-            callback.fail &amp;amp;&amp;amp; callback.fail.apply(null, args);
-        }
-        
-        // Clear callback if not expecting any more results
-        if (!keepCallback) {
-            delete cordova.callbacks[callbackId];
-        }
-    }
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-</description>
-        <pubDate>Mon, 02 May 2016 13:56:00 +0800</pubDate>
-        <link>http://vno.onevcat.com/2016/05/iOS-Hybrid-%E6%A1%86%E6%9E%B6-PhoneGap/</link>
-        <guid isPermaLink="true">http://vno.onevcat.com/2016/05/iOS-Hybrid-%E6%A1%86%E6%9E%B6-PhoneGap/</guid>
-        
-        <category>iOS</category>
-        
-        
-        <category>iOS</category>
-        
-      </item>
-    
-      <item>
-        <title>2016年3月iOS面试总结</title>
-        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-ee50133a21e35335.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;今年3月中下旬因为个人原因，换了一份工作，期间面试了有4，5家，基本都是D轮或者上市公司，也从他们的面试笔试中看到了自己的一些不足，于是就想写出来和大家分享一下，如果能帮到正在面试的同学更好。从面试题中，其实可以看到一些行业的发展，以及总体人才需求是怎样的了。&lt;/p&gt;
-
-&lt;h4 id=&quot;section&quot;&gt;一.笔试题&lt;/h4&gt;
-&lt;p&gt;笔试基本都有一两道基础题，比如说UITableView的重用机制，ARC的基本原理，如何避免retain cycle，谈谈对MVC的理解，iOS内存管理机制。这些大家应该都很清楚了。笔试的内容有几种有选择题，问答题，难一点的就是多选题了。我面试了一家就是给了10道多选题，多选，少选，错选都不行，当时做完以后就感觉不是很好，有些题目题干就是一下哪些是对的，然后ABCD依次给4个不同的概念，这种一道题相当于考了4个点。总之遇到这种“恶心”的多选题也不要太慌，静下心来一一甄别应该能拿到不错的成绩。&lt;/p&gt;
-
-&lt;p&gt;接下来我说几个我当时答的不怎么好的题目，我当时记了一下，和大家分享一下。&lt;/p&gt;
-
-&lt;h5 id=&quot;section-1&quot;&gt;1.进程和线程的区别和联系&lt;/h5&gt;
-&lt;p&gt;这个其实是操作系统的问题，当时一下子把我问的懵了，后来仔细回想了一下，加上自己的理解就答了，下面说说稍微完整的答案，大家可以准备准备，再问这种问题就可以完美作答了。&lt;/p&gt;
-
-&lt;blockquote&gt;
-  &lt;p&gt;进程是具有一定独立功能的程序关于某个数据集合上的一次运行活动,进程是系统进行资源分配和调度的一个独立单位. 线程是进程的一个实体,是CPU调度和分派的基本单位,它是比进程更小的能独立运行的基本单位.线程自己基本上不拥有系统资源,只拥有一点在运行中必不可少的资源(如程序计数器,一组寄存器和栈),但是它可与同属一个进程的其他的线程共享进程所拥有的全部资源. &lt;/p&gt;
-&lt;/blockquote&gt;
-
-&lt;blockquote&gt;
-  &lt;p&gt;一个线程可以创建和撤销另一个线程;同一个进程中的多个线程之间可以并发执行.&lt;/p&gt;
-&lt;/blockquote&gt;
-
-&lt;h5 id=&quot;section-2&quot;&gt;2.并行和并发的区别&lt;/h5&gt;
-&lt;blockquote&gt;
-  &lt;p&gt;并行是指两个或者多个事件在同一时刻发生；
-并发是指两个或多个事件在同一时间间隔内发生。&lt;/p&gt;
-&lt;/blockquote&gt;
-
-&lt;h5 id=&quot;blockdelegate&quot;&gt;3.谈谈你对Block和delegate的理解&lt;/h5&gt;
-&lt;p&gt;我当时是这么答的，delegate的回调更多的面向过程，而block则是面向结果的。如果你需要得到一条多步进程的通知，你应该使用delegation。而当你只是希望得到你请求的信息（或者获取信息时的错误提示），你应该使用block。（如果你结合之前的3个结论，你会发现delegate可以在所有事件中维持state，而多个独立的block却不能）&lt;/p&gt;
-
-&lt;h5 id=&quot;instancetypeid&quot;&gt;4.谈谈&lt;strong&gt;instancetype和id的异同&lt;/strong&gt;&lt;/h5&gt;
-&lt;p&gt;1、相同点
-都可以作为方法的返回类型&lt;/p&gt;
-
-&lt;p&gt;2、不同点
-①instancetype可以返回和方法所在类相同类型的对象，id只能返回未知类型的对象；②instancetype只能作为返回值，不能像id那样作为参数&lt;/p&gt;
-
-&lt;h5 id=&quot;category&quot;&gt;5.category中能不能使用声明属性？为什么？如果能，怎么实现？&lt;/h5&gt;
-&lt;p&gt;这种问题一问，我当时就感觉肯定能实现的，但是实在不知道怎么做，后来回来查了一下，才知道是用到了Runtime的知识了。贴一下答案&lt;/p&gt;
-
-&lt;p&gt;给分类（Category）添加属性
-利用Runtime实现getter/setter 方法&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;@interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ClassName&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nl&quot;&gt;CategoryName&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;strong&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;str&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
-
-&lt;span class=&quot;c1&quot;&gt;//实现文件
-&lt;/span&gt;&lt;span class=&quot;cp&quot;&gt;#import &quot;ClassName + CategoryName.h&quot;
-#import &amp;lt;objc/runtime.h&amp;gt;
-&lt;/span&gt;  
-&lt;span class=&quot;k&quot;&gt;static&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;strKey&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;strKey&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;@implementation&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ClassName&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nl&quot;&gt;CategoryName&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
-
-&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;setStr&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;str&lt;/span&gt;
-&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
-    &lt;span class=&quot;n&quot;&gt;objc_setAssociatedObject&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;self&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;strKey&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;str&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;OBJC_ASSOCIATION_COPY&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
-&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
-
-&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;str&lt;/span&gt;
-&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
-    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;objc_getAssociatedObject&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;self&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;strKey&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
-&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
-
-&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h5 id=&quot;iskindofclassismemberofclass&quot;&gt;6.isKindOfClass和isMemberOfClass的区别&lt;/h5&gt;
-&lt;p&gt;这个题目简单，但是就是当时紧张的情况下，别答反了。&lt;/p&gt;
-
-&lt;p&gt;isKindOfClass来确定一个对象是否是一个类的成员，或者是派生自该类的成员
-isMemberOfClass只能确定一个对象是否是当前类的成员&lt;/p&gt;
-
-&lt;h5 id=&quot;blockretain-cycle&quot;&gt;7.block里面的如何防止retain cycle&lt;/h5&gt;
-&lt;p&gt;使用弱引用打断block里面的retain cycle
-MRC中__ _block &lt;strong&gt;是不会引起retain；但在ARC中&lt;/strong&gt; _block &lt;strong&gt;则会引起retain。ARC中应该使用&lt;/strong&gt; _weak __或__unsafe_unretained弱引用&lt;/p&gt;
-
-&lt;h5 id=&quot;iosgcd&quot;&gt;8.iOS多线程有哪几种实现方法？GCD中有哪些队列？分别是并行还是串行？&lt;/h5&gt;
-&lt;p&gt;iOS中多线程编程工具主要3有：
-1.NSThread
-2.NSOperation
-3.GCD&lt;/p&gt;
-
-&lt;p&gt;dispatch queue分为下面3种：而系统默认就有一串行队列main_queue和并行队列global_queue：&lt;/p&gt;
-
-&lt;p&gt;GCD中有三种队列类型：
-&lt;strong&gt;The main queue:&lt;/strong&gt; 与主线程功能相同。实际上，提交至main queue的任务会在主线程中执行。main queue可以调用dispatch_get_main_queue()来获得。因为main queue是与主线程相关的，所以这是一个串行队列。&lt;/p&gt;
-
-&lt;p&gt;&lt;strong&gt;Global queues:&lt;/strong&gt; 全局队列是并发队列，并由整个进程共享。进程中存在三个全局队列：高、中（默认）、低三个优先级队列。可以调用dispatch_get_global_queue函数传入优先级来访问队列。&lt;/p&gt;
-
-&lt;p&gt;&lt;strong&gt;用户队列:&lt;/strong&gt; 用户队列 (GCD并不这样称呼这种队列, 但是没有一个特定的名字来形容这种队列，所以我们称其为用户队列) 是用函数 dispatch_queue_create
- 创建的队列. 这些队列是串行的。正因为如此，它们可以用来完成同步机制, 有点像传统线程中的mutex。&lt;/p&gt;
-
-&lt;h5 id=&quot;loadinitialize&quot;&gt;9.谈谈load和initialize的区别&lt;/h5&gt;
-
-&lt;p&gt;这个题目当时问出来，真的是一下子就傻了，平时虽然用的多，但是真的没有注意比较过他们俩，看来平时学习还是多要问问所以然！&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-6eb65787e732b3f6.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;h5 id=&quot;core-data&quot;&gt;10.Core Data是数据库么？有哪些重要的类？&lt;/h5&gt;
-&lt;p&gt;我当时一看问到是不是的问题，我就留神，感觉应该不是常理的，当时仔细想了想，Core Data确实不是一个数据库，只是把表和OC对象进行的映射，当时并不是进进映射那么简单，底层还是用的Sqlite3进行存储的，所以Core Data不是数据库。&lt;/p&gt;
-
-&lt;p&gt;有以下6个重要的类：
-(1)NSManagedObjectContext（被管理的数据上下文）
-操作实际内容（操作持久层）
-作用：插入数据，查询数据，删除数据
-(2)NSManagedObjectModel（被管理的数据模型）
-数据库所有表格或数据结构，包含各实体的定义信息
-作用：添加实体的属性，建立属性之间的关系
-操作方法：视图编辑器，或代码
-(3)NSPersistentStoreCoordinator（持久化存储助理）
-相当于数据库的连接器
-作用：设置数据存储的名字，位置，存储方式，和存储时机
-(4)NSManagedObject（被管理的数据记录）
-相当于数据库中的表格记录
-(5)NSFetchRequest（获取数据的请求）
-相当于查询语句
-(6)NSEntityDescription（实体结构）
-相当于表格结构&lt;/p&gt;
-
-&lt;p&gt;以上是我3月份面试遇到的问到的我一下子没有答全或者没答好的问题，大神全部都会的话请忽略哈。然后还有2个开放性的问题，那基本就是完全考验实力和自己理解的深度了。一个是谈谈你对Runtime的理解，另一个是谈谈你对Runloop的理解，由于我个人这两个理解都不是很深，这里就不贴我的理解了。大家如果也感觉欠缺的，就赶紧去网上多看看吧！&lt;/p&gt;
-
-&lt;h4 id=&quot;section-3&quot;&gt;二.机试&lt;/h4&gt;
-&lt;p&gt;这个环节基本都是大公司，或者是复试的时候会出现，因为上机打代码确实很很快区分出谁好谁坏，当然我也面了一家这样的公司，就给一张白纸，全程都是手写代码，这就完全是考验基本功了，因为没了代码补全，没有了编译器告诉你哪里错了，一切都要靠自己的基本功来了。&lt;/p&gt;
-
-&lt;p&gt;机试基本就是靠靠算法题了。当然也有算法题在笔试的最后几道题出现，那就看公司面试怎么安排的。&lt;/p&gt;
-
-&lt;p&gt;2年前我也是面试iOS，当时对算法和 数据结构要求很低的，很多面试基本都不问这些，今年面试多了这些问题，也让我眼前一亮，也感叹，2年技术发展之快，面试如今都会涉及到算法，不会算法和数据结构的程序员的道路会越走越窄。&lt;/p&gt;
-
-&lt;p&gt;算法题，我遇到的都不难，毕竟不是BAT那种公司，简单的就是直接要你写一个算法出来，稍微高级点的就是有一个背景，然后要你解决问题，其实就是和ACM题目一样的，不过就是没有那么复杂。我贴几段问的最多的算法，太难的题只能考自己的算法功底了。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;二分查找 θ(logn)
-
-递归方法
-int binarySearch1(int a[] , int low , int high , int findNum)
-{    
-      int mid = ( low + high ) / 2;       
-      if (low &amp;gt; high)        
-            return -1;   
-     else   
-     {        
-              if (a[mid] &amp;gt; findNum)          
-                    return binarySearch1(a, low, mid - 1, findNum);        
-              else if (a[mid] &amp;lt; findNum)            
-                    return binarySearch1(a, mid + 1, high, findNum);                    
-              else            
-                    return mid;   
-    }
-}
-
-非递归方法
-int binarySearch2(int a[] , int low , int high , int findNum)
-{    
-       while (low &amp;lt;= high)
-      {
-            int mid = ( low + high) / 2;   //此处一定要放在while里面
-            if (a[mid] &amp;lt; findNum)           
-                low = mid + 1;        
-            else if (a[mid] &amp;gt; findNum)            
-                high = mid - 1;       
-             else           
-                return mid;    
-    }       
-    return  -1;
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;冒泡排序   θ(n^2)
-void bubble_sort(int a[], int n)
-{
-    int i, j, temp;
-    for (j = 0; j &amp;lt; n - 1; j++)
-        for (i = 0; i &amp;lt; n - 1 - j; i++) //外层循环每循环一次就能确定出一个泡泡（最大或者最小），所以内层循环不用再计算已经排好的部分
-        {
-            if(a[i] &amp;gt; a[i + 1])
-            {
-                temp = a[i];
-                a[i] = a[i + 1];
-                a[i + 1] = temp;
-            }
-        }
-}
-
-快速排序  调用方法  quickSort(a,0,n);  θ(nlogn)
-void quickSort (int a[] , int low , int high)
-{
-    if (high &amp;lt; low + 2)
-        return;
-    int start = low;
-    int end = high;
-    int temp;
-    
-    while (start &amp;lt; end)
-    {
-        while ( ++start &amp;lt; high &amp;amp;&amp;amp; a[start] &amp;lt;= a[low]);//找到第一个比a[low]数值大的位子start
-
-        while ( --end  &amp;gt; low  &amp;amp;&amp;amp; a[end]  &amp;gt;= a[low]);//找到第一个比a[low]数值小的位子end
-
-        //进行到此，a[end] &amp;lt; a[low] &amp;lt; a[start],但是物理位置上还是low &amp;lt; start &amp;lt; end，因此接下来交换a[start]和a[end],于是[low,start]这个区间里面全部比a[low]小的，[end,hight]这个区间里面全部都是比a[low]大的
-        
-        if (start &amp;lt; end)
-        {
-            temp = a[start];
-            a[start]=a[end];
-            a[end]=temp;
-        }
-        //在GCC编译器下，该写法无法达到交换的目的，a[start] ^= a[end] ^= a[start] ^= a[end];编译器的问题
-    }
-    //进行到此，[low,end]区间里面的数都比a[low]小的,[end,higt]区间里面都是比a[low]大的，把a[low]放到中间即可
-
-    //在GCC编译器下，该写法无法达到交换的目的，a[low] ^= a[end] ^= a[low] ^= a[end];编译器的问题
-    
-    temp = a[low];
-    a[low]=a[end];
-    a[end]=temp;
-    
-    //现在就分成了3段了，由最初的a[low]枢纽分开的
-    quickSort(a, low, end);
-    quickSort(a, start, high);
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;注释我也写上了，这些算法基本上简单的算法题都能应对了。&lt;/p&gt;
-
-&lt;p&gt;数据结构的题目我就遇到了链表翻转，实现一个栈的结构，先进后出的，树先跟，中跟，后跟遍历，图的DFS和BFS。代码就不贴了，太长了。如果有忘记的，可以再去翻翻回顾一下。&lt;/p&gt;
-
-&lt;h4 id=&quot;section-4&quot;&gt;三.面试&lt;/h4&gt;
-&lt;p&gt;面试基本都是问你之前做过什么项目啦，遇到了哪些问题了，自己如何解决的。谈谈对XXX的看法等等这些问题，只要平时认真完成项目，其实面试反而问的东西更好答，因为都是关于你项目的，这些你最了解和清楚了。&lt;/p&gt;
-
-&lt;p&gt;好了，到此就是2016年3月上海地区除了BAT公司，招聘iOS开发工程师的行情了，比2年前，最大的体会就是面试面更广了，要求更高了。现在要求除了会OC，还要懂算法和数据结构，还有要么会ReactNative，或者PhoneGap一系列混合开发的框架，或者熟悉Swift，程序员要一直跟上主流才能不能被时代淘汰。才能具有竞争力。这也是我面试了这些公司的感悟，活到老学到老！最后希望大家都和我交流交流，我也是个iOS菜鸟，请大家多多指教！&lt;/p&gt;
-</description>
-        <pubDate>Thu, 28 Apr 2016 23:56:00 +0800</pubDate>
-        <link>http://vno.onevcat.com/2016/04/2016%E5%B9%B43%E6%9C%88iOS%E9%9D%A2%E8%AF%95%E6%80%BB%E7%BB%93/</link>
-        <guid isPermaLink="true">http://vno.onevcat.com/2016/04/2016%E5%B9%B43%E6%9C%88iOS%E9%9D%A2%E8%AF%95%E6%80%BB%E7%BB%93/</guid>
-        
-        <category>面试总结</category>
-        
-        
-        <category>面试总结</category>
         
       </item>
     
