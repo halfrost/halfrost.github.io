@@ -18,6 +18,11 @@ markdown: kramdown
 cover_color: black
 
 # The blog button should not be removed.
+pre:
+    - {title: test0, description: test0, url: 'http://about.halfrost.com'}
+    
+
+
 blog_button:
     title: 博客
     description: Visit blog
@@ -25,6 +30,7 @@ blog_button:
 # Navigation buttons in the front page.
 nav:
     - {title: 关于, description: 关于, url: 'http://about.halfrost.com'}
+    - {title: test, description: test, url: 'http://google.com'}
     # - {title: Another Button, description: A button, url: 'http://example.com'}
 
 # Pagination

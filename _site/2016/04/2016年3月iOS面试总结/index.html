@@ -28,7 +28,6 @@
   <link rel="alternate" type="application/rss+xml" title="Halfrost's Field | 冰霜之地" href="http://vno.onevcat.com/feed.xml">
 
   <meta name="google-site-verification" content="1-1ZlHoRvM0T2FqPbW2S-qLgYXN6rsn52kErlMPd_gw" />
-
 </head>
 
 
@@ -60,9 +59,16 @@
           <div>
             <nav class="cover-navigation cover-navigation--primary">
               <ul class="navigation">
+                  
+                  
+                  <li class="navigation__item"><a href="http://about.halfrost.com" target="_blank" title="test0">test0</a></li>
+                  
+                  
                 <li class="navigation__item"><a href="/#blog" title="Visit blog" class="blog-button">博客</a></li>
                 
                   <li class="navigation__item"><a href="http://about.halfrost.com" target="_blank" title="关于">关于</a></li>
+                
+                  <li class="navigation__item"><a href="http://google.com" target="_blank" title="test">test</a></li>
                 
               </ul>
             </nav>
@@ -191,7 +197,7 @@
 利用Runtime实现getter/setter 方法</p>
 
 <div class="highlighter-rouge"><pre class="highlight"><code><span class="k">@interface</span> <span class="nc">ClassName</span> <span class="p">(</span><span class="nl">CategoryName</span><span class="p">)</span>
-<span class="k">@property</span> <span class="p">(</span><span class="n">nonatomic</span><span class="p">,</span> <span class="n">strong</span><span class="p">)</span> <span class="n">NSString</span> <span class="o">*</span><span class="n">str</span><span class="p">;</span>
+<span class="err">@</span><span class="nc">property</span> <span class="p">(</span><span class="n">nonatomic</span><span class="p">,</span> <span class="n">strong</span><span class="p">)</span> <span class="n">NSString</span> <span class="o">*</span><span class="n">str</span><span class="p">;</span>
 <span class="k">@end</span>
 
 <span class="c1">//实现文件
@@ -201,12 +207,12 @@
 <span class="k">static</span> <span class="kt">void</span> <span class="o">*</span><span class="n">strKey</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">strKey</span><span class="p">;</span>
 <span class="k">@implementation</span> <span class="nc">ClassName</span> <span class="p">(</span><span class="nl">CategoryName</span><span class="p">)</span>
 
-<span class="k">-</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">setStr</span><span class="p">:(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="nv">str</span>
+<span class="err">-(</span><span class="nc">void</span><span class="p">)</span><span class="n">setStr</span><span class="o">:</span><span class="p">(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="n">str</span>
 <span class="p">{</span>
     <span class="n">objc_setAssociatedObject</span><span class="p">(</span><span class="n">self</span><span class="p">,</span> <span class="o">&amp;</span> <span class="n">strKey</span><span class="p">,</span> <span class="n">str</span><span class="p">,</span> <span class="n">OBJC_ASSOCIATION_COPY</span><span class="p">);</span>
 <span class="p">}</span>
 
-<span class="k">-</span><span class="p">(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="n">str</span>
+<span class="o">-</span><span class="p">(</span><span class="n">NSString</span> <span class="o">*</span><span class="p">)</span><span class="n">str</span>
 <span class="p">{</span>
     <span class="k">return</span> <span class="n">objc_getAssociatedObject</span><span class="p">(</span><span class="n">self</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">strKey</span><span class="p">);</span>
 <span class="p">}</span>
@@ -440,7 +446,7 @@ void quickSort (int a[] , int low , int high)
       <br>
       <br>
     	<span class="footer__copyright">本站点采用<a href="http://creativecommons.org/licenses/by-nc-sa/4.0/">知识共享 署名-非商业性使用-相同方式共享 4.0 国际 许可协议</a></span>
-        <span class="footer__copyright">由 <a href="https://jekyllrb.com">Jekyll</a> 于 2016-07-18 生成，感谢<a href="https://pages.github.com"> GitHub Pages</a> 强力驱动</span>
+        <span class="footer__copyright">由 <a href="https://jekyllrb.com">Jekyll</a> 于 2016-07-24 生成，感谢<a href="https://pages.github.com"> GitHub Pages</a> 强力驱动</span>
         <span class="footer__copyright">本站由 <a href="http://halfrost.com">@halfrost</a> 创建，采用 <a href="https://github.com/onevcat/vno-jekyll">Vno - Jekyll</a> 作为主题，您可以在 GitHub 找到<a href="https://github.com/onevcat/OneV-s-Den">本站源码</a> - &copy; 2016</span>
     </footer>
 </section>

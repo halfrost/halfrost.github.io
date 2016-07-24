@@ -5,9 +5,9 @@
     <description>嗨，我是于德志 (@halfrost)，一名来自中国的 iOS 开发者，已退役 acmer 。现居上海。吾笃信：德不孤，必有志，技不疏，必有朋。</description>
     <link>http://vno.onevcat.com/</link>
     <atom:link href="http://vno.onevcat.com/feed.xml" rel="self" type="application/rss+xml"/>
-    <pubDate>Mon, 18 Jul 2016 02:02:59 +0800</pubDate>
-    <lastBuildDate>Mon, 18 Jul 2016 02:02:59 +0800</lastBuildDate>
-    <generator>Jekyll v3.1.6</generator>
+    <pubDate>Sun, 24 Jul 2016 21:56:44 +0800</pubDate>
+    <lastBuildDate>Sun, 24 Jul 2016 21:56:44 +0800</lastBuildDate>
+    <generator>Jekyll v3.1.2</generator>
     
       <item>
         <title>WWDC2016 Session笔记 - iOS 10 UICollectionView新特性</title>
@@ -1411,7 +1411,7 @@ A promise is an object that wraps an asynchronous task&lt;/p&gt;
 &lt;/div&gt;
 &lt;p&gt;PromiseKit就是用来干净简洁的代码，来解决异步操作，和奇怪的错误处理回调的。它将异步操作变成了链式的调用，简单的错误处理方式。&lt;/p&gt;
 
-&lt;p&gt;PromiseKit里面目前有2个类，一个是Promise&lt;T&gt;(Swift)，一个是AnyPromise(Objective-C)，2者的区别就在2种语言的特性上，Promise&lt;T&gt;是定义精确严格的，AnyPromise是定义宽松，灵活，动态的。&lt;/T&gt;&lt;/T&gt;&lt;/p&gt;
+&lt;p&gt;PromiseKit里面目前有2个类，一个是Promise&lt;t&gt;(Swift)，一个是AnyPromise(Objective-C)，2者的区别就在2种语言的特性上，Promise&lt;t&gt;是定义精确严格的，AnyPromise是定义宽松，灵活，动态的。&lt;/t&gt;&lt;/t&gt;&lt;/p&gt;
 
 &lt;p&gt;在异步编程中，有一个最最典型的例子就是回调地狱CallBack hell，要是处理的不优雅，就会出现下图这样:
 &lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-76966b54ee252dce.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
@@ -2151,7 +2151,7 @@ let realm = Realm()
 
 &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSDictionary&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;defaultPropertyValues&lt;/span&gt;
 &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
-&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;@{&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;@&quot;uuid&quot;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSUUID&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;UUID&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;UUIDString&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;],&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;err&quot;&gt;@&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;@&quot;uuid&quot;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSUUID&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;UUID&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;UUIDString&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;],&lt;/span&gt;
 &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;s&quot;&gt;@&quot;name&quot;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;@&quot;&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
 &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;s&quot;&gt;@&quot;birthdate&quot;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSDate&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;date&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]};&lt;/span&gt;
 &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
