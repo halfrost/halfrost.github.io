@@ -23,7 +23,7 @@ cover_color: black
 
 home-button:
     title: 首页
-    description: home
+    description: Home
 
 blog_button:
     title: 博客
@@ -31,7 +31,7 @@ blog_button:
 
 # Navigation buttons in the front page.
 nav:
-    - {title: 关于, description: about, url: 'http://about.halfrost.com'}
+    - {title: 关于, description: About, url: 'http://about.halfrost.com'}
     # - {title: Another Button, description: A button, url: 'http://example.com'}
 
 # Pagination
