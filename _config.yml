@@ -18,10 +18,12 @@ markdown: kramdown
 cover_color: black
 
 # The blog button should not be removed.
-pre:
-    - {title: test0, description: test0, url: 'http://about.halfrost.com'}
-    
+#pre:
+#    - {title: 首页, description: 首页, url: 'https://halfrost.com'}
 
+home-button:
+    title: 首页
+    description: home
 
 blog_button:
     title: 博客
@@ -30,7 +32,6 @@ blog_button:
 # Navigation buttons in the front page.
 nav:
     - {title: 关于, description: 关于, url: 'http://about.halfrost.com'}
-    - {title: test, description: test, url: 'http://google.com'}
     # - {title: Another Button, description: A button, url: 'http://example.com'}
 
 # Pagination
@@ -48,6 +49,7 @@ social:
     weibo: halfrost
     github: halfrost
     jianshu: halfrost
+    juejin: halfrost
     #gplus: 113872186786618065577
     mail: ydz627@gamil.com
 

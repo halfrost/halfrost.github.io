@@ -22,7 +22,7 @@
   <link href="/assets/images/favicon.ico" rel="shortcut icon" type="image/ico">
 
   <link rel="stylesheet" href="/css/main.css">
-  <link href="//netdna.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
+  <link href="//netdna.bootstrapcdn.com/font-awesome/4.6.0/css/font-awesome.min.css" rel="stylesheet">
 
   <link rel="canonical" href="http://vno.onevcat.com/2016/06/iOS%E5%A6%82%E4%BD%95%E4%BC%98%E9%9B%85%E7%9A%84%E5%A4%84%E7%90%86-%E5%9B%9E%E8%B0%83%E5%9C%B0%E7%8B%B1Callback-hell-(%E4%B8%80)-%E4%BD%BF%E7%94%A8PromiseKit/">
   <link rel="alternate" type="application/rss+xml" title="Halfrost's Field | 冰霜之地" href="http://vno.onevcat.com/feed.xml">
@@ -52,28 +52,25 @@
         <hr class="panel-cover__divider" />
         <p class="panel-cover__description">嗨，我是于德志 (@halfrost)，一名来自中国的 iOS 开发者，已退役 acmer 。现居上海。吾笃信：德不孤，必有志，技不疏，必有朋。</p>
         <hr class="panel-cover__divider panel-cover__divider--secondary" />
+
         
-        
-        
+
         <div class="navigation-wrapper">
           <div>
             <nav class="cover-navigation cover-navigation--primary">
               <ul class="navigation">
+
                   
-                  
-                  <li class="navigation__item"><a href="http://about.halfrost.com" target="_blank" title="test0">test0</a></li>
-                  
-                  
+
+                <li class="navigation__item"><a href="/" title="Visit blog" class="home-button">首页</a></li>
                 <li class="navigation__item"><a href="/#blog" title="Visit blog" class="blog-button">博客</a></li>
                 
                   <li class="navigation__item"><a href="http://about.halfrost.com" target="_blank" title="关于">关于</a></li>
                 
-                  <li class="navigation__item"><a href="http://google.com" target="_blank" title="test">test</a></li>
-                
               </ul>
             </nav>
           </div>
-          
+
           <div><nav class="cover-navigation navigation--social">
   <ul class="navigation">
 
@@ -83,6 +80,16 @@
       <a href="http://jianshu.com/users/12201cdd5d7a/latest_articles" title="@halfrost 的简书" target="_blank">
         <i class='social fa fa-book'></i>
         <span class="label">jianshu</span>
+      </a>
+    </li>
+    
+
+    
+    <!-- juejin-->
+    <li class="navigation__item">
+      <a href="http://gold.xitu.io/user/5692e1e000b09aa2e8dcd422" title="@halfrost 的稀土掘金" target="_blank">
+        <i class='social fa fa-forumbee'></i>
+        <span class="label">juejin</span>
       </a>
     </li>
     
@@ -135,7 +142,7 @@
         </div>
       </div>
     </div>
-    
+
     
     <div class="panel-cover--overlay cover-black"></div>
     
@@ -203,7 +210,7 @@ A promise is an object that wraps an asynchronous task</p>
 </div>
 <p>PromiseKit就是用来干净简洁的代码，来解决异步操作，和奇怪的错误处理回调的。它将异步操作变成了链式的调用，简单的错误处理方式。</p>
 
-<p>PromiseKit里面目前有2个类，一个是Promise<t>(Swift)，一个是AnyPromise(Objective-C)，2者的区别就在2种语言的特性上，Promise<t>是定义精确严格的，AnyPromise是定义宽松，灵活，动态的。</t></t></p>
+<p>PromiseKit里面目前有2个类，一个是Promise<T>(Swift)，一个是AnyPromise(Objective-C)，2者的区别就在2种语言的特性上，Promise<T>是定义精确严格的，AnyPromise是定义宽松，灵活，动态的。</T></T></p>
 
 <p>在异步编程中，有一个最最典型的例子就是回调地狱CallBack hell，要是处理的不优雅，就会出现下图这样:
 <img src="http://upload-images.jianshu.io/upload_images/1194012-76966b54ee252dce.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" />
