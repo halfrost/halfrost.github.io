@@ -5,9 +5,1131 @@
     <description>嗨，我是于德志 (@halfrost)，一名来自中国的 iOS 开发者，已退役 acmer 。现居上海。吾笃信：德不孤，必有志，技不疏，必有朋。</description>
     <link>http://vno.onevcat.com/</link>
     <atom:link href="http://vno.onevcat.com/feed.xml" rel="self" type="application/rss+xml"/>
-    <pubDate>Sun, 07 Aug 2016 16:26:22 +0800</pubDate>
-    <lastBuildDate>Sun, 07 Aug 2016 16:26:22 +0800</lastBuildDate>
+    <pubDate>Sun, 14 Aug 2016 19:33:24 +0800</pubDate>
+    <lastBuildDate>Sun, 14 Aug 2016 19:33:24 +0800</lastBuildDate>
     <generator>Jekyll v3.1.6</generator>
+    
+      <item>
+        <title>手把手教你给一个iOS app配置多个环境变量</title>
+        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-fa88cb2e6feceae7.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h4 id=&quot;section&quot;&gt;前言&lt;/h4&gt;
+&lt;p&gt;谈到多环境，相信现在大多公司都至少有2-3个app环境了，比如Test环境，UAT(User Acceptance Test)用户验收测试环境，Release环境等等。当需要开发打多个包的时候，一般常见做法就是直接代码里面修改环境变量，改完之后Archive一下就打包了。当然这种做法很正确，只不过不是很优雅很高效。如果搭建好了Jenkins(&lt;a href=&quot;http://www.jianshu.com/p/41ecb06ae95f&quot;&gt;搭建教程&lt;/a&gt;)，我们利用它来优雅的打包。如果利用Jenkins来打包，我们就需要来给app来配置一下多个环境变量了。之后Jenkins分别再不同环境下自动集成即可。接下来，我们来谈谈常见的2种做法。&lt;/p&gt;
+
+&lt;h4 id=&quot;section-1&quot;&gt;目录&lt;/h4&gt;
+&lt;ul&gt;
+  &lt;li&gt;1.利用Build Configuration来配置多环境&lt;/li&gt;
+  &lt;li&gt;2.利用&lt;a href=&quot;https://developer.apple.com/library/ios/recipes/xcode_help-project_editor/Articles/BasingBuildConfigurationsonConfigurationFiles.html&quot;&gt;xcconfig&lt;/a&gt;文件来配置多环境&lt;/li&gt;
+  &lt;li&gt;3.利用Targets来配置多环境&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h4 id=&quot;build-configuration&quot;&gt;一.利用Build Configuration来配置多环境&lt;/h4&gt;
+&lt;p&gt;前言里面我们先谈到了需求，由于需要配置多个环境，并且多个环境都需要安装到手机上，那么可以配置Build Configuration来完成这个任务。如果Build Configuration还不熟悉的，可以先温习一下&lt;a href=&quot;https://developer.apple.com/library/ios/recipes/xcode_help-project_editor/Articles/BasingBuildConfigurationsonConfigurationFiles.html&quot;&gt;官方文档&lt;/a&gt;。&lt;/p&gt;
+
+&lt;h5 id=&quot;build-configuration-1&quot;&gt;1. 新建Build Configuration&lt;/h5&gt;
+&lt;p&gt;先点击Project里面找到Configuration，然后选择添加，这里新加一个Configuration。系统默认是2个，一个Debug，一个Release。这里我们需要选择是复制一个Debug还是Release。Release和Debug的区别是，Release是不能调试程序，因为默认是屏蔽了可调试的一些参数，具体可以看BuildSetting里面的区别，而且Release编译时有做编译优化，会比用Debug打包出来的体积更小一点。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-bc2cd086f31d3263.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;这里我们选择一个Duplicate “Debug” Configuration，因为我们新的环境需要debug，添加完了之后就会多了一套Configuration了，这一套其实是包含了一些编译参数的配置集合。如果此时项目里面有cocopods的话，打开Configuration Set就会发现是如下的样子：&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-af56fd34c9b1bfc8.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;在我们自己的项目里面用了Pod，打开配置是会看到如下信息
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-770ea4347a9a0928.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;注意：刚刚新建完Build Configuration之后，这时如果有pod，请立即执行一下&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+pod install  
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;pod安装完成之后会自动生成xcconfig文件，如果你手动新建这个xcconfig，然后把原来的debug和release对应的pod xcconfig文件内容复制进来，这样做是无效的，需要pod自己去生成xcconfig文件才能被识别到。&lt;/p&gt;
+
+&lt;p&gt;新建完Build Configuration，这个时候需要新建pod里面对应的Build Configuration，要不然一会编译会报错。如果没用pod，可以忽略一下这一段。&lt;/p&gt;
+
+&lt;p&gt;如下图新建一个对应之前Porject里面新建的Build Configuration
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-0ecc3c2cb61b83d4.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h5 id=&quot;scheme&quot;&gt;2. 新建Scheme&lt;/h5&gt;
+
+&lt;p&gt;接下来我们要为新的Configuration新建一个编译Scheme。
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-3e882c6c04155c21.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;新建完成之后，我们就可以编辑刚刚新建的Scheme，这里可以把Run模式和Archive都改成新建Scheme。如下图：&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-0ec7df2dfbea089e.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;注意：如果是使用了Git这些协同工具的同学这里还需要把刚刚新建的Scheme共享出去，否则其他人看不到这个Scheme。选择“Manage Schemes”&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-5f6f36cacb4404f0.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h5 id=&quot;user-defined-build-settings&quot;&gt;3. 新建User-defined Build Settings&lt;/h5&gt;
+
+&lt;p&gt;再次回到Project的Build Settings里面来，Add User-Defined Setting。
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-b212148be039475c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;我们这里新加入2个参数，CustomAppBundleld是为了之后打包可以分开打成多个包，这里需要3个不同的Id，建议是直接在原来的Bundleld加上Scheme的名字即可。&lt;/p&gt;
+
+&lt;p&gt;CustomProductName是为了app安装到手机上之后，手机上显示的名字，这里可以按照对应的环境给予描述，比如测试服，UAT，等等。如下图。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-e53a11b9c0317976.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;这里值得提到的一点是，下面Pods的Build_DIR这些目录其实是Pods自己生成好的，之前执行过&lt;strong&gt;Pod install&lt;/strong&gt; 之后，这里默认都是配置好的，不需要再改动了。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-b881321289e8b498.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h5 id=&quot;infoplist--imagesxcassets&quot;&gt;4. 修改info.plist文件 和 Images.xcassets&lt;/h5&gt;
+
+&lt;p&gt;先来修改一下info.plist文件。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-030b30264df74e43.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;由于我们新添加了2个CustomAppBundleld 和 CustomProductName，这里我们需要把info.plist里面的Bundle display name修改成我们自定义的这个字典。编译过程中，编译器会根据我们设置好的Scheme去自己选择Debug，Release，TestRelease分别对应的ProductName。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-2936ad12b68610d0.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;我们还需要在Images.xcassets里面新添加2个New iOS App Icon，名字最好和scheme的名字相同，这样好区分。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-f886a8b706d306e3.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;新建完AppIcon之后，再在Build Setting里面找到&lt;strong&gt;Asset Catalog Compiler&lt;/strong&gt;里面，然后把这几种模式下的App Icon set
+ Name分别设置上对应的图标。如上图。&lt;/p&gt;
+
+&lt;p&gt;既然我们已经新建了这几个scheme，那接下来怎么把他们都打包成app呢？？这里有一份官方的文档&lt;a href=&quot;https://developer.apple.com/library/ios/technotes/tn2215/_index.html&quot;&gt;Troubleshooting Application Archiving in Xcode&lt;/a&gt;这里面详细记录了我们平时点击了Archive之后是怎么打包的。&lt;/p&gt;
+
+&lt;p&gt;这里分享一下我分好这些环境的心得。一切切记，每个环境都要设置好Debug 和 Release！千万别认为线上的版本只设置Release就好，哪天需要调试线上版本，没有设置Debug就无从下手了。也千万别认为测试环境的版本只要设置Debug就好，万一哪天要发布一个测试环境需要发Release包，那又无从下手了。我的建议就是每个环境都配置Debug 和 Release，即使以后不用，也提前设置好，以防万一。合理的设置应该如下图这样。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;  
+| -------------------------- |------------------|
+|           Scheme           |   Configurations |  
+| -------------------------- |------------------| 
+|      XXXXProjectTest       |      Debug       | 
+|                            |------------------|
+|                            |      Release     | 
+| -------------------------- |------------------|
+|      XXXXProjectAppStore   |      Debug       | 
+|                            |------------------|
+|                            |      Release     | 
+| -------------------------- |------------------|
+|      XXXXProjectUAT        |      Debug       | 
+|                            |------------------|
+|                            |      Release     | 
+| -------------------------- |------------------|
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;注意这里一定要把Scheme的名字和编译方式区分开，选择了一个Scheme，只是相当于选择了一个环境，并不是代表这Debug还是Release。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-059d8650a96b18fd.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;我建议Scheme只配置环境，而进来的Run和Archive来配置Debug和Release，我建议每个Scheme都按照上图来，Run对应的Debug，Archive对应的Release。&lt;/p&gt;
+
+&lt;p&gt;配置好上述之后，就可以选择不同环境运行app了。可以在手机上生成不同的环境的app，可以同时安装。如下图。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-a646aa4090d14d41.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h5 id=&quot;section-2&quot;&gt;5. 配置和获取环境变量&lt;/h5&gt;
+
+&lt;p&gt;接下来讲几种动态配置环境变量的方法&lt;/p&gt;
+
+&lt;h6 id=&quot;gccgccpreprocessordefinitions&quot;&gt;1. 使用GCC预编译头参数GCC_PREPROCESSOR_DEFINITIONS&lt;/h6&gt;
+
+&lt;p&gt;我们进入到Build Settings里面，可以找到Apple LLVM Preprocessing，这里我们可以找到&lt;strong&gt;Preprocessor Macros&lt;/strong&gt;在这里，我们是可以加一些环境变量的宏定义来标识符。Preprocessor Macros可以根据不同的环境预先制定不同定义的宏。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-427d4a19e32c41f2.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
+如上图，圈出来的地方其实就是一个标识符。&lt;/p&gt;
+
+&lt;p&gt;有了这些我们预先设置的标识符之后，我们就可以在代码里面写入如下的代码了。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+#ifdef DEVELOP
+#define searchURL @&quot;http://www.baidu.com&quot;
+#define sociaURL  @&quot;weibo.com&quot;
+#elif UAT
+#define searchURL @&quot;http://www.bing.com&quot;
+#define sociaURL  @&quot;twitter.com&quot;
+#else
+#define searchURL @&quot;http://www.google.com&quot;
+#define sociaURL  @&quot;facebook.com&quot;
+#endif
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h6 id=&quot;plist&quot;&gt;2. 使用plist文件动态配置环境变量&lt;/h6&gt;
+
+&lt;p&gt;我们先来新建3个名字一样的plist作为3个环境的配置文件。
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-ea7dd9eeead81ce0.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;这里名字一样的好处是写代码方便，因为就只需要去读取“Configuration.plist”就可以了，如果名字不一样，还要分别去把对应环境的plist名字拼接出来才能读取。&lt;/p&gt;
+
+&lt;p&gt;众所周知，在一个文件夹里面新建2个相同名字的文件，Mac 系统都会提示我们名字相同，不允许我们新建。那我们怎么新建3个相同名字的文件呢？这其实很简单，分别放在3个不同文件夹下面即可。如下图：&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-34d9755680c0828e.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;我就是这样放置的，大家可以根据自己习惯去放置文件。&lt;/p&gt;
+
+&lt;p&gt;接下来我们要做的是在编译的时候，运行app前，动态的copy Configuration.plist到app里面，这里需要设置一个copy脚本。
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-11b5eb2740734f28.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;进入到我们的Target里面，找到&lt;strong&gt;Build Phases&lt;/strong&gt;，我们新建一个&lt;strong&gt;New Copy Files Phase&lt;/strong&gt;，并且重命名为&lt;strong&gt;Copy Configuration Files&lt;/strong&gt;。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+echo &quot;CONFIGURATION -&amp;gt; ${CONFIGURATION}&quot;
+RESOURCE_PATH=${SRCROOT}/${PRODUCT_NAME}/config/${CONFIGURATION}
+
+BUILD_APP_DIR=${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app
+
+echo &quot;Copying all files under ${RESOURCE_PATH} to ${BUILD_APP_DIR}&quot;
+cp -v &quot;${RESOURCE_PATH}/&quot;* &quot;${BUILD_APP_DIR}/&quot;
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;这一段脚本就能保证我们的Configuration.plist 文件可以在编译的时候，选择其中一个打包进我们的app。&lt;/p&gt;
+
+&lt;p&gt;再写代码每次读取这个plist里面的信息就可以做到动态化了。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+- (NSString *) readValueFromConfigurationFile {
+    NSBundle *bundle = [NSBundle mainBundle];
+    NSString *path = [bundle pathForResource:@&quot;Configuration&quot; ofType:@&quot;plist&quot;];
+    NSDictionary *config = [NSDictionary dictionaryWithContentsOfFile:path];
+    return config[@&quot;serverURL&quot;];
+}
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;这里我假设plist文件里面预设置了一个serverURL的字符串，用这种方式就可以读取出来了。当然在plist里面也可以设置数组，字典，相应的把返回值和Key值改一下就可以了。&lt;/p&gt;
+
+&lt;h6 id=&quot;section-3&quot;&gt;3. 使用单例来处理环境切换&lt;/h6&gt;
+
+&lt;p&gt;当然使用一个单例也可以做到环境切换。新建一个单例，然后可以在设置菜单里面加入一个列表，里面列出所有的环境，然后用户选择以后，单例就初始化用户所选的环境。和上面几种方式不同的是，这种方式就是在一个app里面切换多种环境。看大家的需求，任取所需。&lt;/p&gt;
+
+&lt;h4 id=&quot;section-4&quot;&gt;二.利用文件来配置多环境&lt;/h4&gt;
+&lt;p&gt;说道&lt;a href=&quot;https://developer.apple.com/library/ios/recipes/xcode_help-project_editor/Articles/BasingBuildConfigurationsonConfigurationFiles.html&quot;&gt;xcconfig&lt;/a&gt;，这个官方文档上面也提到的不是很详细，在网上寻找了一下，倒是找到了另外一份详细非官方文档。&lt;a href=&quot;http://pewpewthespells.com/blog/xcconfig_guide.html#CondVarSDK&quot;&gt;The Unofficial Guide to xcconfig files&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;提到xcconfig，就要先说说几个概念。&lt;/p&gt;
+
+&lt;h5 id=&quot;section-5&quot;&gt;1. 区分几个概念&lt;/h5&gt;
+&lt;p&gt;先来区分一下Xcode Workspace、Xcode Scheme、Xcode Project、Xcode Target、Build Settings 这5者的关系。这5者的关系在苹果官方文档上其实都已经说明的很清楚了。详情见文档&lt;a href=&quot;https://developer.apple.com/library/ios/featuredarticles/XcodeConcepts/Concept-Targets.html&quot;&gt;Xcode Concepts&lt;/a&gt;。&lt;/p&gt;
+
+&lt;p&gt;我来简单来解读一下文档。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Xcode Workspace&lt;/strong&gt;&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;A workspace is an Xcode document that groups projects and other documents so you can work on them together. A workspace can contain any number of Xcode projects, plus any other files you want to include. In addition to organizing all the files in each Xcode project, a workspace provides implicit and explicit relationships among the included projects and their targets.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;workspace这个概念大家应该都很清楚了。它可以包含多个Project和其他文档文件。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Xcode Project&lt;/strong&gt;&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;An Xcode project is a repository for all the files, resources, and information required to build one or more software products. A project contains all the elements used to build your products and maintains the relationships between those elements. It contains one or more targets, which specify how to build products. A project defines default build settings for all the targets in the project (each target can also specify its own build settings, which override the project build settings).&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;project就是一个个的仓库，里面会包含属于这个项目的所有文件，资源，以及生成一个或者多个软件产品的信息。每一个project会包含一个或者多个 targets，而每一个 target 告诉我们如何生产 products。project 会为所有 targets 定义了默认的 build settings，每一个 target 也能自定义自己的 build settings，且 target 的 build settings 会重写 project 的 build settings。&lt;/p&gt;
+
+&lt;p&gt;最后这句话比较重要，下面设置xcconfig的时候就会用到这一点。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-3175b62b1a46caad.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Xcode Project 文件会包含以下信息，对资源文件的引用(源码.h和.m文件，frame，资源文件plist，bundle文件等，图片文件image.xcassets还有Interface Builder(nib)，storyboard文件)、文件结构导航中用来组织源文件的组、Project-level build configurations(Debug\Release)、Targets、可执行环境，该环境用于调试或者测试程序。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Xcode Target&lt;/strong&gt;&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;A target specifies a product to build and contains the instructions for building the product from a set of files in a project or workspace. A target defines a single product; it organizes the inputs into the build system—the source files and instructions for processing those source files—required to build that product. Projects can contain one or more targets, each of which produces one product.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;target 会有且唯一生成一个 product, 它将构建该 product 所需的文件和处理这些文件所需的指令集整合进 build system 中。Projects 会包含一个或者多个 targets,每一个 target 将会产出一个 product。&lt;/p&gt;
+
+&lt;p&gt;这里值得说明的是，每个target 中的 build setting 参数继承自 project 的 build settings, 一旦你在 target 中修改任意 settings 来重写 project settings，那么最终生效的 settings 参数以在 target 中设置的为准. Project 可以包含多个 target, 但是在同一时刻，只会有一个 target 生效，可用 Xcode 的 scheme 来指定是哪一个 target 生效。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Build Settings&lt;/strong&gt;&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;A build setting is a variable that contains information about how a particular aspect of a product’s build process should be performed. For example, the information in a build setting can specify which options Xcode passes to the compiler.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;build setting 中包含了 product 生成过程中所需的参数信息。project的build settings会对于整个project 中的所有targets生效，而target的build settings是重写了Project的build settings，重写的配置以target为准。&lt;/p&gt;
+
+&lt;p&gt;一个 build configaration 指定了一套 build settings 用于生成某一 target 的 product，例如Debug和Release就属于build configaration。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Xcode Scheme&lt;/strong&gt;&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;An Xcode scheme defines a collection of targets to build, a configuration to use when building, and a collection of tests to execute.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;一个Scheme就包含了一套targets(这些targets之间可能有依赖关系)，一个configuration，一套待执行的tests。&lt;/p&gt;
+
+&lt;p&gt;这5者的关系，举个可能不恰当的例子，
+Xcode Workspace就如同工厂，Xcode Project如同车间，每个车间可以独立于工厂来生产产品(project可独立于workspace存在)，但是各个车间组合起来就需要工厂来组织(如果用了cocopods，就需要用workspace)。Xcode Target是一条条的流水线，一条流水线上面只生产一种产品。Build Settings是生产产品的秘方，如果是生产汽水，Build Settings就是其中各个原料的配方。Xcode Scheme是生产方案，包含了流水线生产，秘方，还包含生产完成之后的质检(test)。&lt;/p&gt;
+
+&lt;h5 id=&quot;xcconfig&quot;&gt;2. 来创建一个xcconfig文件&lt;/h5&gt;
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-bbb676bc468f1522.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;然后创建好了这个文件，我们在project里面设置一下。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-4d0d012da710a3f0.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;在这些地方把配置文件换成我们刚刚新建的文件。&lt;/p&gt;
+
+&lt;p&gt;接下来就要编写我们的xcconfig文件了。这个文件里面可以写的东西挺多的。细心的同学就会发现，其实我们一直使用的cocopods就是用这个文件来配置编译参数的。我们随便看一个简单的cocopods的xcconfig文件，就是下图这样子：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+GCC_PREPROCESSOR_DEFINITIONS = $(inherited) COCOAPODS=1
+HEADER_SEARCH_PATHS = $(inherited) &quot;${PODS_ROOT}/Headers/Public&quot; &quot;${PODS_ROOT}/Headers/Public/Forms&quot;
+OTHER_CFLAGS = $(inherited) -isystem &quot;${PODS_ROOT}/Headers/Public&quot; -isystem &quot;${PODS_ROOT}/Headers/Public/Forms&quot;
+OTHER_LDFLAGS = $(inherited) -ObjC -l&quot;Forms&quot;
+PODS_ROOT = ${SRCROOT}/Pods
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;我们由于需要配置网络环境，那可以这样写&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;//网络请求baseurl
+REQUESTBASE_URL = @&quot;http:\\/\\/10.20.100.1&quot;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;当然也可以写成cocopods那样&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;GCC_PREPROCESSOR_DEFINITIONS = $(inherited) WEBSERVICE_URL=&#39;$(REQUESTBASE_URL)&#39; MESSAGE_SYSTEM_URL=&#39;$(MESSAGE_SYSTEM_URL)&#39;
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;这里利用了一个GCC_PREPROCESSOR_DEFINITIONS编译参数。&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Space-separated list of option specifications. Specifies preprocessor macros in the form foo (for a simple #define) or foo=1 (for a value definition). This list is passed to the compiler through the gcc -D option when compiling precompiled headers and implementation files.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;GCC_PREPROCESSOR_DEFINITIONS 是 GCC 预编译头参数，通常我们可以在 Project 文件下的 Build Settings 对预编译宏定义进行默认赋值。&lt;/p&gt;
+
+&lt;p&gt;它就是在Build Settings里面的 Apple LLVM 7.X - Preprocessing - Preprocessor Macros 这里。
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-94666192eecdeb75.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Preprocessor Macros 其实是按照 Configuration 选项进行默认配置的, 它是可以根据不同的环境预先制定不同定义的宏，或者为不同环境下的相同变量定义不同的值。&lt;/p&gt;
+
+&lt;p&gt;xcconfig 我们可以写入不同的 Configuration 选项配置不同的文件。每一个 xcconfig 可以配置 Build Settings 里的属性值, 其实实质就是通过 xcconfig 去修改 GCC_PREPROCESSOR_DEFINITIONS 的值，这样我们就可以做到动态配置环境的需求了。&lt;/p&gt;
+
+&lt;p&gt;最后还需要提的一点是，这个配置文件的level的问题。现在本地有这么多配置，到底哪一个最终生效呢？打开Build 里面的level，我们来看一个例子。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-33b4ba6054123d00.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;我们目前可以看到有5个配置，他们是有优先级的。优先级是从左往右，依次降低的。Resolved = target-level &amp;gt; project-level &amp;gt; 自定义配置文件 &amp;gt; iOS 默认配置。左边第一列永远显示的是当前生效的最终配置结果。&lt;/p&gt;
+
+&lt;p&gt;知道了这个优先级之后，我们可以更加灵活的配置我们的app了。&lt;/p&gt;
+
+&lt;p&gt;最后关于xcconfig配置，基本使用就这些了。但是这里面的学问不仅仅这些。&lt;/p&gt;
+
+&lt;p&gt;还能利用xcconfig动态配置Build Settings里面的很多参数。这其实类似于cocopods的做法。但是有一个大神的做法很优雅。值得大家感兴趣的人去学习学习。iOS大神&lt;a href=&quot;https://github.com/jspahrsummers&quot;&gt;Justin Spahr-Summers&lt;/a&gt;的开源库&lt;a href=&quot;https://github.com/jspahrsummers/xcconfigs&quot;&gt;xcconfigs&lt;/a&gt;提供了一个类权威的模板, 这是一个很好的学习使用xcconfig的库，强烈推荐。&lt;/p&gt;
+
+&lt;p&gt;最后这里有一个Demo，配置了Cocopods，配置了xcconfig文件，还有Build Configuration的，大家可以看看，请多多指教，&lt;a href=&quot;https://github.com/halfrost/MultiEnvironmentsSettingDemo&quot;&gt;Demo&lt;/a&gt;。&lt;/p&gt;
+
+&lt;h4 id=&quot;targets&quot;&gt;三.利用Targets来配置多环境&lt;/h4&gt;
+
+&lt;p&gt;配置一个多环境其实一个Scheme和xcconfig已经完全够用了，为什么还要有这个第三点呢？虽说仅仅为了配置一个多环境这点“小事”，但是利用多个Targets也能实现需求，只不过有点“兴师动众”了。&lt;/p&gt;
+
+&lt;p&gt;关于构建Targets这个技术，我也是在2年前的公司实践过。当时的需求是做一个OEM的产品。自己公司有主要产品，也帮其他公司做OEM。一说到OEM，大家应该就知道Targets用到这里的妙用了。利用Targets可以瞬间大批量产生大量的app。&lt;/p&gt;
+
+&lt;p&gt;2013年巧哥也发过关于Targets的文章，&lt;a href=&quot;http://blog.devtang.com/2013/10/17/the-tech-detail-of-ape-client-1/&quot;&gt;猿题库iOS客户端的技术细节（一）：使用多target来构建大量相似App&lt;/a&gt;，我原来公司在2014年也实现了这种功能。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-40ecd04a0ed9b2f0.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;仅仅只用一套代码，就可以生产出7个app。7个app的证书都是不同的，配置也都不同，但是代码只需要维护一套代码，就可以完成维护7个app的目标。&lt;/p&gt;
+
+&lt;p&gt;下面我们来看看怎么新建Targets，有2种方法。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-df956ff180fbef19.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;一种方法是完全新建一个Targets，另外一种方法是复制原有的Targets。&lt;/p&gt;
+
+&lt;p&gt;其实第一种方法建立出Targets，之后看你需求是怎么样的。如果也想是做OEM这种，可以把新建出来的project删掉，本地还是维护一套代码，然后在新建的Targets 的Build Phases里面去把本地现有代码加上，参数自己可以随意配置。这样也是一套代码维护多个app。&lt;/p&gt;
+
+&lt;p&gt;第二种方法就是复制一个原有的Targets，这种做法只用自己去改参数就可以了。&lt;/p&gt;
+
+&lt;p&gt;再来说说Targets的参数。&lt;/p&gt;
+
+&lt;p&gt;由于我们新建了Targets，相当于新建了一个app了。所以里面的所有的文件全部都可以更改。包括info.plist，源码引用，Build Settings……所有参数都可以改，这样就不仅仅局限于修改Scheme和xcconfig，所以之前说仅仅配置一个多环境用Targets有点兴师动众，但是它确实能完成目的。根据第二章里面我们也提到了，Targets相当于流水线，仅次于Project的地位，可以想象，有了Targets，我们没有什么不能修改的。&lt;/p&gt;
+
+&lt;p&gt;PS.最后关于Targets还有一点想说的，如果大家有多个app，并且这几个app之间有超过80%的代码都是完全一样的，或者说仅仅只是个别界面显示不同，逻辑都完全相同，建议大家用Targets来做，这样只需要维护一套代码就可以了。维护多套相同的代码，实在太没有效率了。一个bug需要在多套代码上面来回改动，费时费力。&lt;/p&gt;
+
+&lt;p&gt;这时候可能有人会问了，如果维护一套代码，以后这些app如果需求有不同怎么办？？比如要进入不同界面，跳转不同界面，页面也显示不同怎么办？？这个问题其实很简单。在Targets里面的&lt;strong&gt;Compile Sources&lt;/strong&gt;里面是可以给每个不同的Targets添加不同的编译代码的。只需要在每个不同的Targets里面加入不同界面的代码进行编译就可以了，在跳转的那个界面加上宏，来控制不同的app跳转到相应界面。这样本地还是维护的一套代码，只不过每个Targets编译的代码就是这套代码的子集了。这样维护起来还是很方便。也实现了不同app不同界面，不同需求了。&lt;/p&gt;
+
+&lt;h4 id=&quot;section-6&quot;&gt;最后&lt;/h4&gt;
+&lt;p&gt;其实这篇文章的需求源自于上篇Jenkins自动化持续集成，有一个需求是能打不同环境的包。之前没有Jenkins的时候就改改URL运行一遍就好，虽说做法不够优雅，但是也不麻烦。现在想持续集成，只好把环境都分好，参数配置正确，这样Jenkins可以一次性多个环境的包一起打。真正做到多环境的持续集成。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-83b1d03a7495cfe1.PNG?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;最后就可以打出不同环境的包了。请大家多多指教。&lt;/p&gt;
+</description>
+        <pubDate>Thu, 11 Aug 2016 09:01:00 +0800</pubDate>
+        <link>http://vno.onevcat.com/2016/08/%E6%89%8B%E6%8A%8A%E6%89%8B%E6%95%99%E4%BD%A0%E7%BB%99%E4%B8%80%E4%B8%AAiOS-app%E9%85%8D%E7%BD%AE%E5%A4%9A%E4%B8%AA%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F/</link>
+        <guid isPermaLink="true">http://vno.onevcat.com/2016/08/%E6%89%8B%E6%8A%8A%E6%89%8B%E6%95%99%E4%BD%A0%E7%BB%99%E4%B8%80%E4%B8%AAiOS-app%E9%85%8D%E7%BD%AE%E5%A4%9A%E4%B8%AA%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F/</guid>
+        
+        <category>iOS</category>
+        
+        
+        <category>Blog</category>
+        
+      </item>
+    
+      <item>
+        <title>手把手教你利用Jenkins持续集成iOS项目</title>
+        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-6a6d55579dcbe2d8.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h4 id=&quot;section&quot;&gt;前言&lt;/h4&gt;
+&lt;p&gt;众所周知，现在App的竞争已经到了用户体验为王，质量为上的白热化阶段。用户们都是很挑剔的。如果一个公司的推广团队好不容易砸了重金推广了一个APP，好不容易有了一些用户，由于一次线上的bug导致一批的用户在使用中纷纷出现闪退bug，轻则，很可能前期推广砸的钱都白费了，重则，口碑不好，未来也提升不起用户量来了。静下心来分析一下问题的原因，无外乎就是质量没有过关就上线了。除去主观的一些因素，很大部分的客观因素我觉得可以被我们防范的。根据大神们提出的一套开发规范建议，CI + FDD，就可以帮助我们极大程度的解决客观因素。本文接下来主要讨论 &lt;a href=&quot;http://martinfowler.com/articles/continuousIntegration.html&quot;&gt;Continuous Integration&lt;/a&gt; 持续集成（简称CI）&lt;/p&gt;
+
+&lt;h4 id=&quot;section-1&quot;&gt;目录&lt;/h4&gt;
+&lt;ul&gt;
+  &lt;li&gt;1.为什么我们需要持续集成&lt;/li&gt;
+  &lt;li&gt;2.持续化集成工具——Jenkins&lt;/li&gt;
+  &lt;li&gt;3.iOS自动化打包命令——xcodebuild + xcrun 和 fastlane - gym 命令&lt;/li&gt;
+  &lt;li&gt;4.打包完成自动化上传 fir / 蒲公英 第三方平台&lt;/li&gt;
+  &lt;li&gt;5.完整的持续集成流程&lt;/li&gt;
+  &lt;li&gt;6.Jenkins + Docker&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h4 id=&quot;section-2&quot;&gt;一. 为什么我们需要持续集成&lt;/h4&gt;
+&lt;p&gt;谈到为什么需要的问题，我们就需要从什么是来说起。那什么是持续集成呢。&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;持续集成是一种软件开发实践：许多团队频繁地集成他们的工作，每位成员通常进行日常集成，进而每天会有多种集成。每个集成会由自动的构建（包括测试）来尽可能快地检测错误。许多团队发现这种方法可以显著的减少集成问题并且可以使团队开发更加快捷。&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;CI是一种开发实践。实践应该包含3个基本模块，一个可以自动构建的过程，自动编译代码，可以自动分发，部署和测试。一个代码仓库，SVN或者Git。最后一个是一个持续集成的服务器。通过持续集成，可以让我们通过自动化等手段高频率地去获取产品反馈并响应反馈的过程。&lt;/p&gt;
+
+&lt;p&gt;那么持续集成能给我们带来些什么好处呢？这里推荐一篇&lt;a href=&quot;http://apiumtech.com/blog/top-benefits-of-continuous-integration-2/&quot;&gt;文章&lt;/a&gt;，文章中把&lt;a href=&quot;http://apiumtech.com/blog/top-benefits-of-continuous-integration-2/&quot;&gt;Continuous integration&lt;/a&gt; (CI) and &lt;a href=&quot;http://apiumtech.com/blog/20-benefits-of-test-driven-development/&quot;&gt;test-driven development&lt;/a&gt; (TDD)分成了12个步骤。然而带来的好处成倍增加，有24点好处。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-420f52f842539d5d.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;我来说说用了CI以后带来的一些深有体会的优点。&lt;/p&gt;
+
+&lt;h5 id=&quot;section-3&quot;&gt;1. 缩减开发周期，快速迭代版本&lt;/h5&gt;
+&lt;p&gt;每个版本开始都会估算好开发周期，但是总会因为各种事情而延期。这其中包括了一些客观因素。由于产品线增多，迭代速度越来越快，给测试带来的压力也越来越大。如果测试都在开发完全开发完成之后再来测试，那就会影响很长一段时间。这时候由于集成晚就会严重拖慢项目节奏。如果能尽早的持续集成，尽快进入上图的12步骤的迭代环中，就可以尽早的暴露出问题，提早解决，尽量在规定时间内完成任务。&lt;/p&gt;
+
+&lt;h5 id=&quot;section-4&quot;&gt;2. 自动化流水线操作带来的高效&lt;/h5&gt;
+&lt;p&gt;其实打包对于开发人员来说是一件很耗时，而且没有很大技术含量的工作。如果开发人员一多，相互改的代码冲突的几率就越大，加上没有产线管理机制，代码仓库的代码质量很难保证。团队里面会花一些时间来解决冲突，解决完了冲突还需要自己手动打包。这个时候如果证书又不对，又要耽误好长时间。这些时间其实可以用持续集成来节约起来的。一天两天看着不多，但是按照年的单位来计算，可以节约很多时间！&lt;/p&gt;
+
+&lt;h5 id=&quot;section-5&quot;&gt;3. 随时可部署&lt;/h5&gt;
+&lt;p&gt;有了持续集成以后，我们可以以天为单位来打包，这种高频率的集成带来的最大的优点就是可以随时部署上线。这样就不会导致快要上线，到处是漏洞，到处是bug，手忙脚乱弄完以后还不能部署，严重影响上线时间。&lt;/p&gt;
+
+&lt;h5 id=&quot;section-6&quot;&gt;4. 极大程度避免低级错误&lt;/h5&gt;
+&lt;p&gt;我们可以犯错误，但是犯低级错误就很不应该。这里指的低级错误包括以下几点：编译错误，安装问题，接口问题，性能问题。
+以天为单位的持续集成，可以很快发现编译问题，自动打包直接无法通过。打完包以后，测试扫码无法安装，这种问题也会立即被暴露出来。接口问题和性能问题就有自动化测试脚本来发现。这些低级问题由持续集成来暴露展现出来，提醒我们避免低级错误。&lt;/p&gt;
+
+&lt;h4 id=&quot;jenkins&quot;&gt;二. 持续化集成工具——Jenkins&lt;/h4&gt;
+
+&lt;p&gt;Jenkins 是一个开源项目，提供了一种易于使用的持续集成系统，使开发者从繁杂的集成中解脱出来，专注于更为重要的业务逻辑实现上。同时 Jenkins 能实施监控集成中存在的错误，提供详细的日志文件和提醒功能，还能用图表的形式形象地展示项目构建的趋势和稳定性。&lt;/p&gt;
+
+&lt;p&gt;根据官方定义，Jenkins有以下的用途：
+1. 构建项目
+2. 跑测试用例检测bug
+3. 静态代码检测
+4. 部署&lt;/p&gt;
+
+&lt;p&gt;关于这4点，实际使用中还是比较方便的：
+1.构建项目自动化打包可以省去开发人员好多时间，重要的是，Jenkins为我们维护了一套高质量可用的代码，而且保证了一个纯净的环境。我们经常会出现由于本地配置出错而导致打包失败的情况。现在Jenkins就是一个公平的评判者，它无法正确的编译出ipa，那就是有编译错误或者配置问题。开发人员没必要去争论本地是可以运行的，拉取了谁谁谁的代码以后就不能运行了。共同维护Jenkins的正常编译，因为Jenkins的编译环境比我们本地简单的多，它是最纯净无污染的编译环境。开发者就只用专注于编码。这是给开发者带来的便利。&lt;/p&gt;
+
+&lt;p&gt;2.这个可以用来自动化测试。在本地生成大批的测试用例。每天利用服务器不断的跑这些用例。每天每个接口都跑一遍。看上去没必要，但是实际上今天运行正常的系统，很可能由于今天的代码改动，明天就出现问题了。有了Jenkins可以以天为单位的进行回归测试，代码只要有改动，Jenkins就把所有的回归测试的用例全部都跑一遍。在项目工期紧张的情况下，很多情况测试都不是很重视回归测试，毕竟很可能测一遍之后是徒劳的“无用功”。然而由于回归测试不及时，就导致到最后发版的时候系统不可用了，这时候回头查找原因是比较耗时的，查看提交记录，看到上百条提交记录，排查起来也是头疼的事情。以天为单位的回归测试能立即发现问题。测试人员每天可以专注按单元测试，一周手动一次回归测试。这是给测试者带来的便利。&lt;/p&gt;
+
+&lt;p&gt;3.这个是静态代码分析，可以检测出很多代码的问题，比如潜在的内存泄露的问题。由于Jenkins所在环境的纯净，还是可以发现一些我们本地复杂环境无法发现的问题，进一步的提高代码质量。这是给质检带来的便利。&lt;/p&gt;
+
+&lt;p&gt;4.随时部署。Jenkins在打包完成之后可以设定之后的操作，这个时候往往就是提交app到跑测试用例的系统，或者部署到内测平台生成二维码。部署中不能安装等一些低级问题随之立即暴露。测试人员也只需要扫一下二维码即可安装，很方便。这也算是给测试带来的便利。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-9c822836315163c4.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;以下的例子以2016-07-24 22:35的Weekly Release 2.15的版本为例。&lt;/p&gt;
+
+&lt;p&gt;我们来开始安装Jenkins。从官网https://jenkins.io/ 上下载最新的pkg安装包。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-6a2c3d6d42f35d31.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-75539c56443392df.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-126a68ae31c21e6e.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-1a24ed942db2a9d8.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-179ec0017a364cc5.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-982058c2d4701b31.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;也可以下载jenkins.war, 然后运行Java -jar jenkins.war，进行安装。&lt;/p&gt;
+
+&lt;p&gt;安装完成之后，Safari可能会自动打开，如果没有自动打开，打开浏览器，输入http://localhost:8080&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-086f6fe08841b673.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;这个时候可能会报一个错误。如果出现了这面的问题。出现这个问题的原因就是Java环境有问题，重新Java环境即可。&lt;/p&gt;
+
+&lt;p&gt;这个时候如果你重启电脑会发现Jenkins给你新增了一个用户，名字就叫Jenkins，不过这个时候你不知道密码。你可能会去试密码，肯定是是不对的，因为初始密码很复杂。这个时候正确做法是打开http://localhost:8080 会出现下图的重设初始密码的界面。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-c8468fd91737f725.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;按照提示，找到/Users/Shared/Jenkins/Home/ 这个目录下，这个目录虽然是共享目录，但是有权限的，非Jenkins用户/secrets/目录是没有读写权限的。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-1d3da60f2fb25127.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-ad7089207c1a3dcd.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;打开initialAdminPassword文件，复制出密码，就可以填到网页上去重置密码了。如下图&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-0bb3a8b2025ab014.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-cd9979b853d14ac6.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-56431c2d22013dcd.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-578857333787630a.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-a5636c896f987a50.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-f4e6e0284534291b.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-7ac78a54760114dd.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;一路安装过来，输入用户名，密码，邮件这些，就算安装完成了。&lt;/p&gt;
+
+&lt;p&gt;还是继续登录localhost:8080  ，选择“系统管理”——“管理插件”，我们要先安装一些辅助插件。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;安装GitLab插件&lt;/strong&gt;
+因为我们用的是GitLab来管理源代码，Jenkins本身并没有自带GitLab插件，所以我们需要依次选择 &lt;strong&gt;系统管理&lt;/strong&gt;-&amp;gt;&lt;strong&gt;管理插件&lt;/strong&gt;，在“&lt;strong&gt;可选插件&lt;/strong&gt;”中选中“&lt;strong&gt;GitLab Plugin&lt;/strong&gt;”和“&lt;strong&gt;Gitlab Hook Plugin&lt;/strong&gt;”这两项，然后安装。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;安装Xcode插件&lt;/strong&gt;
+同安装GitLab插件的步骤一样，我们依次选择&lt;strong&gt;系统管理&lt;/strong&gt;-&amp;gt;&lt;strong&gt;管理插件&lt;/strong&gt;，在“&lt;strong&gt;可选插件&lt;/strong&gt;”中选中“&lt;strong&gt;Xcode integration&lt;/strong&gt;”安装。&lt;/p&gt;
+
+&lt;p&gt;安装完了这个，我们就可以配置一个构建项目了。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-06d0118a5e04dadf.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-b52d3d102c21f004.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;点击新建好的项目，进来配置一下&lt;strong&gt;General&lt;/strong&gt;参数。
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-cc08dd2e01f3e230.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;这里可以设置包的保留天数还有天数。&lt;/p&gt;
+
+&lt;p&gt;接着设置&lt;strong&gt;源码管理&lt;/strong&gt;。&lt;/p&gt;
+
+&lt;p&gt;由于现在我用到的是GitLab，先配置SSH Key，在Jenkins的证书管理中添加SSH。在Jenkins管理页面，选择“&lt;strong&gt;Credentials&lt;/strong&gt;”，然后选择“&lt;strong&gt;Global credentials (unrestricted)&lt;/strong&gt;”，点击“&lt;strong&gt;Add Credentials&lt;/strong&gt;”，如下图所示，我们填写自己的SSH信息，然后点击“&lt;strong&gt;Save&lt;/strong&gt;”，这样就把SSH添加到Jenkins的全局域中去了。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-6d1b6f56e4dac318.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;如果正常的配置正确的话，是不会出现下图中的那段红色的警告。如果有下图的提示，就说明Jenkins还没有连通GitLab或者SVN，那就请再检查SSH Key是否配置正确。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-268313680eb7a9ec.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;构建触发器设置&lt;/strong&gt;这里是设置自动化测试的地方。这里涉及的内容很多，暂时我也没有深入研究，这里暂时先不设置。有自动化测试需求的可以好好研究研究这里的设置。&lt;/p&gt;
+
+&lt;p&gt;不过这里有两个配置还是需要是配置的&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Poll SCM&lt;/strong&gt;  (poll source code management)  轮询源码管理
+需要设置源码的路径才能起到轮询的效果。一般设置为类似结果： 0/5 * * * * 每5分钟轮询一次
+&lt;strong&gt;Build periodically&lt;/strong&gt; (定时build) 
+一般设置为类似： 00 20 * * *   每天 20点执行定时build 。当然两者的设置都是一样可以通用的。&lt;/p&gt;
+
+&lt;p&gt;格式是这样的&lt;/p&gt;
+
+&lt;p&gt;分钟(0-59) 小时(0-23) 日期(1-31) 月(1-12) 周几(0-7,0和7都是周日) &lt;a href=&quot;http://www.scmgalaxy.com/scm/setting-up-the-cron-jobs-in-jenkins-using-build-periodically-scheduling-the-jenins-job.html&quot;&gt;更加详细的设置看这里&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-af09deb5eb53c6f4.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;构建环境设置&lt;/strong&gt;
+iOS打包需要签名文件和证书，所以这部分我们勾选“&lt;strong&gt;Keychains and Code Signing Identities&lt;/strong&gt;”和“&lt;strong&gt;Mobile Provisioning Profiles&lt;/strong&gt;”。
+这里我们又需要用到Jenkins的插件，在系统管理页面，选择“&lt;strong&gt;Keychains and Provisioning Profiles Management&lt;/strong&gt;”。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-63ed7bd1daee82fc.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;进入&lt;strong&gt;Keychains and Provisioning Profiles Management&lt;/strong&gt;页面，点击“&lt;strong&gt;浏览&lt;/strong&gt;”按钮，分别上传自己的keychain和证书。上传成功后，我们再为keychain指明签名文件的名称。点击“&lt;strong&gt;Add Code Signing Identity&lt;/strong&gt;”，最后添加成功后如下图所示：&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-7fcfb1bcd4543907.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
+注意：我第一次导入证书和Provisioning Profiles文件，就遇到了一点小“坑”，我当时以为是需要证书，但是这里需要的Keychain，并不是cer证书文件。这个Keychain其实在/Users/管理员用户名/Library/keychains/login.keychain,当把这个Keychain设置好了之后，Jenkins会把这个Keychain拷贝到/Users/Shared/Jenkins/Library/keychains这里，(Library是隐藏文件)。Provisioning Profiles文件也直接拷贝到/Users/Shared/Jenkins/Library/MobileDevice文件目录下。&lt;/p&gt;
+
+&lt;p&gt;这样Adhoc证书和签名文件就在Jenkins中配置好了，接下来我们只需要在item设置中指定相关文件即可。
+回到我们新建的item，找到&lt;strong&gt;构建环境&lt;/strong&gt;，按下图选好自己的相关证书和签名文件。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-849e17d402c0b8c8.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;接下来在进行&lt;strong&gt;构建&lt;/strong&gt;的设置
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-4ae0a5ae5d914ae8.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;我们这里选择执行一段打包脚本。脚本在下一章节详细的讲解。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;构建后操作&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-0e5e09ad80e0c42b.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;这里我们选择&lt;strong&gt;Execute a set of scripts&lt;/strong&gt;，这里也是一个脚本，这个脚本用来上传自动打包好的ipa文件。脚本在第四章节有详细的讲解。&lt;/p&gt;
+
+&lt;p&gt;至此，我们的Jenkins设置就全部完成了。点击&lt;strong&gt;构建&lt;/strong&gt;，就会开始构建项目了。&lt;/p&gt;
+
+&lt;p&gt;构建一次，各个颜色代表的意义如下：&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-7f2d51581dd7d16a.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;天气的晴雨表代表了项目的质量，这也是Jenkins的一个特色。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-4bbbd2b19dea15eb.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;如果构建失败了，可以去查看&lt;strong&gt;Console Output&lt;/strong&gt;可以查看log日志。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-ccd34e26b402960e.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h4 id=&quot;iosxcodebuild--xcrun--fastlane---gym-&quot;&gt;三. iOS自动化打包命令——xcodebuild + xcrun 和 fastlane - gym 命令&lt;/h4&gt;
+
+&lt;p&gt;在日常开发中，打包是最后上线不可缺少的环节，如果需要把工程打包成 ipa 文件，通常的做法就是在 Xcode 里点击 「Product -&amp;gt; Archive」，当整个工程 archive 后，然后在自动弹出的 「Organizer」 中进行选择，根据需要导出 ad hoc，enterprise 类型的 ipa 包。虽然Xcode已经可以很完美的做到打包的事情，但是还是需要我们手动点击5，6下。加上我们现在需要持续集成，用打包命令自动化执行就顺其自然的需要了。&lt;/p&gt;
+
+&lt;h5 id=&quot;xcodebuild--xcrun&quot;&gt;1. xcodebuild + xcrun命令&lt;/h5&gt;
+
+&lt;p&gt;Xcode为我们开发者提供了一套构建打包的命令，就是xcodebuild
+和xcrun命令。xcodebuild把我们指定的项目打包成.app文件，xcrun将指定的.app文件转换为对应的.ipa文件。&lt;/p&gt;
+
+&lt;p&gt;具体的文档如下， &lt;a href=&quot;https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man1/xcodebuild.1.html&quot;&gt;xcodebuild官方文档&lt;/a&gt;、&lt;a href=&quot;https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man1/xcrun.1.html&quot;&gt;xcrun官方文档&lt;/a&gt;&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;NAME
+xcodebuild – build Xcode projects and workspaces
+
+SYNOPSIS
+1. xcodebuild [-project name.xcodeproj] [[-target targetname] … | -alltargets] [-configuration configurationname] [-sdk [sdkfullpath | sdkname]] [action …] [buildsetting=value …] [-userdefault=value …]
+
+2. xcodebuild [-project name.xcodeproj] -scheme schemename [[-destination destinationspecifier] …] [-destination-timeout value] [-configuration configurationname] [-sdk [sdkfullpath | sdkname]] [action …] [buildsetting=value …] [-userdefault=value …]
+
+3. xcodebuild -workspace name.xcworkspace -scheme schemename [[-destination destinationspecifier] …] [-destination-timeout value] [-configuration configurationname] [-sdk [sdkfullpath | sdkname]] [action …] [buildsetting=value …] [-userdefault=value …]
+
+4. xcodebuild -version [-sdk [sdkfullpath | sdkname]] [infoitem]
+
+5. xcodebuild -showsdks
+
+6. xcodebuild -showBuildSettings [-project name.xcodeproj | [-workspace name.xcworkspace -scheme schemename]]
+
+7. xcodebuild -list [-project name.xcodeproj | -workspace name.xcworkspace]
+
+8. xcodebuild -exportArchive -archivePath xcarchivepath -exportPath destinationpath -exportOptionsPlist path
+
+9. xcodebuild -exportLocalizations -project name.xcodeproj -localizationPath path [[-exportLanguage language] …]
+
+10. xcodebuild -importLocalizations -project name.xcodeproj -localizationPath path
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;上面10个命令最主要的还是前3个。&lt;/p&gt;
+
+&lt;p&gt;接下来来说明一下参数：
+-project -workspace：这两个对应的就是项目的名字。如果有多个工程，这里又没有指定，则默认为第一个工程。
+-target：打包对应的targets，如果没有指定这默认第一个。
+-configuration：如果没有修改这个配置，默认就是Debug和Release这两个版本，没有指定默认为Release版本。
+-buildsetting=value …：使用此命令去修改工程的配置。
+-scheme：指定打包的scheme。&lt;/p&gt;
+
+&lt;p&gt;上面这些是最最基本的命令。&lt;/p&gt;
+
+&lt;p&gt;上面10个命令的第一个和第二个里面的参数，其中 -target
+ 和 -configuration 参数可以使用 xcodebuild -list
+获得，-sdk 参数可由 xcodebuild -showsdks
+ 获得，[buildsetting=value …] 用来覆盖工程中已有的配置。可覆盖的参数参考官方文档 &lt;a href=&quot;https://developer.apple.com/documentation/DeveloperTools/Reference/XcodeBuildSettingRef/&quot;&gt;Xcode Build Setting Reference&lt;/a&gt;。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;build
+Build the target in the build root (SYMROOT). This is the default action, and is used if no action is given.
+
+analyze
+Build and analyze a target or scheme from the build root (SYMROOT). This requires specifying a scheme.
+
+archive
+Archive a scheme from the build root (SYMROOT). This requires specifying a scheme.
+
+test
+Test a scheme from the build root (SYMROOT). This requires specifying a scheme and optionally a destination.
+
+installsrc
+Copy the source of the project to the source root (SRCROOT).
+
+install
+Build the target and install it into the target’s installation directory in the distribution root (DSTROOT).
+
+clean
+Remove build products and intermediate files from the build root (SYMROOT).
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;上面第3个命令就是专门用来打带有Cocopods的项目，因为这个时候项目工程文件不再是xcodeproj了，而是变成了xcworkspace了。&lt;/p&gt;
+
+&lt;p&gt;再来说说xcrun命令。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;Usage:
+PackageApplication [-s signature] application [-o output_directory] [-verbose] [-plugin plugin] || -man || -help
+
+Options:
+
+[-s signature]: certificate name to resign application before packaging
+[-o output_directory]: specify output filename
+[-plugin plugin]: specify an optional plugin
+-help: brief help message
+-man: full documentation
+-v[erbose]: provide details during operation
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;参数不多，使用方法也很简单，xcrun -sdk iphoneos -v PackageApplication  + 上述一些参数。&lt;/p&gt;
+
+&lt;p&gt;参数都了解之后，我们就来看看该如何用了。下面这个是使用了xcodebuild + xcrun命令写的自动化打包脚本&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;# 工程名
+APP_NAME=&quot;YourProjectName&quot;
+# 证书
+CODE_SIGN_DISTRIBUTION=&quot;iPhone Distribution: Shanghai ******* Co., Ltd.&quot;
+# info.plist路径
+project_infoplist_path=&quot;./${APP_NAME}/Info.plist&quot;
+
+#取版本号
+bundleShortVersion=$(/usr/libexec/PlistBuddy -c &quot;print CFBundleShortVersionString&quot; &quot;${project_infoplist_path}&quot;)
+
+#取build值
+bundleVersion=$(/usr/libexec/PlistBuddy -c &quot;print CFBundleVersion&quot; &quot;${project_infoplist_path}&quot;)
+
+DATE=&quot;$(date +%Y%m%d)&quot;
+IPANAME=&quot;${APP_NAME}_V${bundleShortVersion}_${DATE}.ipa&quot;
+
+#要上传的ipa文件路径
+IPA_PATH=&quot;$HOME/${IPANAME}&quot;
+echo ${IPA_PATH}
+echo &quot;${IPA_PATH}&quot;&amp;gt;&amp;gt; text.txt
+
+//下面2行是没有Cocopods的用法
+echo &quot;=================clean=================&quot;
+xcodebuild -target &quot;${APP_NAME}&quot;  -configuration &#39;Release&#39; clean
+
+echo &quot;+++++++++++++++++build+++++++++++++++++&quot;
+xcodebuild -target &quot;${APP_NAME}&quot; -sdk iphoneos -configuration &#39;Release&#39; CODE_SIGN_IDENTITY=&quot;${CODE_SIGN_DISTRIBUTION}&quot; SYMROOT=&#39;$(PWD)&#39;
+
+//下面2行是集成有Cocopods的用法
+echo &quot;=================clean=================&quot;
+xcodebuild -workspace &quot;${APP_NAME}.xcworkspace&quot; -scheme &quot;${APP_NAME}&quot;  -configuration &#39;Release&#39; clean
+
+echo &quot;+++++++++++++++++build+++++++++++++++++&quot;
+xcodebuild -workspace &quot;${APP_NAME}.xcworkspace&quot; -scheme &quot;${APP_NAME}&quot; -sdk iphoneos -configuration &#39;Release&#39; CODE_SIGN_IDENTITY=&quot;${CODE_SIGN_DISTRIBUTION}&quot; SYMROOT=&#39;$(PWD)&#39;
+
+xcrun -sdk iphoneos PackageApplication &quot;./Release-iphoneos/${APP_NAME}.app&quot; -o ~/&quot;${IPANAME}&quot;
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h5 id=&quot;gym-&quot;&gt;2. gym 命令&lt;/h5&gt;
+&lt;p&gt;说到gym，就要先说一下fastlane。
+fastlane是一套自动化打包的工具集，用 Ruby 写的，用于 iOS 和 Android 的自动化打包和发布等工作。gym是其中的打包命令。&lt;/p&gt;
+
+&lt;p&gt;fastlane 的官网看&lt;a href=&quot;https://fastlane.tools/&quot;&gt;这里&lt;/a&gt;, fastlane 的 github 看&lt;a href=&quot;https://github.com/fastlane/fastlane&quot;&gt;这里&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;要想使用gym，先要安装fastlane。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;sudo gem install fastlane --verbose
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;fastlane包含了我们日常编码之后要上线时候进行操作的所有命令。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;deliver：上传屏幕截图、二进制程序数据和应用程序到AppStore
+snapshot：自动截取你的程序在每个设备上的图片
+frameit：应用截屏外添加设备框架
+pem：可以自动化地生成和更新应用推送通知描述文件
+sigh：生成下载开发商店的配置文件
+produce：利用命令行在iTunes Connect创建一个新的iOS app
+cert：自动创建iOS证书
+pilot：最好的在终端管理测试和建立的文件
+boarding：很容易的方式邀请beta测试
+gym：建立新的发布的版本，打包
+match：使用git同步你成员间的开发者证书和文件配置
+scan：在iOS和Mac app上执行测试用例
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;整个发布过程可以用fastlane描述成下面这样&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;lane :appstore do
+  increment_build_number
+  cocoapods
+  xctool
+  snapshot
+  sigh
+  deliver
+  frameit
+  sh &quot;./customScript.sh&quot;
+
+  slack
+end
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Ps：这里可能大家还会听过一个命令叫 &lt;a href=&quot;https://github.com/facebook/xctool&quot;&gt;xctool&lt;/a&gt;
+xctool是官方xcodebuild命令的一个增强实现，输出的内容比xcodebuild直观可读得多。通过brew即可安装。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;brew install xctool
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;使用gym自动化打包，&lt;a href=&quot;https://github.com/xilin/ios-build-script/blob/master/build_using_gym.sh&quot;&gt;脚本&lt;/a&gt;如下&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;#计时
+
+SECONDS=0
+
+#假设脚本放置在与项目相同的路径下
+
+project_path=$(pwd)
+
+#取当前时间字符串添加到文件结尾
+
+now=$(date +&quot;%Y_%m_%d_%H_%M_%S&quot;)
+
+#指定项目的scheme名称
+
+scheme=&quot;DemoScheme&quot;
+
+#指定要打包的配置名
+
+configuration=&quot;Adhoc&quot;
+
+#指定打包所使用的输出方式，目前支持app-store, package, ad-hoc, enterprise, development, 和developer-id，即xcodebuild的method参数
+
+export_method=&#39;ad-hoc&#39;
+
+#指定项目地址
+
+workspace_path=&quot;$project_path/Demo.xcworkspace&quot;
+
+#指定输出路径
+
+output_path=&quot;/Users/your_username/Documents/&quot;
+
+#指定输出归档文件地址
+
+archive_path=&quot;$output_path/Demo_${now}.xcarchive&quot;
+
+#指定输出ipa地址
+
+ipa_path=&quot;$output_path/Demo_${now}.ipa&quot;
+
+#指定输出ipa名称
+
+ipa_name=&quot;Demo_${now}.ipa&quot;
+
+#获取执行命令时的commit message
+
+commit_msg=&quot;$1&quot;
+
+#输出设定的变量值
+
+echo &quot;===workspace path: ${workspace_path}===&quot;
+
+echo &quot;===archive path: ${archive_path}===&quot;
+
+echo &quot;===ipa path: ${ipa_path}===&quot;
+
+echo &quot;===export method: ${export_method}===&quot;
+
+echo &quot;===commit msg: $1===&quot;
+
+#先清空前一次build
+
+gym --workspace ${workspace_path} --scheme ${scheme} --clean --configuration ${configuration} --archive_path ${archive_path} --export_method ${export_method} --output_directory ${output_path} --output_name ${ipa_name}
+
+#输出总用时
+
+echo &quot;===Finished. Total time: ${SECONDS}s===&quot;
+
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h4 id=&quot;fir---&quot;&gt;四. 打包完成自动化上传 fir / 蒲公英 第三方平台&lt;/h4&gt;
+
+&lt;p&gt;要上传到 fir / 蒲公英 第三方平台，都需要注册一个账号，获得token，之后才能进行脚本化操作。&lt;/p&gt;
+
+&lt;h5 id=&quot;fir&quot;&gt;1. 自动化上传fir&lt;/h5&gt;
+&lt;p&gt;安装fir-clifir的命令行工具
+需要先装好ruby再执行&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;gem install fir-cli
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;#上传到fir
+fir publish ${ipa_path} -T fir_token -c &quot;${commit_msg}&quot;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h5 id=&quot;section-7&quot;&gt;2.自动化上传蒲公英&lt;/h5&gt;
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;#蒲公英上的User Key
+uKey=&quot;7381f97070*****c01fae439fb8b24e&quot;
+#蒲公英上的API Key
+apiKey=&quot;0b27b5c145*****718508f2ad0409ef4&quot;
+#要上传的ipa文件路径
+IPA_PATH=$(cat text.txt)
+
+rm -rf text.txt
+
+#执行上传至蒲公英的命令
+echo &quot;++++++++++++++upload+++++++++++++&quot;
+curl -F &quot;file=@${IPA_PATH}&quot; -F &quot;uKey=${uKey}&quot; -F &quot;_api_key=${apiKey}&quot; http://www.pgyer.com/apiv1/app/upload
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h4 id=&quot;section-8&quot;&gt;五. 完整的持续集成流程&lt;/h4&gt;
+
+&lt;p&gt;经过上面的持续化集成，现在我们就拥有了如下完整持续集成的流程&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-60e101c4e6cc14fd.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h4 id=&quot;jenkins--docker&quot;&gt;六. Jenkins + Docker&lt;/h4&gt;
+
+&lt;p&gt;关于Jenkins的部署，其实是分以下两种：
+单节点（Master）部署
+这种部署适用于大多数项目，其构建任务较轻，数量较少，单个节点就足以满足日常开发所需。
+多节点(Master-Slave)部署
+通常规模较大，代码提交频繁（意味着构建频繁），自动化测试压力较大的项目都会采取这种部署结构。在这种部署结构下，Master通常只充当管理者的角色，负责任务的调度，slave节点的管理，任务状态的收集等工作，而具体的构建任务则会分配给slave节点。一个Master节点理论上可以管理的slave节点数是没有上限的，但通常随着数量的增加，其性能以及稳定性就会有不同程度的下降，具体的影响则因Master硬件性能的高低而不同。&lt;/p&gt;
+
+&lt;p&gt;但是多节点部署又会有一些缺陷，当测试用例变得海量以后，会造成一些问题，于是有人设计出了下面这种部署结构，Jenkins + Docker&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-71ccde99201bf290.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;由于笔者现在的项目还处于单节点（Master）部署，关于多节点(Master-Slave)部署也没有实践经验，改进版本的Docker更是没有接触过，但是如果有这种海量测试用例，高压力的大量复杂的回归测试的需求的，那推荐大家看这篇&lt;a href=&quot;http://www.zjbonline.com/2016/03/05/Jenkins-Docker%E6%90%AD%E5%BB%BA%E6%8C%81%E7%BB%AD%E9%9B%86%E6%88%90%E6%B5%8B%E8%AF%95%E7%8E%AF%E5%A2%83/&quot;&gt;文章&lt;/a&gt;。&lt;/p&gt;
+
+&lt;h4 id=&quot;section-9&quot;&gt;最后&lt;/h4&gt;
+
+&lt;p&gt;以上就是我关于Jenkins持续集成的一次实践经验。分享给大家，如果里面有什么错误，欢迎大家多多指教。&lt;/p&gt;
+</description>
+        <pubDate>Sun, 31 Jul 2016 15:04:00 +0800</pubDate>
+        <link>http://vno.onevcat.com/2016/07/%E6%89%8B%E6%8A%8A%E6%89%8B%E6%95%99%E4%BD%A0%E5%88%A9%E7%94%A8Jenkins%E6%8C%81%E7%BB%AD%E9%9B%86%E6%88%90iOS%E9%A1%B9%E7%9B%AE/</link>
+        <guid isPermaLink="true">http://vno.onevcat.com/2016/07/%E6%89%8B%E6%8A%8A%E6%89%8B%E6%95%99%E4%BD%A0%E5%88%A9%E7%94%A8Jenkins%E6%8C%81%E7%BB%AD%E9%9B%86%E6%88%90iOS%E9%A1%B9%E7%9B%AE/</guid>
+        
+        <category>iOS</category>
+        
+        
+        <category>Blog</category>
+        
+      </item>
+    
+      <item>
+        <title>关于IB_DESIGNABLE / IBInspectable的那些需要注意的事</title>
+        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-0c431c95e1f76510.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h4 id=&quot;section&quot;&gt;前言&lt;/h4&gt;
+
+&lt;p&gt;IB_DESIGNABLE / IBInspectable 这两个关键字是在WWDC 2014年”What’s New in Interface Builder”这个Session里面，用Swift讲过一个例子。也是随着Xcode 6 新加入的关键字。&lt;/p&gt;
+
+&lt;p&gt;这两个关键字是用在我们自定义View上的，&lt;strong&gt;目前暂时只能用在UIView的子类中&lt;/strong&gt;所以系统自带的原生的那些控件使用这个关键字都没有效果。&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Live RenderingYou can use two different attributes—@IBDesignable and @IBInspectable—to enable live, interactive custom view design in Interface Builder. When you create a custom view that inherits from the UIView class or the NSView class, you can add the @IBDesignable attribute just before the class declaration. After you add the custom view to Interface Builder (by setting the custom class of the view in the inspector pane), Interface Builder renders your view in the canvas.You can also add the @IBInspectable attribute to properties with types compatible with user defined runtime attributes. After you add your custom view to Interface Builder, you can edit these properties in the inspector.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;其大意就是说，“所见即所得”的思想，我们可以将自定义的代码实时渲染到Interface Builder中。而它们之间的桥梁就是通过两个指令来完成，即@IBDesignable和@IBInspectable。我们通过@IBDesignable告诉Interface Builder这个类可以实时渲染到界面中，无论我们drawRect里面多么复杂，自定义有多复杂，Xib / Storyboard都可以把它编译出来，并且渲染展示出来。但是这个类必须是UIView或者NSView的子类。通过@IBInspectable可以定义动态属性，即可在Attributes inspector面板中可视化修改属性值。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt; @IBInspectable var integer: Int = 0
+ @IBInspectable var float: CGFloat = 0
+ @IBInspectable var double: Double = 0
+ @IBInspectable var point: CGPoint = CGPointZero
+ @IBInspectable var size: CGSize = CGSizeZero
+ @IBInspectable var customFrame: CGRect = CGRectZero
+ @IBInspectable var color: UIColor = UIColor.clearColor()
+ @IBInspectable var string: String = &quot;&quot;
+ @IBInspectable var bool: Bool = false
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-19b37e597b722379.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;这两个关键字不是今天的重点，看个Demo就会使用了。
+&lt;a href=&quot;https://github.com/halfrost/CircleSlider&quot;&gt;Demo地址&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;如果想看Session的话，可以看这两个WWDC 2014的链接&lt;br /&gt;
+&lt;a href=&quot;http://devstreaming.apple.com/videos/wwdc/2014/401xxfkzfrjyb93/401/401_whats_new_in_xcode_6.pdf?dl=1&quot;&gt;whats_new_in_xcode_6&lt;/a&gt;&lt;br /&gt;
+&lt;a href=&quot;http://devstreaming.apple.com/videos/wwdc/2014/411xx0xo98zzoor/411/411_whats_new_in_interface_builder.pdf?dl=1&quot;&gt;whats_new_in_interface_builder&lt;/a&gt;&lt;br /&gt;
+&lt;a href=&quot;https://developer.apple.com/library/ios/recipes/xcode_help-IB_objects_media/Chapters/CreatingaLiveViewofaCustomObject.html#//apple_ref/doc/uid/TP40014224-CH41-SW1&quot;&gt;苹果官方文档&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;今天来分享一下我使用这两个关键字的时候遇到的一些问题和解决过程。&lt;/p&gt;
+
+&lt;h4 id=&quot;the-agent-raised-a-nsinternalinconsistencyexception-exception&quot;&gt;1.The agent raised a “NSInternalInconsistencyException” exception&lt;/h4&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt; 
+file://BottomCommentView-master/BottomCommentView/Base.lproj/Main.storyboard: error: 
+IB Designables: Failed to update auto layout status: The agent raised a &quot;NSInternalInconsistencyException&quot; exception: Could not load NIB in bundle: &#39;NSBundle &amp;lt;/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Xcode/Overlays&amp;gt; (loaded)&#39; with name &#39;BottomCommentView&#39;
+
+file://BottomCommentView/Base.lproj/Main.storyboard: error:
+ IB Designables: Failed to render instance of BottomCommentView: The agent threw an exception.   
+ 
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;我们会看到面板上Designables这里显示的是一个Crashed，Xib / Storyboard 居然也会Crashed！整个app是跑起来了，但是报了2个错，不能忍！这两个错其实是编译时候Xib报的错误，并不是运行时的错误。
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-548c7e2d005a5da0.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;当我们看到Debug的时候，肯定第一想到的就是点Debug。但是很不幸的是，在这种情况下，点击Debug，每次都会告诉你“Finishing debugging instance of XXXX for interface Builder”，即使你在你自定义的View里面打了断点，也无济于事。&lt;/p&gt;
+
+&lt;p&gt;回到问题上来，我们来仔细看看崩溃信息。信息上说Could not load NIB in bundle，并且还给了我们一个类似地址一样的东西’NSBundle &amp;lt;/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Xcode/Overlays&amp;gt; (loaded)’，我们可以定位到时Xib在从bundle中读取出来出错了。&lt;/p&gt;
+
+&lt;p&gt;通过在网上查找资料，问题其实是这样的。&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;When loading the nib, we’re relying on the fact that passing bundle: nil defaults to your app’s mainBundle at run time.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;每次我们取mainBundle的时候，都是用的默认的方法&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;let nib = UINib(nibName: String(StripyView), bundle: nil)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;这里在Xib / Storyboard 编译的时候，我们需要告诉iOS系统，我们要指定哪一个bundle类去读取。把上面的代码改成下面这样就可以了。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;let bundle = NSBundle(forClass: self.dynamicType)
+let nib = UINib(nibName: String(StripyView), bundle: bundle)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;或者这样&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;#if TARGET_INTERFACE_BUILDER
+        NSBundle *bundle = [NSBundle bundleForClass:[self class]];
+        [bundle loadNibNamed:@&quot;BottomCommentView&quot; owner:self options:nil];
+#else
+        [[NSBundle mainBundle] loadNibNamed:@&quot;BottomCommentView&quot; owner:self options:nil];
+        
+#endif
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Ps:如果你自定义的View不显示在Xib / Storyboard上，但是程序一运行就又能显示出View来，原因也有可能是这个原因，虽然Xib / Storyboard没有报错，因为app没有运行起来，Xib / Storyboard并不知道上下文，所以没有把我们自定义的View加载出来。&lt;/p&gt;
+
+&lt;h4 id=&quot;xib&quot;&gt;2.代码或者Xib依旧不显示自定义控件的样子&lt;/h4&gt;
+
+&lt;p&gt;如果你按照上面的第一个问题里面加上了bundle的代码之后还是不显示，那可能是你代码加的地方不对。&lt;/p&gt;
+
+&lt;p&gt;如果是代码手动创建控件的话，会调用initWithFrame方法&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+- (instancetype)initWithFrame:(CGRect)frame
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;如果是通过Xib / Storyboard 拖拽显示控件的话，会调用initWithCoder方法&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+- (instancetype)initWithCoder:(NSCoder *)aDecoder
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;需要在对应的这两个方法里面去加上bundle的方法。如果为了保险起见，那这两个init方法里面都加上问题一里面的代码吧。&lt;/p&gt;
+
+&lt;h4 id=&quot;failed-to-update-auto-layout-status-the-agent-crashed--failed-to-render-instance-of-xxxxxxx-the-agent-crashed&quot;&gt;3.Failed to update auto layout status: The agent crashed / Failed to render instance of XXXXXXX: The agent crashed&lt;/h4&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;file://BottomCommentView/Base.lproj/Main.storyboard: error: 
+IB Designables: Failed to update auto layout status: The agent crashed
+
+file://BottomCommentView/Base.lproj/Main.storyboard: error: 
+IB Designables: Failed to render instance of BottomCommentView: The agent crashed
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;如果是遇到了这个问题，是比较严重的，这个问题不像问题一，问题一整个app是可以运行的，错误来源于Xib / Storyboard编译时候的错误，但是并不影响这个app的运行。&lt;/p&gt;
+
+&lt;p&gt;但是这个问题会直接导致整个app闪退，直接Crashed掉！没办法，我们只能打断点debug一下。&lt;/p&gt;
+
+&lt;p&gt;如果你在Designables 那里把Debug打开，然后断点打到initWithCoder 和 initWithFrame那里，会发现程序总是运行到这一行&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+self = [super initWithCoder:aDecoder];
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;或者这一行&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+self = [super initWithFrame:frame];
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;就崩溃了。其实从下面的栈信息也可以很快看出发生了什么：&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-ee0d98669a4889f8.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-ca3fcc8e1ef9a9e6.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;可以很明显的看到，是initWithCoder这个方法陷入了死循环。由于这个死循环导致了程序Crashed了。&lt;/p&gt;
+
+&lt;p&gt;可是这里为什么会死循环呢？其实根本原因在于，我们自定义的类的class写成自己了。&lt;/p&gt;
+
+&lt;p&gt;来看看到底发生了什么。现在在Xode 7中，我们默认创建一个View，是不给我们默认生成一个XIB文件，ViewController会有下面那个选项，可以选择勾上。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-747a4d232003df04.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;在我们创建完这个类的时候，我们还要再创建一个Xib和这个类进行关联。&lt;/p&gt;
+
+&lt;p&gt;再对比一下我们创建TableviewCell的过程&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-736c5bf9967f48af.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;一般我们会勾选上那个“Also create XIB file”，创建完成之后，我们就会在Custom Class里面把我们这个cell的类名填上。&lt;/p&gt;
+
+&lt;p&gt;如果我们现在自定义View的时候也是相同做法，创建完Xib文件之后，File‘s owner关联好了之后。然后在Custom Class里面填上了我们自定义的类之后，这个时候就错了！&lt;/p&gt;
+
+&lt;p&gt;为什么我们平时相同的做法，到这里就错误了呢？&lt;/p&gt;
+
+&lt;p&gt;我们来考虑一下我们自定义View加载的过程。我们这个自定义View肯定是放在了一个ViewController上面，代码创建出来或者直接拖拽到Xib / Storyboard 上。用代码或者SB上面拖一个View，这个时候我们需要指定这个类是什么，这个毋庸置疑，是绝对没有问题的。SB上面拖的View的class肯定要选择我们自定义的这个View。&lt;/p&gt;
+
+&lt;p&gt;但是在加载我们这个View的时候，会走initWithCoder / initWithFrame 方法，在这里方法里面又会去调用super的这个方法，现在我们把这个class写成了自己，依照我们上面调试的log，可以看到，initWithCoder以后，会按照以下的路线去调用.&lt;/p&gt;
+
+&lt;p&gt;[NSBundle loadNibName] —— [UINib instantiateWithOwner:options] ——[UINibDecoder decodeObjectForKey:]——UINibDecoderDecodeObjectForValue——[UIRuntimeConnection initWithCoder]——[UINibDecoder decodeObjectForKey:]——UINibDecoderDecodeObjectForValue——[UIClassSwapper initWithCoder:]——[BottomCommentView initWithCoder:]&lt;/p&gt;
+
+&lt;p&gt;从NSBundle加载开始，解析完之后会调用到ClassSwapper 的initWithCoder，由于我们class写了自己，这里就陷入死循环了。程序崩溃！这里就跟set方法里面调用点语法赋值一样，无限的递归调用了。&lt;/p&gt;
+
+&lt;p&gt;经过上面的分析之后，我们就知道了问题就出在我们在initWithCoder里面又调用了loadNibName，loadNibName又会去最终调UIClassSwapper initWithCoder。难道是我们custom class不对么？对比一下我们自定义tableViewCell的class就是本身，怎么就没有这个问题呢。&lt;/p&gt;
+
+&lt;p&gt;我们来仔细看看tableViewCell我们是怎么加载的，我们的Xib的class还是自己，但是registerWithNibName的方法调用在tableView中，这样就不会无限递归了。&lt;/p&gt;
+
+&lt;p&gt;这里当然我们也可以仿照这个方法做，那我们需要把loadNibName写到另外一个类中去。class还是写自己本身，用那个类来加载我们这个View，这样就可以不崩溃，不会无限递归了。但是问题又来了，我们无法在Xib/Storyboard上实时预览到我们的View了。&lt;/p&gt;
+
+&lt;p&gt;这里需要提一下IB_DESIGNABLE的工作原理。当我们用了IB_DESIGNABLE关键字以后，Xib/StoryBoard会在不运行整个程序的情况下，把这个View代码编译跑一遍，由于没有程序上下文，所有的编译就只在这个view的代码中进行。&lt;/p&gt;
+
+&lt;p&gt;我们在ViewController里面拖拽了一个View，并且更改它的class为我们自定义的class，那么接下来所有view的绘制都会交给我们这个自定义view的class，由这个class来管理。这里就分两种情况了。第一种情况就是我文章一开头给的Demo的例子，用DrawRect代码绘制出这个View的样子。这里不会出现任何问题。第二种情况就是我们还想用一个Xib来显示View，这种情况就是Xib/StoryBoard里面再次加载Xib的情况了。由于现在我们自定义的class有了接管整个view的绘制权利，那么我们就应该在initWithCoder中loadNibName，把整个View在初始化的时候load出来。根据上面的分析，我们找到崩溃的原因是无限递归，这里又必须要调用initWithCoder，我们的唯一办法就是把class改成父类的class，即UIView，这时候一切就好了，Xib/Storyboard不报错，也能及时显示出view的样子来了。&lt;/p&gt;
+
+&lt;p&gt;总结一下：
+&amp;gt; when using loadNibNamed:owner:options:, the File’s Owner should be NSObject, the main view should be your class type, and all outlets should be hooked up to the view, not the File’s Owner.&lt;/p&gt;
+
+&lt;p&gt;Ps.这里说的仅仅是loadNibNamed而不是initWithNibName。顺带提一下他们俩的不同点。initWithNibName要加载的Xib的类为我们定义的ViewController。loadNibNamed要加载的Xib的类为NSOjbect。他们的加载方式也不同，initWithNibName方法：是延迟加载，这个View上的控件是 nil 的，只有到需要显示时，才会不是 nil。loadNibNamed是立即加载，调用这个方法加载的xib对象中的各个元素都已经存在。&lt;/p&gt;
+
+&lt;h4 id=&quot;section-1&quot;&gt;总结&lt;/h4&gt;
+&lt;p&gt;当我第一次知道IB_DESIGNABLE / IBInspectable之后，感觉到特别的神奇，连我们自定义化的View也可以及时可见了。不过经过一段研究以后就发现。IB_DESIGNABLE / IBInspectable还是有一些缺陷的。IB_DESIGNABLE暂时只能在UIView的子类中用，常用的UIButton加圆角这些暂时也没法预览。IBInspectable实质是在Runtime Attributes设置了值，这也使得IBInspectable只能使用常用类型。NSDate这种类型没法设置成IBInspectable。&lt;/p&gt;
+
+&lt;p&gt;以上就是我和大家分享的IB_DESIGNABLE / IBInspectable使用过程中遇到的一些“坑”。&lt;/p&gt;
+
+&lt;h4 id=&quot;section-2&quot;&gt;更新：&lt;/h4&gt;
+&lt;p&gt;下面这一段要感谢@&lt;strong&gt;Andy矢倉&lt;/strong&gt; 微博上面指点我，其实系统的子类可以这么做：抽了几个常用的控件的公共类，顺便用External剥离常用属性，更复杂的移步这个库&lt;a href=&quot;https://github.com/JakeLin/IBAnimatable&quot;&gt;IBAnimatable&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;@&lt;strong&gt;Andy矢倉&lt;/strong&gt;还提醒说，用这个特性最好是iOS8 + Swift，OC或者iOS7都会出现Failed to update而且无解，再次感谢@&lt;strong&gt;Andy矢倉&lt;/strong&gt;大神的指点！！！下图是他对系统控件的可视化改造！&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-932768201a4dae84.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+</description>
+        <pubDate>Fri, 22 Jul 2016 21:13:00 +0800</pubDate>
+        <link>http://vno.onevcat.com/2016/07/%E5%85%B3%E4%BA%8EIB_DESIGNABLE-IBInspectable%E7%9A%84%E9%82%A3%E4%BA%9B%E9%9C%80%E8%A6%81%E6%B3%A8%E6%84%8F%E7%9A%84%E4%BA%8B/</link>
+        <guid isPermaLink="true">http://vno.onevcat.com/2016/07/%E5%85%B3%E4%BA%8EIB_DESIGNABLE-IBInspectable%E7%9A%84%E9%82%A3%E4%BA%9B%E9%9C%80%E8%A6%81%E6%B3%A8%E6%84%8F%E7%9A%84%E4%BA%8B/</guid>
+        
+        <category>iOS</category>
+        
+        
+        <category>Blog</category>
+        
+      </item>
     
       <item>
         <title>WWDC2016 Session笔记 - Xcode 8 Auto Layout新特性</title>
@@ -187,7 +1309,7 @@
 &lt;/code&gt;&lt;/pre&gt;
 &lt;/div&gt;
 
-&lt;h4 id=&quot;turn-off-ambiguity-per-view&quot;&gt;3.Turn Off Ambiguity Per View&lt;/h4&gt;
+&lt;h5 id=&quot;turn-off-ambiguity-per-view&quot;&gt;3.Turn Off Ambiguity Per View&lt;/h5&gt;
 
 &lt;p&gt;这个是Xcode 8的一个新特性。当上述2种方法都无法解决我们的需求的时候。这个时候就需要用到这种方法了。Xcode 8给了我们可以在constraints产生歧义的时候，可以动态调整警告级别的能力。&lt;/p&gt;
 
@@ -498,6 +1620,218 @@ cell.customPlacementConstraints = [centering]
         <pubDate>Sun, 17 Jul 2016 19:36:00 +0800</pubDate>
         <link>http://vno.onevcat.com/2016/07/WWDC2016-Session%E7%AC%94%E8%AE%B0-Xcode-8-Auto-Layout%E6%96%B0%E7%89%B9%E6%80%A7/</link>
         <guid isPermaLink="true">http://vno.onevcat.com/2016/07/WWDC2016-Session%E7%AC%94%E8%AE%B0-Xcode-8-Auto-Layout%E6%96%B0%E7%89%B9%E6%80%A7/</guid>
+        
+        <category>iOS</category>
+        
+        
+        <category>Blog</category>
+        
+      </item>
+    
+      <item>
+        <title>函数响应式编程(FRP)从入门到&quot;放弃&quot;——基础概念篇</title>
+        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-903db38916fcf0cb.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h4 id=&quot;section&quot;&gt;前言&lt;/h4&gt;
+&lt;p&gt;研究ReactiveCocoa一段时间了，是时候总结一下学到的一些知识了。&lt;/p&gt;
+
+&lt;h4 id=&quot;section-1&quot;&gt;一.函数响应式编程&lt;/h4&gt;
+&lt;p&gt;说道函数响应式编程，就不得不提到函数式编程，它们俩到底有什么关系呢？今天我们就详细的解析一下他们的关系。&lt;/p&gt;
+
+&lt;p&gt;现在有下面4个概念，需要我们理清一下它们之间的关系：
+面向对象编程 Object Oriented Programming
+响应式编程  Reactive Programming
+函数式编程 Functional Programming
+函数响应式编程 Functional Reactive Programming&lt;/p&gt;
+
+&lt;p&gt;我们先来说说什么是函数式编程Functional Programming，我们先来看看&lt;a href=&quot;https://en.wikipedia.org/wiki/Functional_programming&quot;&gt;wikipedia&lt;/a&gt;上的相关定义：&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Functional Programming is a programming paradigm &lt;br /&gt;
+1. treats computation as the evaluation of  mathematical functions.
+2. avoids changing-state and mutable data&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;总结一下函数式编程具有以下几个特点：
+1. 函数是”第一等公民”&lt;br /&gt;
+2. 闭包和高阶函数
+3. 不改变状态(由此延伸出”引用透明”的概念) 
+4. 递归
+5. 只用”表达式”，不用”语句”，没有副作用&lt;/p&gt;
+
+&lt;p&gt;接下来我们依次说明一下这些特点。
+##### 一.  函数是”第一等公民” &lt;br /&gt;
+所谓”第一等公民”（first class），指的是函数与其他数据类型一样，处于平等地位，可以赋值给其他变量，也可以作为参数，传入另一个函数，或者作为别的函数的返回值。&lt;/p&gt;
+
+&lt;p&gt;一等函数的理念可以追溯到 Church 的 lambda 演算 (Church 1941; Barendregt 1984)。此后，包括 Haskell，OCaml，Standard ML，Scala 和 F# 在内的大量 (函数式) 编程语言都不同程度地借鉴了这个概念。&lt;/p&gt;
+
+&lt;p&gt;Ps：世界上最纯粹的函数式编程语言非Haskell莫属。&lt;/p&gt;
+
+&lt;h5 id=&quot;section-2&quot;&gt;二.闭包和高阶函数&lt;/h5&gt;
+&lt;p&gt;闭包是起函数的作用并可以像对象一样操作的对象。与此类似，函数式编程语言支持高阶函数。高阶函数可以用另一个函数（间接地，用一个表达式） 作为其输入参数，在大多数情况下，它甚至返回一个函数作为其输出参数。这两种结构结合在一起使得可以用优雅的方式进行模块化编程，这是使用函数式编程的最大好处。&lt;/p&gt;
+
+&lt;h5 id=&quot;section-3&quot;&gt;三. 不改变状态(由此延伸出”引用透明”的概念)&lt;/h5&gt;
+
+&lt;p&gt;不改变状态：
+函数式编程只是返回新的值，不修改系统变量。因此，不修改变量，也是它的一个重要特点。在其他类型的语言中，变量往往用来保存”状态”（state）。不修改变量，意味着状态不能保存在变量中。函数式编程使用参数保存状态，最好的例子就是递归。&lt;/p&gt;
+
+&lt;p&gt;避免使用程序状态和可变对象，是降低程序复杂度的有效方式之一，而这也正是函数式编程的精髓。函数式编程强调执行的结果，而非执行的过程。我们先构建一系列简单却具有一定功能的小函数，然后再将这些函数进行组装以实现完整的逻辑和复杂的运算，这是函数式编程的基本思想。&lt;/p&gt;
+
+&lt;p&gt;引用透明： 
+如果提供同样的输入，那么函数总是返回同样的结果。就是说，表达式的值不依赖于可以改变值的全局状态。这使您可以从形式上推断程序行为，因为表达式的意义只取决于其子表达式而不是计算顺序或者其他表达式的副作用。&lt;/p&gt;
+
+&lt;p&gt;这里有出现了一个问题：&lt;/p&gt;
+
+&lt;p&gt;面试题:** 纯函数式的闭包是否满足函数式编程里面不改变函数状态的特性？**&lt;/p&gt;
+
+&lt;p&gt;根据&lt;a href=&quot;http://en.wikipedia.org/wiki/Pure_function&quot;&gt;纯函数&lt;/a&gt;的定义
+&amp;gt; 在计算机编程中，假如满足下面这两个句子的约束，一个函数可能被描述为一个纯函数：&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;ol&gt;
+    &lt;li&gt;给出同样的参数值，该函数总是求出同样的结果。该函数结果值不依赖任何隐藏信息或程序执行处理可能改变的状态或在程序的两个不同的执行，也不能依赖来自I/O装置的任何外部的输入（通常是这样的–看下面的描述）。&lt;/li&gt;
+    &lt;li&gt;结果的求值不会促使任何可语义上可观察的副作用或输出，例如易变对象的变化或输出到I/O装置。&lt;/li&gt;
+  &lt;/ol&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;函数的返回值是不需要依赖所有（或任何）参数值，必须不依赖参数值以外的东西。函数可能返回多重结果值，并且对于被认为是纯函数的函数，这些条件必须应用到所有返回值。假如一个参数通过引用调用，任何内部参数变化将改变函数外部的输入参数值，它将使函数变为非纯函数。&lt;/p&gt;
+
+&lt;p&gt;回到我们讨论的这个问题上来:&lt;/p&gt;
+
+&lt;p&gt;闭包虽然可以把闭包外部的变量捕获到闭包内部，但是闭包还是满足不改变状态的特性的。假设f(x)的返回值是g(x)，而g(x)是会依靠f(x)的参数返回的,g(x)相当于拥有f(x)的闭包。这个时候就会有一种错误的感觉，g(x)捕捉了f(x)入参的变量，从而产生了不同的闭包。从而得出g(x)不是纯函数式的，因为它改变了状态。如果我们站在更高的层面去看待这个问题，函数在函数式编程里面是一等值，和结构体，整型，布尔类型没有区别。回到上述的问题中来，由于我们传入了不同参数，但是闭包里面的整体算法是没有变化的。更加详细的例子，f(x)返回一个计算x平方的函数g(x)，g(x)虽然每次都会由f(x)传入的x值变化而变化，但是g(x)整体算法就是计算x的平方，这个计算方法是没有变化的，不根据外部状态改变而改变的。那么这个g(x)的block是满足函数式编程的不改变函数状态的特性的。所以它也是引用透明的。&lt;/p&gt;
+
+&lt;p&gt;额外需要说明的一点，__block这个关键字其实是破坏了函数式编程的。&lt;/p&gt;
+
+&lt;p&gt;面试题:&lt;strong&gt;如何理解引用透明？&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;如果一个函数只会受到入参的变化，那么这个函数每次的调用都会是相同的
+一个函数f(x),里面调用了g(x),g(x)里面又调用了h(x),h(x)最终计算出了结果，作为f(x)的返回值返回了。如果所有的状态都没有改变，f(x)下一次再调用相同的参数的时候，应该会得到完全一样的结果,那这个时候其实不用再调用g(x)和h(x)了，也可以得到完全一样的结果。当一个函数，不依赖“外部”变量和状态，只依赖入参的变化而影响函数最终返回值，也就是说入参相同，得到的返回值结果一定相同，如果函数具有这种性质，就可以说这个函数是引用透明的。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;typedef int(^intFx)(int a);
+
+intFx transparent(intFx origin) {
+    NSMutableDictionary *results = [NSMutableDictionary dictionary];
+    return ^int(int p) {
+        if (results[@(p)]) {
+            return [results[@(p)] intValue];
+        }
+        results[@(p)] = @(origin(p));
+        return [results[@(p)] intValue];
+    };
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;在上述例子中可以看到，如果result里面有我们需要的值了，我们就不会再去调用回调的闭包，这样transparent的函数每次传入相同的值，肯定会返回相同的结果。&lt;/p&gt;
+
+&lt;p&gt;一个纯函数在执行的过程中，只跟入参有关，在函数体中并不会引用外部全局变量，或者说是一个类方法里面的其他成员变量。另外，纯函数除了返回值之外，也不会去改变外部的变量值。满足上面这两点的纯函数，就可以说它是引用透明的。也有说法叫这种特性为&lt;strong&gt;幂等性&lt;/strong&gt;&lt;/p&gt;
+
+&lt;h5 id=&quot;section-4&quot;&gt;四.递归&lt;/h5&gt;
+&lt;p&gt;函数式编程是用递归做为控制流程的机制。&lt;/p&gt;
+
+&lt;h5 id=&quot;section-5&quot;&gt;五.只用”表达式”，不用”语句”，没有副作用&lt;/h5&gt;
+
+&lt;p&gt;“表达式”（expression）是一个单纯的运算过程，总是有返回值；”语句”（statement）是执行某种操作，没有返回值。函数式编程要求，只使用表达式，不使用语句。也就是说，每一步都是单纯的运算，而且都有返回值。
+原因是函数式编程的开发动机，一开始就是为了处理运算（computation），不考虑系统的读写（I/O）。”语句”属于读写操作，所以就被排斥在外。 
+函数式编程强调没有”副作用”，意味着函数要保持独立，所有功能就是返回一个新的值，没有其他行为，尤其是不得修改外部变量的值。&lt;/p&gt;
+
+&lt;p&gt;举个例子来说明一下函数式编程和指令式编程的区别：
+```&lt;/p&gt;
+
+&lt;p&gt;// 指令式编程
+int factorial1(int x) {
+    int result = 1;
+    for (int i = 1; i &amp;lt;= x; i ++) {
+        result *= i;
+    }
+    return result;
+}&lt;/p&gt;
+
+&lt;p&gt;// 函数式编程
+int factorial2(int x) {
+    if (x == 1) return 1;
+    return x * factorial2(x - 1);
+}&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;上面这个例子就是计算阶乘的例子。我们先来看看指令式编程。指令式编程，像机器一条条命令一样思考问题。指令式的思想就类似于汇编，一条条指令告诉计算机该怎么去处理这个问题。所以在指令式编程里面就有很多的**状态量**和**语句**。而在函数式编程里面，思想是利用数学方法来思考问题。阶乘在数学定义里面就是f(n) = n _*_ f(n - 1) (n &amp;gt; 1),f(n) = 1(n = 1)。在函数式编程里面是基本上没有**状态量**，只有**表达式**，也没有赋值语句。利用了递归解决了问题。
+
+再来看看指令式编程和响应式编程的区别
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;void test() {
+    int a = 5;
+    int b = 8;
+    int c = a + b;
+    a = 10;
+    NSLog(@”%d”,c);
+}
+```&lt;br /&gt;
+在指令式编程里面，计算是一种瞬间的操作。而响应式编程，计算是相互相应的，相互之间都存在关系，某些变化了，相互之间的关系会使相应的值随之变化。响应式编程有2个典型的例子：Excel，当单元格变化了，相互之间的单元格也会立即变化。Autolayout，当父View变化了，根据相互之间的关系Constraint，子View的frame也会随之变化。&lt;/p&gt;
+
+&lt;p&gt;在面向对象语言中也是可以实现响应式编程的，具体做法应该是，把关系抽象出来，然后把变化抽象出来，用关系把变化事件传递下去。Cocoa框架下RAC的实现就是如此。&lt;/p&gt;
+
+&lt;p&gt;最后再来说说函数响应式编程。
+首先函数响应式编程肯定是满足函数式编程的上述特性的。函数响应式编程是面向离散事件流的，在一个时间轴上会产生一些离散事件，这些事件会依次向下传递。&lt;/p&gt;
+
+&lt;p&gt;RAC就是Cocoa框架下的函数响应式编程的实现。它提供了基于时间变化的数据流的组合和变化。&lt;/p&gt;
+
+&lt;p&gt;接着再来说说之前说的4种编程范式，总结出来，如果按照类似继承图谱来看的话，应该如下图：
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-92e858ac89ee627f.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;首先在声明式编程里面有2大家族，那就是函数式编程和数据流编程，数据流编程下面就是响应式编程，而函数响应式编程是”继承”于函数式编程和响应式编程的。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-b7b30d442802c2d0.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;面向对象编程就属于指令式编程的范畴。从上面2张图来看，我们可以很明显看出这4者是什么关系了。&lt;/p&gt;
+
+&lt;p&gt;面试题:&lt;strong&gt;函数式编程是面向对象编程的升级产品&lt;/strong&gt;&lt;br /&gt;
+由上面的说明来看，这个说法肯定是错误的，关系根据上面2图来看就很明显了。&lt;/p&gt;
+
+&lt;p&gt;面试题:&lt;strong&gt;函数式语言主张不变量的原因是什么？&lt;/strong&gt;  &lt;br /&gt;
+1. 函数保持独立，所有功能就是返回一个新的值，没有其他行为，尤其是不修改外部变量的值。由于这一主张，我们不需要考虑线程”死锁”问题，线程之间一定是安全的，因为它不修改变量，所以根本不存在”锁”线程的问题。&lt;br /&gt;
+2. 进一步，函数式语言更加趋向于数学公式的推导，在数学公式里面其实是完全不存在变量这一概念的，此时如果又不存在变量了，那整个程序的执行顺序其实就不必要了，这样可以使我们更加容易的进行并发编程，更加有效率的利用多核cpu的计算处理能力。&lt;/p&gt;
+
+&lt;h4 id=&quot;section-6&quot;&gt;二.链式调用&lt;/h4&gt;
+&lt;p&gt;定义：f(x)，表示的是一种态射，从x的定义域到f(x)值域的态射。如果定义域和值域是完全相同的话，这种映射也成为单元态射。那么满足单元态射的函数，就可以进行链式调用。&lt;/p&gt;
+
+&lt;p&gt;以RAC为例，把RACSignal链式传递下去，subscribeNext就会返回一个RACSignal，定义域和值域都是RACSignal，那么就满足了单元态射的要求，就可以链式调用下去。&lt;/p&gt;
+
+&lt;p&gt;面试题:&lt;strong&gt;组成链式调用的必要条件就是在方法里面返回对象自己&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;这个说法是错误，举个例子：RAC每次做信号变换的时候，都产生了一个新的信号，所以返回自己就并不是必要条件。其实如果返回自己的同类或者和自己类似的类型，里面也包含可以继续链式调用的方法，也是可以组成链式调用的。&lt;/p&gt;
+
+&lt;h4 id=&quot;rac&quot;&gt;三.关于RAC的其他一些概念&lt;/h4&gt;
+&lt;p&gt;面试题:&lt;strong&gt;ReactiveCocoa是Facebook出的一个FRP开源库&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;错误，是写Github客户端时候的附属品，附带开发出的一个开源框架。&lt;/p&gt;
+
+&lt;p&gt;面试题:**ReactiveCocoa是基于KVO的一个开源库 **&lt;/p&gt;
+
+&lt;p&gt;错误。KVO是RAC非常次要的部分，甚至可以说没有KVO，RAC依旧可以存在。&lt;/p&gt;
+
+&lt;p&gt;面试题:**ReactiveCocoa是一个纯函数式编程的库 **&lt;/p&gt;
+
+&lt;p&gt;错误，由于Cocoa框架并不是函数式，RAC又是在Cocoa框架下，所以就不是纯函数式。在命令式编程的语言范畴里面实现纯函数编程，需要折中的方法，我们可以封装命令式编程，使其向上层可以形成纯函数式的，但是下层肯定就是命令式编程实现的。&lt;/p&gt;
+
+&lt;p&gt;最后我们再来区分一个概念:&lt;/p&gt;
+
+&lt;p&gt;面试题:&lt;strong&gt;RAC中Pull-driver和Push-driver的区别？&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;Pull-driver是指的是任何时刻，我们如果需要数据了，都可以从pull-driver里面拿走数据，因为数据先存储了。整个取数据的时间控制在调用者手上。典型的例子就是for-in循环，这就是一个pull-driver的操作。不管你循环几次，每次循环如何操作，数组或者字典里面的数据都一直存在在那里，“躺”在那里。
+Push-driver是相反的，在任何时刻，当有数据或者事件产生，都会push给你，如果你此时没有处理，该事件或者数据就丢失了。整个取数据的时间并不控制在调用者的手里。&lt;/p&gt;
+
+&lt;p&gt;Pull-driver可以类比看书，知识和文字不管你看不看，一直都在书里。
+Push-driver可以类比看电视，节目不管你看不看，都一直播放，你错过了就是错过了。&lt;/p&gt;
+
+&lt;p&gt;在RAC里面，Sequence就是一个pull-driver，Signal就是一个push-driver。&lt;/p&gt;
+
+&lt;h4 id=&quot;section-7&quot;&gt;未完待续……&lt;/h4&gt;
+
+&lt;p&gt;我会不定期把关于RAC相关难理解易混淆的概念都整理进来……欢迎大家指点。&lt;/p&gt;
+</description>
+        <pubDate>Mon, 11 Jul 2016 15:36:00 +0800</pubDate>
+        <link>http://vno.onevcat.com/2016/07/%E5%87%BD%E6%95%B0%E5%93%8D%E5%BA%94%E5%BC%8F%E7%BC%96%E7%A8%8B(FRP)%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0-%E6%94%BE%E5%BC%83-%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5%E7%AF%87/</link>
+        <guid isPermaLink="true">http://vno.onevcat.com/2016/07/%E5%87%BD%E6%95%B0%E5%93%8D%E5%BA%94%E5%BC%8F%E7%BC%96%E7%A8%8B(FRP)%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0-%E6%94%BE%E5%BC%83-%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5%E7%AF%87/</guid>
         
         <category>iOS</category>
         
@@ -2515,1237 +3849,6 @@ void (^errorHandler)(NSError *) = ^(NSError *error) {
         <pubDate>Fri, 10 Jun 2016 19:51:00 +0800</pubDate>
         <link>http://vno.onevcat.com/2016/06/iOS%E5%A6%82%E4%BD%95%E4%BC%98%E9%9B%85%E7%9A%84%E5%A4%84%E7%90%86-%E5%9B%9E%E8%B0%83%E5%9C%B0%E7%8B%B1Callback-hell-(%E4%B8%80)-%E4%BD%BF%E7%94%A8PromiseKit/</link>
         <guid isPermaLink="true">http://vno.onevcat.com/2016/06/iOS%E5%A6%82%E4%BD%95%E4%BC%98%E9%9B%85%E7%9A%84%E5%A4%84%E7%90%86-%E5%9B%9E%E8%B0%83%E5%9C%B0%E7%8B%B1Callback-hell-(%E4%B8%80)-%E4%BD%BF%E7%94%A8PromiseKit/</guid>
-        
-        <category>iOS</category>
-        
-        
-        <category>iOS</category>
-        
-      </item>
-    
-      <item>
-        <title>手把手教你从Core Data迁移到Realm</title>
-        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-86f3f1bc02294ac7.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;h4 id=&quot;section&quot;&gt;前言&lt;/h4&gt;
-&lt;p&gt;看了这篇文章的标题，也许有些人还不知道Realm是什么，那么我先简单介绍一下这个新生的数据库。号称是用来替代SQLite 和 Core Data的。Realm有以下优点：
-1. 使用方便
-Realm并不是基于SQLite的对象关系映射数据库。它是使用自己的持久化引擎，为简单和速度而生。&lt;a href=&quot;https://realm.io/users&quot;&gt;用户&lt;/a&gt;们说，他们在数分钟之内就上手了Realm，构建一个app只需要数小时，每个app开发时间至少节约数周的时间。&lt;/p&gt;
-
-&lt;ol&gt;
-  &lt;li&gt;
-    &lt;p&gt;快
-Realm比其他的对象关系映射型数据库(Object Relational Mapping)，甚至比原生的SQLite更加快，这都得益于它零拷贝的设计。看看&lt;a href=&quot;https://realm.io/news/introducing-realm/#fast&quot;&gt;iOS&lt;/a&gt;用户和&lt;a href=&quot;https://realm.io/news/realm-for-android/#realm-for-android&quot;&gt;Android&lt;/a&gt;用户都是怎么评价它的快的&lt;a href=&quot;https://twitter.com/realm/favorites&quot;&gt;Twitter&lt;/a&gt;&lt;/p&gt;
-  &lt;/li&gt;
-  &lt;li&gt;跨平台
-Realm 支持 iOS 和 OS X (&lt;a href=&quot;https://static.realm.io/downloads/objc/realm-objc-1.0.0.zip&quot;&gt;Objective‑C&lt;/a&gt; &amp;amp; &lt;a href=&quot;https://static.realm.io/downloads/swift/realm-swift-1.0.0.zip&quot;&gt;Swift&lt;/a&gt;) 和&lt;a href=&quot;https://static.realm.io/downloads/java/realm-java-1.0.0.zip&quot;&gt;Android&lt;/a&gt;。你可以通过使用相同的model，共享Realm文件到各个平台，Java，Swift，Objective-C。并且在全平台可以使用相同的业务逻辑
- &lt;/li&gt;
-  &lt;li&gt;
-    &lt;p&gt;优秀的特性
-Realm支持先进的特性，如&lt;a href=&quot;https://realm.io/docs/java/latest/#encryption&quot;&gt;加密&lt;/a&gt;，&lt;a href=&quot;https://realm.io/docs/objc/latest/#queries&quot;&gt;图形查询&lt;/a&gt;，&lt;a href=&quot;https://realm.io/docs/swift/latest/#migrations&quot;&gt;轻松的迁移&lt;/a&gt;。Realm的API是一个非常适合打造高响应的应用程​​序，并且Realm为我们提供方便的组件，以轻松构建复杂的用户界面&lt;/p&gt;
-  &lt;/li&gt;
-  &lt;li&gt;
-    &lt;p&gt;值得信任
-Realm已经获得了银行，医疗保健提供商，复杂的企业app，星巴克这些产品的青睐。&lt;/p&gt;
-  &lt;/li&gt;
-  &lt;li&gt;社区驱动
-Realm是Github上星标最多的数据库里面排名第四，仅次于Java 和 Cocoa 的repos。除了核心工程之外，Realm的社区已经编译了&lt;a href=&quot;https://realm.io/addons&quot;&gt;上百个app插件和组件&lt;/a&gt;&lt;/li&gt;
-  &lt;li&gt;支持
-可以从Realm公司快速获得官方的答案，去编译和支持你的数据库。Realm的团队会在&lt;a href=&quot;https://github.com/realm&quot;&gt;Github&lt;/a&gt;, &lt;a href=&quot;https://stackoverflow.com/questions/tagged/realm?sort=newest&quot;&gt;StackOverflow&lt;/a&gt;, &amp;amp; &lt;a href=&quot;https://twitter.com/realm&quot;&gt;Twitter&lt;/a&gt;回答大家的各种问题&lt;/li&gt;
-&lt;/ol&gt;
-
-&lt;p&gt;下面再发3张令人惊喜的性能对比图&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-c5a9a2eba990151e.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;上图是每秒能在20万条数据中进行查询后count的次数。realm每秒可以进行30.9次查询后count。SQLite仅仅只有每秒13.6次查询后的count，相对于Core Data只有可怜的1。&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-f44984d9ac96595c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;在20万条中进行一次遍历查询，数据和前面的count相似：Realm一秒可以遍历20万条数据31次，而RCore Data只能进行两次查询。 SQLite也只有14次而已。&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-c808e85259fbccf5.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;这是在一次事务每秒插入数据的对比，Realm每秒可以插入9.4万条记录，在这个比较里纯SQLite的性能最好，每秒可以插入17.8万条记录。然而封装了SQLite的FMDB的成绩大概是Realm的一半，4.7万，Core Data就更低了，只有可怜的1.8万。&lt;/p&gt;
-
-&lt;p&gt;从以上3张图可以看出Realm优秀的特性。那么我们开始使用Realm吧。第一步就是把本地的数据库换成Realm。&lt;/p&gt;
-
-&lt;p&gt;下面是我翻译的一篇手把手教程，那么让我们赶紧通过教程，来把Core Data迁移到Realm吧。&lt;/p&gt;
-
-&lt;h4 id=&quot;httpsrealmionewsmigrating-from-core-data-to-realm&quot;&gt;&lt;a href=&quot;https://realm.io/news/migrating-from-core-data-to-realm/&quot;&gt;原文&lt;/a&gt;&lt;/h4&gt;
-
-&lt;h4 id=&quot;section-1&quot;&gt;译文&lt;/h4&gt;
-&lt;p&gt;把一个使用core data框架作为数据库存储方式的app，迁移到Realm的确是一件很容易的事情。如果你现在有一个已经用了Core Data的app，并且考虑换成Realm，这个手把手教程正适合你！&lt;/p&gt;
-
-&lt;p&gt;很多开发者在用户界面，高度集成了Core Data(有时可能有上千行代码),这时很多人会告诉你转换Core Data到Realm可能会花数小时。Core Data和Realm两者都是把你的数据当成Object看待，所以迁移通常是很直接的过程:把你已经存在的Core Data的代码重构成使用Realm API的过程是很简单的。&lt;/p&gt;
-
-&lt;p&gt;迁移后，你会为Realm为你app带来的易用性，速度快，和稳定性而感到兴奋。&lt;/p&gt;
-
-&lt;h4 id=&quot;core-data-framework&quot;&gt;1.移除Core Data Framework&lt;/h4&gt;
-&lt;p&gt;首先，如果你的app当前正在使用Core Data，你需要找出哪些代码是包含了Core Data的代码。这些代码是需要重构的。幸运的是，这里有一个手动的方式去做这件事:你可以手动的在整个代码里面搜索相关的代码，然后删除每个导入了Core Data头文件声明的语句&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;#import &amp;lt;CoreData/CoreData.h&amp;gt;
-//or
-@import CoreData;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;一旦这样删除以后，每一行使用了Core Data的将会报一个编译错误，接下来，解决这些编译错误只是时间问题。&lt;/p&gt;
-
-&lt;h4 id=&quot;core-data&quot;&gt;2.移除Core Data的设置代码&lt;/h4&gt;
-&lt;p&gt;在Core Data中，对model objects的更改是要通过managed object context object来实现的。而managed object context objects又是被persistent store coordinator object创建的，它们两者又是被managed object model object创建的。&lt;/p&gt;
-
-&lt;p&gt;可以这么说，在你开始思考用Core Data读取，或者写入数据的时候，你通常需要在你的app中的某处去设置依赖的对象，暴露一些Core Data的方法给你的app逻辑使用。无论在你的application delegate中，全局的单例中，或者就是在inline实现中，这些地方都会存在大量的潜在的Core Data 设置代码。&lt;/p&gt;
-
-&lt;p&gt;当你准备转换到Realm时，所有的这些代码都可以删掉。&lt;/p&gt;
-
-&lt;p&gt;在Realm中，所有设置都在你第一次创建一个Realm object的时候就已经都完成了。当然也是可以手动去配置它，就像你指定Realm数据文件存储在你的硬盘的哪个路径下，这些完全都可以在runtime的时候去选择的。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;RLMRealm *defaultRealm = [RLMRealm defaultRealm];
-//or
-let realm = Realm()
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;感觉很好吧？&lt;/p&gt;
-
-&lt;h4 id=&quot;model&quot;&gt;3.迁移model文件&lt;/h4&gt;
-
-&lt;p&gt;在Core Data中，实用的那些类都是被定义成NSManagedObject的子类。这些object的接口都是很标准的，原始的类型(比如NSInteger 和 CGFloat)是不能被使用的，它们必须抽象成一个NSNumber对象。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;@interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Dog&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;NSManagedObject&lt;/span&gt;
-
-&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;copy&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;strong&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSNumber&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;age&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;strong&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSDate&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;birthdate&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-
-&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
-
-&lt;span class=&quot;k&quot;&gt;@implementation&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Dog&lt;/span&gt;
-
-&lt;span class=&quot;k&quot;&gt;@dynamic&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;@dynamic&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;age&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;@dynamic&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;birthdate&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-
-&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;把这些managed object subclasses转换成Realm是非常简单的:&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;@interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Dog&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;RLMObject&lt;/span&gt;
-
-&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;uuid&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSInteger&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;age&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSDate&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;birthdate&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-
-&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
-
-&lt;span class=&quot;k&quot;&gt;@implementation&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Dog&lt;/span&gt;
-
-&lt;span class=&quot;k&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;primaryKey&lt;/span&gt;
-&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
-&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;@&quot;uuid&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
-
-&lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSDictionary&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;defaultPropertyValues&lt;/span&gt;
-&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
-&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;@{&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;@&quot;uuid&quot;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSUUID&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;UUID&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;UUIDString&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;],&lt;/span&gt;
-&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;s&quot;&gt;@&quot;name&quot;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;@&quot;&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
-&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;s&quot;&gt;@&quot;birthdate&quot;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSDate&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;date&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]};&lt;/span&gt;
-&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
-
-&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;或者&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-class Dog: Object {
-    dynamic var uuid = NSUUID().UUIDString
-    dynamic var name = &quot;&quot;
-    dynamic var age = 0
-    dynamic var birthdate = NSDate().date
-    
-    override static func primaryKey() -&amp;gt; String? {
-        return &quot;uuid&quot;
-    }
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;完成！这是多么的简单？&lt;/p&gt;
-
-&lt;p&gt;看这些实现，还是有一些Realm的细节需要注意的。&lt;/p&gt;
-
-&lt;p&gt;对于初次使用Realm的人来说，没有必要去指定属性关键字，Realm在内部已经管理了。所以这些类的头文件看上去都很精简。此外，Realm支持简单的数据类型，比如NSInteger 和 CGFloat，所有所有的NSNumber都可以安全的删除。&lt;/p&gt;
-
-&lt;p&gt;另一方面，这有一些关于Realm model的声明额外的说明。
-1. Core Data objects通过内部的NSManagedObjectID属性去唯一标识一个objects，Realm把这个留给开发者去完成。在上面的例子中，我们额外添加了一个名为uuid的属性，然后通过调用 [RLMObject primaryKey]方法去作为这个class的唯一标识。当然，如果你的objects完全不需要唯一标识，这些都可以跳过。&lt;/p&gt;
-
-&lt;ol&gt;
-  &lt;li&gt;在写数据的过程中(这个过程不会太长！),Realm不能处理nil的object的属性。原因是，在[RLMObject defaultPropertyValues]这个类方法中给每个object在最初创建的时候，每个object属性都定义了一系列default值。当然这只是暂时的，我们很高兴的告诉你，在接下来的更新中，我们将会支持Realm object的属性可以为nil。&lt;/li&gt;
-&lt;/ol&gt;
-
-&lt;h4 id=&quot;section-2&quot;&gt;4.迁移写操作&lt;/h4&gt;
-
-&lt;p&gt;如果你不能保存你的数据，这肯定不是一个持久的方案！创建一个新的Core Data对象然后再简单的修改一下它，需要下面这些代码：&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-//Create a new Dog
-Dog *newDog = [NSEntityDescription insertNewObjectForEntityForName:@&quot;Dog&quot; inManagedObjectContext:myContext];
-newDog.name = @&quot;McGruff&quot;;
-
-//Save the new Dog object to disk
-NSError *saveError = nil;
-[newDog.managedObjectContext save:&amp;amp;saveError];
-
-//Rename the Dog
-newDog.name = @&quot;Pluto&quot;;
-[newDog.managedObjectContext save:&amp;amp;saveError];
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;相比之下，Realm保存的操作是略有不同的，但在相同的范围内修改上面的代码，仍然有相似的地方。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;//Create the dog object
-Dog *newDog = [[Dog alloc] init];
-newDog.name = @&quot;McGruff&quot;;
-
-//Save the new Dog object to disk (Using a block for the transaction)
-RLMRealm *defaultRealm = [RLMRealm defaultRealm];
-[defaultRealm transactionWithBlock:^{
-    [defaultRealm addObject:newDog];
-}];
-
-//Rename the dog (Using open/close methods for the transaction)
-[defaultRealm beginWriteTransaction];
-newDog.name = @&quot;Pluto&quot;;
-[defaultRealm commitWriteTransaction];
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;或者&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;//Create the dog object
-let mydog = Dog()
-myDog.name = &quot;McGruff&quot;
-
-//Save the new Dog object to disk (Using a block for the transaction)
-Realm().write {
-    realm.add(myDog)
-}
-
-//Rename the dog (Using open/close methods for the transaction)
-Realm().beginWrite()
-myDog.name = &quot;Pluto&quot;
-Realm().commitWrite()
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;完成！我们的数据被保存了！&lt;/p&gt;
-
-&lt;p&gt;明显的不同是，在Realm中，一旦一个objects被添加到一个Realm object中，它就是不可被修改的。为了在修改属性操作的后面执行，Realm object会被保存在一个写的事务中。这种不能被修改的model，保证了在不同线程中读/写 object数据的情况下，数据的一致性。&lt;/p&gt;
-
-&lt;p&gt;Core Data的实现确实可以改变属性，然后调用save方法，对比Realm的实现，只是一些小小的不同罢了。&lt;/p&gt;
-
-&lt;h4 id=&quot;section-3&quot;&gt;5.迁移查询&lt;/h4&gt;
-
-&lt;p&gt;另一方面，如果你不能检索查询你的数据，这肯定不是一个持久的方案！&lt;/p&gt;
-
-&lt;p&gt;在Core Data的基础实现中，它运用了fetch requests的概念去从硬盘检索数据。一个fetch request object是被当成一个单独的实例化对象去创建的，包含了一些额外的过滤参数，排序条件。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-NSManagedObjectContext *context = self.managedObjectContext;
-
-//A fetch request to get all dogs younger than 5 years old, in alphabetical order
-NSEntityDescription *entity = [NSEntityDescription
-                               entityForName:@&quot;Dog&quot; inManagedObjectContext:context];
-
-NSPredicate *predicate = [NSPredicate predicateWithFormat:@&quot;age &amp;lt; 5&quot;];
-
-NSSortDescriptor *sortDescriptor = [[NSSortDescriptor alloc] initWithKey:@&quot;name&quot; ascending:YES];
-
-NSFetchRequest *request = [[NSFetchRequest alloc] init];
-request.entity = entity;
-request.predicate = predicate;
-request.sortDescriptors = @[sortDescriptor];
-
-NSError *error;
-NSArray *dogs = [moc executeFetchRequest:request error:&amp;amp;error];
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;虽然这确实挺好，但是需要编写大量的代码！一些聪明的开发者就开发了一些library使这些代码编写的更加容易。比如MagicalRecord。&lt;/p&gt;
-
-&lt;p&gt;对比这些，使用了Realm之后，这些查询的等效代码如下:&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;RLMResults *dogs = [[Dog objectsWhere:@&quot;age &amp;lt; 5&quot;] sortedResultsUsingProperty:@&quot;name&quot; ascending:YES];
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;或者&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;var dogs = Realm().objects(Dog).filter(&quot;age &amp;lt; 5&quot;).sorted(&quot;name&quot;)
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;在一行调用了2个方法。对比Core Data将近10行代码。&lt;/p&gt;
-
-&lt;p&gt;当然，相同操作得到的结果是相同的(RLMResults 和 NSArray 基本类似),转换到Realm，由于这些查询都是很独立的，所以查询周围的逻辑只需要重构很少的一部分代码就可以了。&lt;/p&gt;
-
-&lt;h4 id=&quot;section-4&quot;&gt;6.迁移用户数据&lt;/h4&gt;
-
-&lt;p&gt;一旦你所有代码都迁移到Realm，这里还有一个突出的问题，你如何迁移所有用户已经存在在他们设备上的数据，从Core Data迁移到Realm中？&lt;/p&gt;
-
-&lt;p&gt;显然，这是非常复杂的问题，它决定于你的app的功能，还有用户的环境。你处理这种情况可能解决办法每次都不一样。&lt;/p&gt;
-
-&lt;p&gt;目前，我们看到了2种情况:
-1. 一旦你迁移到Realm，你可以重新导入Core Data framework到你的app，用原生的NSManagedObject objects去fetch你的用户的Core Data数据，然后手动的把数据传给Realm。你可以把这段迁移的代码永久的留在app中，或者也可以经过非常充足的时间之后，再删除掉。&lt;/p&gt;
-
-&lt;ol&gt;
-  &lt;li&gt;如果用户数据不是不可替代的——举个例子，如果是一些简单的缓存信息，可以通过硬盘上的用户数据重新生成的话，那么可以很简单的就把Core Data数据直接清除掉，当用户下次打开app的时候，一切从0开始。当然这需要经过非常谨慎的考虑，不然的话，会给很多人留下非常坏的用户体验。&lt;/li&gt;
-&lt;/ol&gt;
-
-&lt;p&gt;最终，决定应该偏向于用户。理想的情况是不要留下Core Data还连接着你的app，但是结果还是要取决于你的情况。好运！&lt;/p&gt;
-
-&lt;h4 id=&quot;section-5&quot;&gt;进一步的讨论&lt;/h4&gt;
-
-&lt;p&gt;虽然在移植一个应用程序到Realm过程中，没有真正重要的步骤，但是有一些额外的情况下，你应该知道：&lt;/p&gt;
-
-&lt;h6 id=&quot;section-6&quot;&gt;并发&lt;/h6&gt;
-
-&lt;p&gt;如果你在后台线程做了一些比较重的操作，你可能会发现你需要在线程之间传递Realm object。在Core Data中允许你在线程之间传递managed objects(虽然这样做不是最佳实践)，但是在Realm中，在线程中传递objects是严格禁止的，并且任何企图这样做的，都会抛出一个严重的异常。&lt;/p&gt;
-
-&lt;p&gt;如此来说，对于下面这些情况，是件很容易的事情:&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0), ^{
-    //Rename the dog in a background queue
-    [[RLMRealm defaultRealm] transactionWithBlock:^{
-        dog.name = @&quot;Peanut Wigglebutt&quot;;
-    }];
-    
-    //Print the dog&#39;s name on the main queue
-    NSString *uuid = dog.uuid;
-    dispatch_async(dispatch_get_main_queue(), ^{
-        Dog *localDog = [Dog objectForPrimaryKey:uuid];
-        NSLog(@&quot;Dog&#39;s name is %@&quot;, localDog.name);
-    });
-});
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;或者&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-dispatch_async(queue) {
-    //Rename the dog in a background queue
-    Realm().write {
-        dog.name = &quot;Peanut Wigglebutt&quot;
-    }
-    
-    //Print the dog&#39;s name on the main queue
-    let uuid = dog.uuid
-    dispatch_async(dispatch_get_main_queue()) {
-        let localDog = Realm().objectForPrimaryKey(Dog, uuid)
-        println(&quot;Dog&#39;s name is \\(localDog.name)&quot;)
-    }
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;虽然Realm objects不能在线程间被传递，但是Realm properties的副本可以在线程中被传递。考虑到Realm从磁盘中检索objects是非常快速的，如果只是简单的通过新线程在存储区中重新refetch相同的object，这只会造成很小的性能损失。在这个例子中，我们取了对象的主键的copy，然后把它从后台队列传递给主队列，然后再通过它在主线程的上下文中重新获取该对象。&lt;/p&gt;
-
-&lt;h6 id=&quot;nsfetchedresultscontroller-&quot;&gt;NSFetchedResultsController 的等效做法&lt;/h6&gt;
-&lt;p&gt;相比Core Data的所有缺点，可能使用Core Data最充足的理由就是NSFetchedResultsController——这是一个类，它可以检测到数据存储的变化，并且能自动的把这一变化展示到UI上。&lt;/p&gt;
-
-&lt;p&gt;在写这篇文章的时候，Realm还没有相似的机制。虽然它可以注册一个block，这个block会在数据源发生变化的时候被执行，但是这种”蛮力”的做法对大多数的UI来说都是不友好的。目前，如果你的UI代码很依赖Realm，那么这种做法对你来说就像处理一个breaker一样。&lt;/p&gt;
-
-&lt;p&gt;Realm的cocoa工程师现在正在开发一套通知系统，当一些object的属性被更改的时候，允许我们去注册一个通知，来接收到这些改变。这些特性都会在Realm的Swift and  Objective‑C 的未来的更新版本中。&lt;/p&gt;
-
-&lt;p&gt;在此期间，如果现有的通知block API还是没有满足你的需要，但是你还是需要当特定的property被更改了收到一个通知，这里推荐使用神奇的第三方库，名字叫&lt;a href=&quot;https://github.com/Roobiq/RBQFetchedResultsController&quot;&gt;RBQFetchedResultsController&lt;/a&gt;，它能模仿上述功能。除此之外，你还可以通过在objects里面加入setter方法，当setter方法被调用的时候，发送一个广播通知，这样做也能实现相同的功能。&lt;/p&gt;
-
-&lt;h4 id=&quot;section-7&quot;&gt;结尾&lt;/h4&gt;
-&lt;p&gt;Core Data和Realm的在展示数据的时候都是通过model objects，由于这一相似性，得以让我们从Core Data迁移到Realm时非常迅速，简单(并且非常令人满意！)。尽管开始看上去令人怯步，但是实际做起来，就是需要把每个Core Data的方法调用转换成等价的Realm的方法，然后写一个辅助类去帮你迁移用户的数据。这些也都非常简单。&lt;/p&gt;
-
-&lt;p&gt;如果你在你的app中使用Core Data遇到了些困难，需要些更加简单的解决办法，我们强烈推荐你尝试一下Realm，看看它是否适用于你。如果适用，请你告诉我们！&lt;/p&gt;
-
-&lt;p&gt;感谢阅读这篇文章。快去用Realm构建一个令人惊喜的app吧！在这些地方可以联系到我们&lt;a href=&quot;https://stackoverflow.com/questions/tagged/realm?sort=newest&quot;&gt;StackOverflow&lt;/a&gt;, &lt;a href=&quot;https://github.com/realm/realm-cocoa&quot;&gt;GitHub&lt;/a&gt;, or &lt;a href=&quot;https://twitter.com/realm&quot;&gt;Twitter&lt;/a&gt;.&lt;/p&gt;
-
-</description>
-        <pubDate>Fri, 03 Jun 2016 00:02:00 +0800</pubDate>
-        <link>http://vno.onevcat.com/2016/06/%E6%89%8B%E6%8A%8A%E6%89%8B%E6%95%99%E4%BD%A0%E4%BB%8ECore-Data%E8%BF%81%E7%A7%BB%E5%88%B0Realm/</link>
-        <guid isPermaLink="true">http://vno.onevcat.com/2016/06/%E6%89%8B%E6%8A%8A%E6%89%8B%E6%95%99%E4%BD%A0%E4%BB%8ECore-Data%E8%BF%81%E7%A7%BB%E5%88%B0Realm/</guid>
-        
-        <category>iOS</category>
-        
-        
-        <category>iOS</category>
-        
-      </item>
-    
-      <item>
-        <title>iOS app旧貌换新颜(一)—Launch Page让Logo&quot;飞&quot;出屏幕</title>
-        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-cf3e37d486bf7c51.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;h4 id=&quot;section&quot;&gt;前言&lt;/h4&gt;
-&lt;p&gt;当今是个看脸的世界，一个app的颜值可能会决定用户的使用次数，icon的颜值更可能决定了用户是否回去下载，如果太丑，放在手机桌面都难看，那用户很可能就直接卸载了。所以漂亮的界面UI + 合理的用户体验UX/UE也会很大程度决定用户的黏性。最近由于公司的app准备美化一下界面，提升性能，所以我就想把美化过程中可以和大家分享的东西都整理整理，拿出来也和大家一起分享学习。这个“旧貌换新颜”我就写成一个系列吧，相信美化的道路是永无止境的！(场外音:自己又给自己开了一个巨坑)&lt;/p&gt;
-
-&lt;h4 id=&quot;section-1&quot;&gt;一.灵感的来源&lt;/h4&gt;
-&lt;p&gt;也许有些人看了文章的标题并不一定完全懂是啥意思，其实设计这个的来源源自于我在微博上看到的一个动图，很生动，形象。
-&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-2c82a315c04b2a63.gif?imageMogr2/auto-orient/strip&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;一个呆萌的大叔点开Twitter客户端，启动界面有一个动效，就是他们的logo直接“飞”出屏幕，打在了他的脸上。这个效果我当时看了就觉得很有趣。很多应用每次启动之后都是直接进去，或者先展示一个几秒的广告页。其实要是加一个这种启动特性，感觉也挺不错。&lt;/p&gt;
-
-&lt;h4 id=&quot;section-2&quot;&gt;二.动画原理&lt;/h4&gt;
-&lt;p&gt;接下来说一下上面那个启动特效的原理，其实原理很简单:app在启动之后，先加载一个View，上面放了我们的logo，然后在做一个放大的UIView的动画就好了。接下来看看我的做法吧。&lt;/p&gt;
-
-&lt;h4 id=&quot;section-3&quot;&gt;三.准备工具&lt;/h4&gt;
-&lt;p&gt;PS + AI 或者 Sketch + PaintCode
-这个可能有人问了，怎么突然还需要这些作图的工具。其实大家也可以加载一个logo图片放在view上，一样可以实现。不过老板觉得加载一张图片如果太高清会占app大小，能尽量程序画出来的，就让程序画出来。对于不规则复杂的图形，就只好用上面这一套组合工具了。&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-4ce2d7bca595f60e.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;PS主要是把logo抠出来&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-1a7156da405557e4.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
-&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-f570354c4b17de1c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;AI和Sketch是为了把抠出来的logo用钢笔工具，进行描点，导出路径。&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-5a872f4388f8c95c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;最后PaintCode就是把路径转换成UIBezierPath(PaintCode这个软件很厉害，可以直接把SVG里面的路径直接转换成对应的Swift或者Objective-C代码)(后来我发现其实只要用PaintCode一个软件就可以完成上面所有功能了，它也可以直接用钢笔工具画路径)&lt;/p&gt;
-
-&lt;h4 id=&quot;section-4&quot;&gt;四.开始制作&lt;/h4&gt;
-&lt;p&gt;1.首先用PS把Logo图抠出来，保存成图片。
-2.然后打开Sketch，导入刚刚的Logo图片。&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-93cc2ee749ecde12.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;3.选择左上角的“Insert”-“Vector”钢笔工具，依次连接Logo图标的各个顶点
-&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-4504387610269f31.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
-4.然后在每段顶点之间，加新的锚点，钢笔工具会出现+号。在软件的右侧，会出现下面这个面板&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-b4faccaa7e9955c4.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
-通过拖拉这些你加出来的点，可以使路径完全吻合Logo复杂的外形。拖过一番拖拽之后，就应该成下面这个图的样子了。
-&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-a10c6a94f30c1d49.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;5.接下来我们就选择左边面板上面有一个Page面板
-&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-195b264d904142c8.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
-选一下刚刚描出来的Path，右下角会出现一个Export面板&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-692ee827e904a2a4.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-f90a1583f99ecc95.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-2c9e94dcdd68baba.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;这个时候我们选择导出SVG文件&lt;/p&gt;
-
-&lt;blockquote&gt;
-  &lt;p&gt;SVG&lt;a href=&quot;http://baike.baidu.com/pic/SVG/63178/0/4e83cb62211a2be5e7113acd?fr=lemma&amp;amp;ct=single&quot;&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-50421760e6be23df.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;svg logo&quot; /&gt;&lt;/a&gt;可缩放矢量图形（Scalable Vector Graphics）是基于
-可扩展标记语言（XML），用于描述二维矢量图形的一种图形格式。SVG是W3C(“World Wide Web ConSortium” 即 “ 国际互联网标准组织”)在2000年8月制定的一种新的二维矢量图形格式，也是规范中的网络矢量图形标准。SVG严格遵从XML语法，并用文本格式的描述性语言来描述图像内容，因此是一种和图像分辨率无关的矢量图形格式&lt;/p&gt;
-&lt;/blockquote&gt;
-
-&lt;p&gt;其实这里有一个小插曲，绘制路径的时候，其实我用的是AI描点的，之后导出SVG给PaintCode，居然不识别我的路径。后来网上问了问，大神要我换Sketch试试，然后就行了。后来我比较了一下Sketch和AI导出的SVG有什么不同，才发现，我之前AI导出的，加了几个图层，把路径盖住了。用AI绘制路径的方法和Sketch的差不多，如下图。
-&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-c41cf3802e3c5b9f.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-37b8ee89ce46e689.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;6.把之前导出的SVG文件导入到PaintCode中，下面会自动生成Objective-C代码
-&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-e13e918ec6ce6c5b.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;把生成的这些代码复制出来。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;//// Color Declarations
-UIColor* color1 = [UIColor colorWithRed: 0.521 green: 0.521 blue: 0.521 alpha: 1];
-
-//// Bezier Drawing
-
-
-//// Page-1
-{
-    //// Bezier 2 Drawing
-    UIBezierPath* bezier2Path = UIBezierPath.bezierPath;
-    [bezier2Path moveToPoint: CGPointMake(552.37, 9.09)];
-    [bezier2Path addCurveToPoint: CGPointMake(519.07, 26.69) controlPoint1: CGPointMake(552.37, 9.09) controlPoint2: CGPointMake(538.05, 18.98)];
-    [bezier2Path addCurveToPoint: CGPointMake(480.56, 38.26) controlPoint1: CGPointMake(500.1, 34.4) controlPoint2: CGPointMake(480.56, 38.26)];
-    [bezier2Path addCurveToPoint: CGPointMake(439.19, 9.09) controlPoint1: CGPointMake(480.56, 38.26) controlPoint2: CGPointMake(467.44, 22.55)];
-    [bezier2Path addCurveToPoint: CGPointMake(368.15, 2.85) controlPoint1: CGPointMake(410.93, -4.38) controlPoint2: CGPointMake(368.15, 2.85)];
-    [bezier2Path addCurveToPoint: CGPointMake(316.47, 30.92) controlPoint1: CGPointMake(368.15, 2.85) controlPoint2: CGPointMake(340.52, 7.85)];
-    [bezier2Path addCurveToPoint: CGPointMake(281.09, 86.36) controlPoint1: CGPointMake(292.42, 53.99) controlPoint2: CGPointMake(290.08, 59.09)];
-    [bezier2Path addCurveToPoint: CGPointMake(279.09, 144.27) controlPoint1: CGPointMake(272.1, 113.63) controlPoint2: CGPointMake(279.09, 144.27)];
-    [bezier2Path addCurveToPoint: CGPointMake(181.55, 124.87) controlPoint1: CGPointMake(279.09, 144.27) controlPoint2: CGPointMake(224.85, 139.76)];
-    [bezier2Path addCurveToPoint: CGPointMake(101.23, 83.11) controlPoint1: CGPointMake(138.25, 109.98) controlPoint2: CGPointMake(101.23, 83.11)];
-    [bezier2Path addLineToPoint: CGPointMake(38.19, 22.55)];
-    [bezier2Path addCurveToPoint: CGPointMake(21.56, 66.97) controlPoint1: CGPointMake(38.19, 22.55) controlPoint2: CGPointMake(24, 45.21)];
-    [bezier2Path addCurveToPoint: CGPointMake(28.04, 113.2) controlPoint1: CGPointMake(19.12, 88.74) controlPoint2: CGPointMake(28.04, 113.2)];
-    [bezier2Path addCurveToPoint: CGPointMake(45.34, 151.3) controlPoint1: CGPointMake(28.04, 113.2) controlPoint2: CGPointMake(34.12, 134.96)];
-    [bezier2Path addCurveToPoint: CGPointMake(72.71, 178.32) controlPoint1: CGPointMake(56.55, 167.65) controlPoint2: CGPointMake(72.71, 178.32)];
-    [bezier2Path addCurveToPoint: CGPointMake(45.34, 173.23) controlPoint1: CGPointMake(72.71, 178.32) controlPoint2: CGPointMake(57.6, 176.78)];
-    [bezier2Path addCurveToPoint: CGPointMake(21.56, 163.51) controlPoint1: CGPointMake(33.08, 169.68) controlPoint2: CGPointMake(21.56, 163.51)];
-    [bezier2Path addCurveToPoint: CGPointMake(28.04, 210.73) controlPoint1: CGPointMake(21.56, 163.51) controlPoint2: CGPointMake(20.58, 191.27)];
-    [bezier2Path addCurveToPoint: CGPointMake(53.47, 246.86) controlPoint1: CGPointMake(35.49, 230.2) controlPoint2: CGPointMake(53.47, 246.86)];
-    [bezier2Path addCurveToPoint: CGPointMake(80.14, 268.29) controlPoint1: CGPointMake(53.47, 246.86) controlPoint2: CGPointMake(65.25, 259.74)];
-    [bezier2Path addCurveToPoint: CGPointMake(113.46, 281.28) controlPoint1: CGPointMake(95.04, 276.83) controlPoint2: CGPointMake(113.46, 281.28)];
-    [bezier2Path addCurveToPoint: CGPointMake(86.11, 286.04) controlPoint1: CGPointMake(113.46, 281.28) controlPoint2: CGPointMake(98.18, 285.95)];
-    [bezier2Path addCurveToPoint: CGPointMake(62.93, 281.67) controlPoint1: CGPointMake(74.03, 286.13) controlPoint2: CGPointMake(62.93, 281.67)];
-    [bezier2Path addCurveToPoint: CGPointMake(80.14, 317.03) controlPoint1: CGPointMake(62.93, 281.67) controlPoint2: CGPointMake(71.12, 304.22)];
-    [bezier2Path addCurveToPoint: CGPointMake(103.91, 339.84) controlPoint1: CGPointMake(89.17, 329.83) controlPoint2: CGPointMake(103.91, 339.84)];
-    [bezier2Path addCurveToPoint: CGPointMake(135.88, 359.44) controlPoint1: CGPointMake(103.91, 339.84) controlPoint2: CGPointMake(119.59, 353.53)];
-    [bezier2Path addCurveToPoint: CGPointMake(170.93, 364.15) controlPoint1: CGPointMake(152.16, 365.34) controlPoint2: CGPointMake(170.93, 364.15)];
-    [bezier2Path addCurveToPoint: CGPointMake(135.88, 386.44) controlPoint1: CGPointMake(170.93, 364.15) controlPoint2: CGPointMake(153.54, 376.98)];
-    [bezier2Path addCurveToPoint: CGPointMake(101.13, 401.54) controlPoint1: CGPointMake(118.21, 395.9) controlPoint2: CGPointMake(101.13, 401.54)];
-    [bezier2Path addCurveToPoint: CGPointMake(53.47, 412.64) controlPoint1: CGPointMake(101.13, 401.54) controlPoint2: CGPointMake(81.16, 409.59)];
-    [bezier2Path addCurveToPoint: CGPointMake(0.29, 412.64) controlPoint1: CGPointMake(25.78, 415.7) controlPoint2: CGPointMake(0.29, 412.64)];
-    [bezier2Path addCurveToPoint: CGPointMake(72.71, 447.67) controlPoint1: CGPointMake(0.29, 412.64) controlPoint2: CGPointMake(36.62, 435.16)];
-    [bezier2Path addCurveToPoint: CGPointMake(149.39, 464.31) controlPoint1: CGPointMake(108.8, 460.17) controlPoint2: CGPointMake(149.39, 464.31)];
-    [bezier2Path addCurveToPoint: CGPointMake(249.01, 457.71) controlPoint1: CGPointMake(149.39, 464.31) controlPoint2: CGPointMake(196.6, 469.56)];
-    [bezier2Path addCurveToPoint: CGPointMake(352.07, 418.46) controlPoint1: CGPointMake(301.42, 445.86) controlPoint2: CGPointMake(352.07, 418.46)];
-    [bezier2Path addCurveToPoint: CGPointMake(414.45, 370.11) controlPoint1: CGPointMake(352.07, 418.46) controlPoint2: CGPointMake(388.26, 396.31)];
-    [bezier2Path addCurveToPoint: CGPointMake(458.34, 312.2) controlPoint1: CGPointMake(440.64, 343.92) controlPoint2: CGPointMake(458.34, 312.2)];
-    [bezier2Path addCurveToPoint: CGPointMake(489.68, 246.86) controlPoint1: CGPointMake(458.34, 312.2) controlPoint2: CGPointMake(476.64, 284.33)];
-    [bezier2Path addCurveToPoint: CGPointMake(509.39, 165.55) controlPoint1: CGPointMake(502.73, 209.38) controlPoint2: CGPointMake(509.39, 165.55)];
-    [bezier2Path addLineToPoint: CGPointMake(510.48, 117.41)];
-    [bezier2Path addCurveToPoint: CGPointMake(542.8, 90.45) controlPoint1: CGPointMake(510.48, 117.41) controlPoint2: CGPointMake(526.7, 107.34)];
-    [bezier2Path addCurveToPoint: CGPointMake(569.12, 56.54) controlPoint1: CGPointMake(558.9, 73.55) controlPoint2: CGPointMake(569.12, 56.54)];
-    [bezier2Path addLineToPoint: CGPointMake(537.79, 66.97)];
-    [bezier2Path addLineToPoint: CGPointMake(503.61, 73.55)];
-    [bezier2Path addCurveToPoint: CGPointMake(537.79, 43.14) controlPoint1: CGPointMake(503.61, 73.55) controlPoint2: CGPointMake(528.94, 56.27)];
-    [bezier2Path addCurveToPoint: CGPointMake(552.37, 9.09) controlPoint1: CGPointMake(546.63, 30.01) controlPoint2: CGPointMake(552.37, 9.09)];
-    [bezier2Path closePath];
-    bezier2Path.miterLimit = 4;
-
-    bezier2Path.usesEvenOddFillRule = YES;
-
-    [color1 setStroke];
-    bezier2Path.lineWidth = 1;
-    [bezier2Path stroke];
-}
-
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;小插曲:当我全部忙活完这些以后，我才发现PaintCode也有钢笔工具&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-8f2308c103a3639d.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
-也就是说只用一个PaintCode就可以完成所有想做的事情了，不需要Sketch或者AI去画路径了。PaintCode自己就可以画路径，导出OC或者Swift代码了。&lt;/p&gt;
-
-&lt;p&gt;7.现在我们回到Xcode工程中。添加一个UIView用来显示Logo。并且把Layer加到View的Layer中&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;-(void)addLayerToLaunchView
-{
-    //self.launchView是我添加的一个显示Logo的UIVIew
-    CAShapeLayer *layer = [[CAShapeLayer alloc]init];
-    layer.path = [self setBezierPath].CGPath;
-    layer.bounds = CGPathGetBoundingBox(layer.path);
-    
-    self.launchView.backgroundColor = [UIColor blueColor];
-    layer.position = CGPointMake(self.view.layer.bounds.size.width / 2, self.view.layer.bounds.size.height/ 2);
-    layer.fillColor = [UIColor whiteColor].CGColor;
-    [self.launchView.layer addSublayer:layer];
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
--(UIBezierPath *)setBezierPath
-{
-    //  这里面加入的就是刚刚PaintCode粘贴出来的代码
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-7a0cc3fd94a481c1.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;8.给这个View添加动画。仔细观察我文章开头的那个呆萌大叔打开Twitter的Gif图，动画效果是先把鸟缩小，然后再变大&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-- (void)startLaunch
-{
-    [UIView animateWithDuration:0.2 animations:^{
-        // 这里先把View缩小
-        self.launchView.frame = CGRectMake(0, 0, 50, 50);
-        self.launchView.center = self.view.center;
-    } completion:^(BOOL finished) {
-        [UIView animateWithDuration:0.3 animations:^{
-            // 这里要把View放大
-            self.launchView.frame = CGRectMake(0, 0, 5000, 5000);
-            self.launchView.center = self.view.center;
-            self.alpha = 0;
-        } completion:^(BOOL finished) {
-            [self.launchView removeFromSuperview];
-        }];;
-    }];
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;接下来运行工程就可以实现应用启动的时候，让Logo”飞”起来的效果啦。&lt;/p&gt;
-
-&lt;p&gt;这是我把这个效果做到app中的效果：&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-613695775b65dd57.gif?imageMogr2/auto-orient/strip&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;h4 id=&quot;section-5&quot;&gt;结尾&lt;/h4&gt;
-&lt;p&gt;这个效果其实适用很多app，如果公司也没有强制要加入广告页，等等其他页面，
-可以考虑在启动之后加上这些动画来增加app的用户体验。优秀的过场动画能让app更加鲜活，充满活力！&lt;/p&gt;
-</description>
-        <pubDate>Wed, 25 May 2016 06:56:00 +0800</pubDate>
-        <link>http://vno.onevcat.com/2016/05/iOS-app%E6%97%A7%E8%B2%8C%E6%8D%A2%E6%96%B0%E9%A2%9C(%E4%B8%80)-Launch-Page%E8%AE%A9Logo-%E9%A3%9E-%E5%87%BA%E5%B1%8F%E5%B9%95/</link>
-        <guid isPermaLink="true">http://vno.onevcat.com/2016/05/iOS-app%E6%97%A7%E8%B2%8C%E6%8D%A2%E6%96%B0%E9%A2%9C(%E4%B8%80)-Launch-Page%E8%AE%A9Logo-%E9%A3%9E-%E5%87%BA%E5%B1%8F%E5%B9%95/</guid>
-        
-        <category>iOS</category>
-        
-        
-        <category>iOS</category>
-        
-      </item>
-    
-      <item>
-        <title>微信,QQ这类IM app怎么做——谈谈Websocket</title>
-        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-324588e5f12ae955.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;h4 id=&quot;section&quot;&gt;前言&lt;/h4&gt;
-&lt;p&gt;关于我和WebSocket的缘：我从大二在计算机网络课上听老师讲过之后，第一次使用就到了毕业之后的第一份工作。直到最近换了工作，到了一家是含有IM社交聊天功能的app的时候，我觉得我现在可以谈谈我对WebSocket/Socket的一些看法了。要想做IM聊天app，就不得不理解WebSocket和Socket的原理了，听我一一道来。&lt;/p&gt;
-
-&lt;h4 id=&quot;section-1&quot;&gt;目录&lt;/h4&gt;
-&lt;ul&gt;
-  &lt;li&gt;1.WebSocket使用场景&lt;/li&gt;
-  &lt;li&gt;2.WebSocket诞生由来&lt;/li&gt;
-  &lt;li&gt;3.谈谈WebSocket协议原理&lt;/li&gt;
-  &lt;li&gt;4.WebSocket 和 Socket的区别与联系&lt;/li&gt;
-  &lt;li&gt;5.iOS平台有哪些WebSocket和Socket的开源框架&lt;/li&gt;
-  &lt;li&gt;6.iOS平台如何实现WebSocket协议&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;h5 id=&quot;websocket&quot;&gt;一.WebSocket的使用场景&lt;/h5&gt;
-&lt;p&gt;&lt;strong&gt;1.社交聊天&lt;/strong&gt;&lt;br /&gt;
-最著名的就是微信，QQ，这一类社交聊天的app。这一类聊天app的特点是低延迟，高即时。即时是这里面要求最高的，如果有一个紧急的事情，通过IM软件通知你，假设网络环境良好的情况下，这条message还无法立即送达到你的客户端上，紧急的事情都结束了，你才收到消息，那么这个软件肯定是失败的。&lt;br /&gt;
-&lt;strong&gt;2.弹幕&lt;/strong&gt;&lt;br /&gt;
-说到这里，大家一定里面想到了A站和B站了。确实，他们的弹幕一直是一种特色。而且弹幕对于一个视频来说，很可能弹幕才是精华。发弹幕需要实时显示，也需要和聊天一样，需要即时。&lt;br /&gt;
-&lt;strong&gt;3.多玩家游戏&lt;/strong&gt;&lt;br /&gt;
-&lt;strong&gt;4.协同编辑&lt;/strong&gt;&lt;br /&gt;
-现在很多开源项目都是分散在世界各地的开发者一起协同开发，此时就会用到版本控制系统，比如Git，SVN去合并冲突。但是如果有一份文档，支持多人实时在线协同编辑，那么此时就会用到比如WebSocket了，它可以保证各个编辑者都在编辑同一个文档，此时不需要用到Git，SVN这些版本控制，因为在协同编辑界面就会实时看到对方编辑了什么，谁在修改哪些段落和文字。&lt;br /&gt;
-&lt;strong&gt;5.股票基金实时报价&lt;/strong&gt;&lt;br /&gt;
-金融界瞬息万变——几乎是每毫秒都在变化。如果采用的网络架构无法满足实时性，那么就会给客户带来巨大的损失。几毫秒钱股票开始大跌，几秒以后才刷新数据，一秒钟的时间内，很可能用户就已经损失巨大财产了。&lt;br /&gt;
-&lt;strong&gt;6.体育实况更新&lt;/strong&gt;&lt;br /&gt;
-全世界的球迷，体育爱好者特别多，当然大家在关心自己喜欢的体育活动的时候，比赛实时的赛况是他们最最关心的事情。这类新闻中最好的体验就是利用Websocket达到实时的更新！&lt;br /&gt;
-&lt;strong&gt;7.视频会议/聊天&lt;/strong&gt;&lt;br /&gt;
-视频会议并不能代替和真人相见，但是他能让分布在全球天涯海角的人聚在电脑前一起开会。既能节省大家聚在一起路上花费的时间，讨论聚会地点的纠结，还能随时随地，只要有网络就可以开会。&lt;br /&gt;
-&lt;strong&gt;8.基于位置的应用&lt;/strong&gt;&lt;br /&gt;
-越来越多的开发者借用移动设备的GPS功能来实现他们基于位置的网络应用。如果你一直记录用户的位置(比如运行应用来记录运动轨迹)，你可以收集到更加细致化的数据。&lt;br /&gt;
-&lt;strong&gt;9.在线教育&lt;/strong&gt;&lt;br /&gt;
-在线教育近几年也发展迅速。优点很多，免去了场地的限制，能让名师的资源合理的分配给全国各地想要学习知识的同学手上，Websocket是个不错的选择，可以视频聊天、即时聊天以及其与别人合作一起在网上讨论问题…&lt;br /&gt;
-&lt;strong&gt;10.智能家居&lt;/strong&gt;&lt;br /&gt;
-这也是我一毕业加入的一个伟大的物联网智能家居的公司。考虑到家里的智能设备的状态必须需要实时的展现在手机app客户端上，毫无疑问选择了Websocket。&lt;br /&gt;
-&lt;strong&gt;11.总结&lt;/strong&gt; &lt;br /&gt;
-从上面我列举的这些场景来看，一个共同点就是，高实时性！&lt;/p&gt;
-
-&lt;h5 id=&quot;websocket-1&quot;&gt;二.WebSocket诞生由来&lt;/h5&gt;
-&lt;p&gt;1.&lt;strong&gt;最开始的轮询Polling阶段&lt;/strong&gt;
-&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-ce4df238336909a5.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;这种方式下，是不适合获取实时信息的，客户端和服务器之间会一直进行连接，每隔一段时间就询问一次。客户端会轮询，有没有新消息。这种方式连接数会很多，一个接受，一个发送。而且每次发送请求都会有Http的Header，会很耗流量，也会消耗CPU的利用率。&lt;/p&gt;
-
-&lt;p&gt;2.&lt;strong&gt;改进版的长轮询Long polling阶段&lt;/strong&gt;&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-6ca608d5a37095e6.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;长轮询是对轮询的改进版，客户端发送HTTP给服务器之后，有没有新消息，如果没有新消息，就一直等待。当有新消息的时候，才会返回给客户端。在某种程度上减小了网络带宽和CPU利用率等问题。但是这种方式还是有一种弊端：例如假设服务器端的数据更新速度很快，服务器在传送一个数据包给客户端后必须等待客户端的下一个Get请求到来，才能传递第二个更新的数据包给客户端，那么这样的话，客户端显示实时数据最快的时间为2×RTT（往返时间），而且如果在网络拥塞的情况下，这个时间用户是不能接受的，比如在股市的的报价上。另外，由于http数据包的头部数据量往往很大（通常有400多个字节），但是真正被服务器需要的数据却很少（有时只有10个字节左右），这样的数据包在网络上周期性的传输，难免对网络带宽是一种浪费。&lt;/p&gt;
-
-&lt;p&gt;3.&lt;strong&gt;WebSocket诞生&lt;/strong&gt;&lt;/p&gt;
-
-&lt;p&gt;现在急需的需求是能支持客户端和服务器端的双向通信，而且协议的头部又没有HTTP的Header那么大，于是，Websocket就诞生了！&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-b88b2623a2e4a8ea.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;上图就是Websocket和Polling的区别，从图中可以看到Polling里面客户端发送了好多Request，而下图，只有一个Upgrade，非常简洁高效。至于消耗方面的比较就要看下图了&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-f1f91e25b9635701.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
-上图中，我们先看蓝色的柱状图，是Polling轮询消耗的流量，&lt;/p&gt;
-
-&lt;p&gt;&lt;strong&gt;Use case A: &lt;/strong&gt;1,000 clients polling every second: Network throughput is (871 x 1,000) = 871,000 bytes = 6,968,000 bits per second (6.6 Mbps)&lt;br /&gt;
-&lt;strong&gt;Use case B: &lt;/strong&gt;10,000 clients polling every second: Network throughput is (871 x 10,000) = 8,710,000 bytes = 69,680,000 bits per second (66 Mbps)&lt;br /&gt;
-&lt;strong&gt;Use case C: &lt;/strong&gt;100,000 clients polling every 1 second: Network throughput is (871 x 100,000) = 87,100,000 bytes = 696,800,000 bits per second (665 Mbps)
-而Websocket的Frame是 just two bytes of overhead instead of 871，仅仅用2个字节就代替了轮询的871字节！&lt;br /&gt;
-&lt;strong&gt;Use case A: &lt;/strong&gt;1,000 clients receive 1 message per second: Network throughput is (2 x 1,000) = 2,000 bytes = 16,000 bits per second (0.015 Mbps)&lt;br /&gt;
-&lt;strong&gt;Use case B: &lt;/strong&gt;10,000 clients receive 1 message per second: Network throughput is (2 x 10,000) = 20,000 bytes = 160,000 bits per second (0.153 Mbps)&lt;br /&gt;
-&lt;strong&gt;Use case C: &lt;/strong&gt;100,000 clients receive 1 message per second: Network throughput is (2 x 100,000) = 200,000 bytes = 1,600,000 bits per second (1.526 Mbps)&lt;/p&gt;
-
-&lt;p&gt;相同的每秒客户端轮询的次数，当次数高达10W/s的高频率次数的时候，Polling轮询需要消耗665Mbps，而Websocket仅仅只花费了1.526Mbps，将近435倍！！&lt;/p&gt;
-
-&lt;h5 id=&quot;websocket-2&quot;&gt;三.谈谈WebSocket协议原理&lt;/h5&gt;
-&lt;p&gt;Websocket是应用层第七层上的一个应用层协议，它必须依赖 &lt;a href=&quot;http://tools.ietf.org/html/rfc6455#section-4&quot;&gt;HTTP 协议进行一次握手&lt;/a&gt; ，握手成功后，数据就直接从 TCP 通道传输，与 HTTP 无关了。&lt;/p&gt;
-
-&lt;p&gt;Websocket的数据传输是frame形式传输的，比如会将一条消息分为几个frame，按照先后顺序传输出去。这样做会有几个好处：&lt;/p&gt;
-
-&lt;p&gt;1 大数据的传输可以分片传输，不用考虑到数据大小导致的长度标志位不足够的情况。
-2 和http的chunk一样，可以边生成数据边传递消息，即提高传输效率。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt; 0                   1                   2                   3
- 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- +-+-+-+-+-------+-+-------------+-------------------------------+
- |F|R|R|R| opcode|M| Payload len |    Extended payload length    |
- |I|S|S|S|  (4)  |A|     (7)     |             (16/64)           |
- |N|V|V|V|       |S|             |   (if payload len==126/127)   |
- | |1|2|3|       |K|             |                               |
- +-+-+-+-+-------+-+-------------+ - - - - - - - - - - - - - - - +
- |     Extended payload length continued, if payload len == 127  |
- + - - - - - - - - - - - - - - - +-------------------------------+
- |                               |Masking-key, if MASK set to 1  |
- +-------------------------------+-------------------------------+
- | Masking-key (continued)       |          Payload Data         |
- +-------------------------------- - - - - - - - - - - - - - - - +
- :                     Payload Data continued ...                :
- + - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - +
- |                     Payload Data continued ...                |
- +---------------------------------------------------------------+
-
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h5 id=&quot;websocket--socket&quot;&gt;四.WebSocket 和 Socket的区别与联系&lt;/h5&gt;
-&lt;p&gt;首先，&lt;br /&gt;
-&lt;a href=&quot;http://en.wikipedia.org/wiki/Network_socket&quot;&gt;Socket&lt;/a&gt; 其实并不是一个协议。它工作在 OSI 模型会话层（第5层），是为了方便大家直接使用更底层协议（一般是 &lt;a href=&quot;http://en.wikipedia.org/wiki/Transmission_Control_Protocol&quot;&gt;TCP&lt;/a&gt; 或 &lt;a href=&quot;http://en.wikipedia.org/wiki/User_Datagram_Protocol&quot;&gt;UDP&lt;/a&gt; ）而存在的一个抽象层。Socket是对TCP/IP协议的封装，Socket本身并不是协议，而是一个调用接口(API)。&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-d35653654be833ae.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
-Socket通常也称作”套接字”，用于描述IP地址和端口，是一个通信链的句柄。网络上的两个程序通过一个双向的通讯连接实现数据的交换，这个双向链路的一端称为一个Socket，一个Socket由一个IP地址和一个端口号唯一确定。应用程序通常通过”套接字”向网络发出请求或者应答网络请求。&lt;/p&gt;
-
-&lt;p&gt;Socket在通讯过程中，服务端监听某个端口是否有连接请求，客户端向服务端发送连接请求，服务端收到连接请求向客户端发出接收消息，这样一个连接就建立起来了。客户端和服务端也都可以相互发送消息与对方进行通讯，直到双方连接断开。&lt;/p&gt;
-
-&lt;p&gt;所以基于WebSocket和基于Socket都可以开发出IM社交聊天类的app&lt;/p&gt;
-
-&lt;h5 id=&quot;ioswebsocketsocket&quot;&gt;五.iOS平台有哪些WebSocket和Socket的开源框架&lt;/h5&gt;
-&lt;p&gt;Socket开源框架有：&lt;a href=&quot;https://github.com/robbiehanson/CocoaAsyncSocket&quot;&gt;CocoaAsync Socket&lt;/a&gt;，&lt;a href=&quot;https://github.com/socketio/socket.io-client-swift&quot;&gt;socketio/socket.io-client-swift&lt;/a&gt;
-WebSocket开源框架有:&lt;a href=&quot;https://github.com/facebook/SocketRocket&quot;&gt;facebook/Socket Rocket&lt;/a&gt;，&lt;a href=&quot;https://github.com/tidwall/SwiftWebSocket&quot;&gt;tidwall/SwiftWeb Socket &lt;/a&gt;&lt;/p&gt;
-
-&lt;h5 id=&quot;ioswebsocket&quot;&gt;六.iOS平台如何实现WebSocket协议&lt;/h5&gt;
-&lt;blockquote&gt;
-  &lt;p&gt;Talk is cheap。Show me the code ——Linus Torvalds&lt;/p&gt;
-&lt;/blockquote&gt;
-
-&lt;p&gt;我们今天来看看&lt;a href=&quot;https://github.com/facebook/SocketRocket&quot;&gt;facebook/Socket Rocket&lt;/a&gt;的实现方法
-首先这是SRWebSocket定义的一些成员变量&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;weak&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;id&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;SRWebSocketDelegate&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;delegate&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;cm&quot;&gt;/**
- A dispatch queue for scheduling the delegate calls. The queue doesn&#39;t need be a serial queue.
-
- If `nil` and `delegateOperationQueue` is `nil`, the socket uses main queue for performing all delegate method calls.
- */&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;strong&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;dispatch_queue_t&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;delegateDispatchQueue&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;cm&quot;&gt;/**
- An operation queue for scheduling the delegate calls.
-
- If `nil` and `delegateOperationQueue` is `nil`, the socket uses main queue for performing all delegate method calls.
- */&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;strong&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSOperationQueue&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;delegateOperationQueue&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;readonly&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;SRReadyState&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;readyState&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;readonly&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;retain&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSURL&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;readonly&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;CFHTTPMessageRef&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;receivedHTTPHeaders&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;// Optional array of cookies (NSHTTPCookie objects) to apply to the connections
-&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;copy&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSArray&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSHTTPCookie&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&amp;gt;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;requestCookies&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-
-&lt;span class=&quot;c1&quot;&gt;// This returns the negotiated protocol.
-// It will be nil until after the handshake completes.
-&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;readonly&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;copy&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;protocol&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;下面这些是SRWebSocket的一些方法&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-&lt;span class=&quot;c1&quot;&gt;// Protocols should be an array of strings that turn into Sec-WebSocket-Protocol.
-&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;instancetype&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;initWithURLRequest&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSURLRequest&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;request&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;instancetype&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;initWithURLRequest&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSURLRequest&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;request&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;protocols&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSArray&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&amp;gt;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;protocols&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;instancetype&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;initWithURLRequest&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSURLRequest&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;request&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;protocols&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSArray&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&amp;gt;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;protocols&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;allowsUntrustedSSLCertificates&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;BOOL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;allowsUntrustedSSLCertificates&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-
-&lt;span class=&quot;c1&quot;&gt;// Some helper constructors.
-&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;instancetype&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;initWithURL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSURL&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;instancetype&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;initWithURL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSURL&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;url&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;protocols&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSArray&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&amp;gt;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;protocols&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;instancetype&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;initWithURL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSURL&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;url&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;protocols&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSArray&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&amp;gt;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;protocols&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;allowsUntrustedSSLCertificates&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;BOOL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;allowsUntrustedSSLCertificates&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-
-&lt;span class=&quot;c1&quot;&gt;// By default, it will schedule itself on +[NSRunLoop SR_networkRunLoop] using defaultModes.
-&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;scheduleInRunLoop&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSRunLoop&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;aRunLoop&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;forMode&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;mode&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;unscheduleFromRunLoop&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSRunLoop&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;aRunLoop&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;forMode&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;mode&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-
-&lt;span class=&quot;c1&quot;&gt;// SRWebSockets are intended for one-time-use only.  Open should be called once and only once.
-&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;open&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;close&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;closeWithCode&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSInteger&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;code&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;reason&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;reason&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-
-&lt;span class=&quot;c1&quot;&gt;///--------------------------------------
-&lt;/span&gt;&lt;span class=&quot;cp&quot;&gt;#pragma mark Send
-&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;///--------------------------------------
-&lt;/span&gt;
-&lt;span class=&quot;c1&quot;&gt;//下面是4个发送的方法
-&lt;/span&gt;&lt;span class=&quot;cm&quot;&gt;/**
- Send a UTF-8 string or binary data to the server.
-
- @param message UTF-8 String or Data to send.
-
- @deprecated Please use `sendString:` or `sendData` instead.
- */&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;send&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;id&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;message&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;__attribute__&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;((&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;deprecated&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;Please use `sendString:` or `sendData` instead.&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)));&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;sendString&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;string&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;sendData&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSData&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;data&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;sendPing&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSData&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;data&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-
-&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;对应5种状态的代理方法&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;c1&quot;&gt;///--------------------------------------
-&lt;/span&gt;&lt;span class=&quot;cp&quot;&gt;#pragma mark - SRWebSocketDelegate
-&lt;/span&gt;&lt;span class=&quot;c1&quot;&gt;///--------------------------------------
-&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;@protocol&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;SRWebSocketDelegate&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSObject&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt;
-
-&lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;webSocket&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;SRWebSocket&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;webSocket&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;didReceiveMessage&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;id&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;message&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-
-&lt;span class=&quot;k&quot;&gt;@optional&lt;/span&gt;
-&lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;webSocketDidOpen&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;SRWebSocket&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;webSocket&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;webSocket&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;SRWebSocket&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;webSocket&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;didFailWithError&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSError&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;error&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;webSocket&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;SRWebSocket&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;webSocket&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;didCloseWithCode&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSInteger&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;code&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;reason&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;reason&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;wasClean&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;BOOL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;wasClean&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;webSocket&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;SRWebSocket&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;webSocket&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;didReceivePong&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSData&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;pongPayload&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-
-&lt;span class=&quot;c1&quot;&gt;// Return YES to convert messages sent as Text to an NSString. Return NO to skip NSData -&amp;gt; NSString conversion for Text messages. Defaults to YES.
-&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;BOOL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;webSocketShouldConvertTextFrameToString&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;SRWebSocket&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;webSocket&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;didReceiveMessage方法是必须实现的，用来接收消息的。
-下面4个did方法分别对应着Open，Fail，Close，ReceivePong不同状态的代理方法&lt;/p&gt;
-
-&lt;p&gt;方法就上面这些了，我们实际来看看代码怎么写&lt;/p&gt;
-
-&lt;p&gt;先是初始化Websocket连接，注意此处ws://或者wss://连接有且最多只能有一个，这个是Websocket协议规定的&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;    self.ws = [[SRWebSocket alloc] initWithURLRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:[NSString stringWithFormat:@&quot;%@://%@:%zd/ws&quot;, serverProto, serverIP, serverPort]]]];
-    self.ws.delegate = delegate;
-    [self.ws open];
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;发送消息&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;    [self.ws send:message];
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;接收消息以及其他3个代理方法&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;//这个就是接受消息的代理方法了，这里接受服务器返回的数据，方法里面就应该写处理数据，存储数据的方法了。
-- (void)webSocket:(SRWebSocket *)webSocket didReceiveMessage:(id)message
-{
-    NSDictionary *data = [NetworkUtils decodeData:message];
-    if (!data)
-        return;
-}
-
-//这里是Websocket刚刚Open之后的代理方法。就想微信刚刚连接中，会显示连接中，当连接上了，就不显示连接中了，取消显示连接的方法就应该写在这里面
-- (void)webSocketDidOpen:(SRWebSocket *)webSocket
-{
-    // Open = silent ping
-    [self.ws receivedPing];
-}
-
-//这是关闭Websocket的代理方法
-- (void)webSocket:(SRWebSocket *)webSocket didCloseWithCode:(NSInteger)code reason:(NSString *)reason wasClean:(BOOL)wasClean
-{
-    [self failedConnection:NSLS(Disconnected)];
-}
-
-//这里是连接Websocket失败的方法，这里面一般都会写重连的方法
-- (void)webSocket:(SRWebSocket *)webSocket didFailWithError:(NSError *)error
-{
-    [self failedConnection:NSLS(Disconnected)];
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h4 id=&quot;section-2&quot;&gt;最后&lt;/h4&gt;
-&lt;p&gt;以上就是我想分享的一些关于Websocket的心得，文中如果有错误的地方，欢迎大家指点！一般没有微信QQ那么大用户量的app，用Websocket应该都可以完成IM社交聊天的任务。当用户达到亿级别，应该还有很多需要优化，优化性能各种的吧。&lt;/p&gt;
-
-&lt;p&gt;最后，微信和QQ的实现方法也许并不是只用Websocket和Socket这么简单，也许是他们自己开发的一套能支持这么大用户，大数据的，各方面也都优化都最优的方法。如果有开发和微信和QQ的大神看到这篇文章，可以留言说说看你们用什么方式实现的，也可以和我们一起分享，我们一起学习！我先谢谢大神们的指点了！&lt;/p&gt;
-</description>
-        <pubDate>Sun, 15 May 2016 18:55:00 +0800</pubDate>
-        <link>http://vno.onevcat.com/2016/05/%E5%BE%AE%E4%BF%A1,QQ%E8%BF%99%E7%B1%BBIM-app%E6%80%8E%E4%B9%88%E5%81%9A-%E8%B0%88%E8%B0%88Websocket/</link>
-        <guid isPermaLink="true">http://vno.onevcat.com/2016/05/%E5%BE%AE%E4%BF%A1,QQ%E8%BF%99%E7%B1%BBIM-app%E6%80%8E%E4%B9%88%E5%81%9A-%E8%B0%88%E8%B0%88Websocket/</guid>
-        
-        <category>iOS</category>
-        
-        
-        <category>iOS</category>
-        
-      </item>
-    
-      <item>
-        <title>iOS Core Data 数据迁移 指南</title>
-        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-4e1295f1f4cd4d75.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;h4 id=&quot;section&quot;&gt;前言&lt;/h4&gt;
-&lt;p&gt;Core Data是iOS上一个效率比较高的数据库框架，(但是Core Data并不是一种数据库，它底层还是利用Sqlite3来存储数据的)，它可以把数据当成对象来操作，而且开发者并不需要在乎数据在磁盘上面的存储方式。它会把位于NSManagedObject Context里面的托管对象NSManagedObject类的实例或者某个NSManagedObject子类的实例，通过NSManagedObjectModel托管对象模型，把托管对象保存到持久化存储协调器NSPersistentStoreCoordinator持有的一个或者多个持久化存储区中NSPersistentStore中。使用Core Data进行查询的语句都是经过Apple特别优化过的，所以都是效率很高的查询。&lt;/p&gt;
-
-&lt;p&gt;当你进行简单的设定，比如说设定某个实体的默认值，设定级联删除的操作，设定数据的验证规则，使用数据的请求模板，这些修改Core Data都会自己完成，不用自己进行数据迁移。那那些操作需要我们进行数据迁移呢？凡是会引起NSManagedObjectModel托管对象模型变化的，都最好进行数据迁移，防止用户升级应用之后就闪退。会引起NSManagedObjectModel托管对象模型变化的有以下几个操作，新增了一张表，新增了一张表里面的一个实体，新增一个实体的一个属性，把一个实体的某个属性迁移到另外一个实体的某个属性里面…………大家应该现在都知道哪些操作需要进行数据迁移了吧。&lt;/p&gt;
-
-&lt;h4 id=&quot;section-1&quot;&gt;小技巧：&lt;/h4&gt;
-&lt;p&gt;进入正题之前，我先说3个调试Core Data里面调试可能你会需要的操作。&lt;/p&gt;
-
-&lt;p&gt;1.一般打开app沙盒里面的会有三种类型的文件，sqlite，sqlite-shm,sqlite-wal,后面2者是iOS7之后系统会默认开启一个新的“数据库日志记录模式”(database journaling mode)生成的，sqlite-shm是共享内存(Shared Memory)文件，该文件里面会包含一份sqlite-wal文件的索引，系统会自动生成shm文件，所以删除它，下次运行还会生成。sqlite-wal是预写式日志(Write-Ahead Log)文件，这个文件里面会包含尚未提交的数据库事务，所以看见有这个文件了，就代表数据库里面还有还没有处理完的事务需要提交，所以说如果有sqlite-wal文件，再去打开sqlite文件，很可能最近一次数据库操作还没有执行。&lt;/p&gt;
-
-&lt;p&gt;所以在调试的时候，我们需要即时的观察数据库的变化，我们就可以先禁用这个日志记录模式，只需要在建立持久化存储区的时候存入一个参数即可。具体代码如下&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;    NSDictionary *options =
-    @{
-          NSSQLitePragmasOption: @{@&quot;journal_mode&quot;: @&quot;DELETE&quot;}
-     };
-    
-    NSError *error = nil;
-    _store = [_coordinator addPersistentStoreWithType:NSSQLiteStoreType
-                                        configuration:nil
-                                                  URL:[self storeURL]
-                                              options:options error:&amp;amp;error];
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;2.Mac上打开数据库的方式很多，我推荐3个，一个是Firefox里面直接有sqlite的插件，免费的，可以直接安装，也很方便。当然也有不用Firefox的朋友，就像我是Chrome重度使用者，那就推荐2个免费的小的app，一个是sqlitebrowser，一个是sqlite manager，这2个都比较轻量级，都比较好用。&lt;/p&gt;
-
-&lt;p&gt;3.如果你想看看Core Data到底底层是如何优化你的查询语句的，这里有一个方法可以看到。&lt;/p&gt;
-
-&lt;p&gt;先点击Product -&amp;gt;Scheme -&amp;gt;Edit Scheme
-&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-d786cef528c3cfea.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;然后再切换到Arguments分页中,在Arguments Passed On Launch里面加入 “- com.apple.CoreData.SQLDebug 3”,重新运行app，下面就会显示Core Data优化过的Sql语句了。
-&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-7b48361d04265a5c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;好了，调试信息应该都可以完美显示了，可以开始愉快的进入正文了！&lt;/p&gt;
-
-&lt;h4 id=&quot;core-data&quot;&gt;一.Core Data自带的轻量级的数据迁移&lt;/h4&gt;
-&lt;p&gt;这种迁移可别小看它，在你新建一张表的时候还必须加上它才行，否则会出现如下的错误，&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;**Failed to add store. Error: Error Domain=NSCocoaErrorDomain Code=134100 &quot;(null)&quot; UserInfo={metadata={**
-**    NSPersistenceFrameworkVersion = 641;**
-**    NSStoreModelVersionHashes =     {**
-**        Item = &amp;lt;64288772 72e62096 a8a4914f 83db23c9 13718f81 4417e297 293d0267 79b04acb&amp;gt;;**
-**        Measurement = &amp;lt;35717f0e 32cae0d4 57325758 58ed0d11 c16563f2 567dac35 de63d5d8 47849cf7&amp;gt;;**
-**    };**
-**    NSStoreModelVersionHashesVersion = 3;**
-**    NSStoreModelVersionIdentifiers =     (**
-**        &quot;&quot;**
-**    );**
-**    NSStoreType = SQLite;**
-**    NSStoreUUID = &quot;9A16746E-0C61-421B-B936-412F0C904FDF&quot;;**
-**    &quot;_NSAutoVacuumLevel&quot; = 2;**
-**}, reason=The model used to open the store is incompatible with the one used to create the store}**
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;错误原因写的比较清楚了，reason=The model used to open the store is incompatible with the one used to create the store，这个是因为我新建了一张表，但是我没有打开轻量级的迁移Option。这里会有人会问了，我新建表从来没有出现这个错误啊？那是因为你们用的第三方框架就已经写好了改Option了。(场外人:这年头谁还自己从0开始写Core Data啊，肯定都用第三方框架啊)那这里我就当讲解原理了哈。如果是自己从0开始写的Core Data的话，这里是应该会报错了，解决办法当然是加上代码，利用Core Data的轻量级迁移，来防止这种找不到存储区的闪退问题&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-NSDictionary *options =
-    @{
-      NSSQLitePragmasOption: @{@&quot;journal_mode&quot;: @&quot;DELETE&quot;},
-      NSMigratePersistentStoresAutomaticallyOption :@YES,
-      NSInferMappingModelAutomaticallyOption:@YES
-    };
-    
-    NSError *error = nil;
-    _store = [_coordinator addPersistentStoreWithType:NSSQLiteStoreType
-                                        configuration:nil
-                                                  URL:[self storeURL]
-                                              options:options error:&amp;amp;error];
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;这里说一下新增加的2个参数的意义：&lt;br /&gt;
-NSMigratePersistentStoresAutomaticallyOption = YES，那么Core Data会试着把之前低版本的出现不兼容的持久化存储区迁移到新的模型中，这里的例子里，Core Data就能识别出是新表，就会新建出新表的存储区来，上面就不会报上面的error了。&lt;/p&gt;
-
-&lt;p&gt;NSInferMappingModelAutomaticallyOption = YES,这个参数的意义是Core Data会根据自己认为最合理的方式去尝试MappingModel，从源模型实体的某个属性，映射到目标模型实体的某个属性。&lt;/p&gt;
-
-&lt;p&gt;接着我们来看看MagicRecord源码是怎么写的，所以大家才能执行一些操作不会出现我上面说的闪退的问题&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-+ (NSDictionary *) MR_autoMigrationOptions;
-{
-    // Adding the journalling mode recommended by apple
-    NSMutableDictionary *sqliteOptions = [NSMutableDictionary dictionary];
-    [sqliteOptions setObject:@&quot;WAL&quot; forKey:@&quot;journal_mode&quot;];
-    
-    NSDictionary *options = [NSDictionary dictionaryWithObjectsAndKeys:
-                             [NSNumber numberWithBool:YES], NSMigratePersistentStoresAutomaticallyOption,
-                             [NSNumber numberWithBool:YES], NSInferMappingModelAutomaticallyOption,
-                             sqliteOptions, NSSQLitePragmasOption,
-                             nil];
-    return options;
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;上面这一段就是MagicRecord源码里面替大家加的Core Data轻量级的数据迁移的保护了，所以大家不写那2个参数，一样不会报错。(题外话：MagicRecord默认这里是开启了WAL日志记录模式了)  此处如果大家注销掉那两个参数，或者把参数的值设置为NO，再运行一次，新建一张表，就会出现我上面提到的错误了。大家可以实践实践，毕竟实践出真知嘛。&lt;/p&gt;
-
-&lt;p&gt;只要打开上面2个参数，Core Data就会执行自己的轻量级迁移了，当然，在实体属性迁移时候，用该方式不靠谱，之前我觉得它肯定能推断出来，结果后来还是更新后直接闪退报错了，可能是因为表结构太复杂，超过了它简单推断的能力范围了，所以我建议，在进行复杂的实体属性迁移到另一个属性迁移的时候，不要太相信这种方式，还是最好自己Mapping一次。当然，你要是新建一张表的时候，这2个参数是必须要加上的！！！&lt;/p&gt;
-
-&lt;h4 id=&quot;core-datamapping&quot;&gt;二.Core Data手动创建Mapping文件进行迁移&lt;/h4&gt;
-&lt;p&gt;这种方式比前一种方式要更加精细一些，Mapping文件会指定哪个实体的某个属性迁移到哪个实体的某个属性，这比第一种交给Core Data自己去推断要靠谱一些，这种方法直接指定映射！ &lt;br /&gt;
-先说一下，如果复杂的迁移，不加入这个Mapping文件会出现什么样的错误&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-**Failed to add store. Error: Error Domain=NSCocoaErrorDomain Code=134140 &quot;(null)&quot; UserInfo={destinationModel=(&amp;lt;NSManagedObjectModel: 0x7f82d4935280&amp;gt;) isEditable 0, entities {**
-**    Amount = &quot;(&amp;lt;NSEntityDescription: 0x7f82d4931960&amp;gt;) name Amount, managedObjectClassName NSManagedObject, renamingIdentifier Amount, isAbstract 0, superentity name (null), properties {\n    qwe = \&quot;(&amp;lt;NSAttributeDescription: 0x7f82d4930f40&amp;gt;), name qwe, isOptional 1, isTransient 0, entity Amount, renamingIdentifier qwe, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 700 , attributeValueClassName NSString, defaultValue (null)\&quot;;\n}, subentities {\n}, userInfo {\n}, versionHashModifier (null), uniquenessConstraints (\n)&quot;;**
-**    Item = &quot;(&amp;lt;NSEntityDescription: 0x7f82d4931a10&amp;gt;) name Item, managedObjectClassName Item, renamingIdentifier Item, isAbstract 0, superentity name (null), properties {\n    collected = \&quot;(&amp;lt;NSAttributeDescription: 0x7f82d4930fd0&amp;gt;), name collected, isOptional 1, isTransient 0, entity Item, renamingIdentifier collected, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 800 , attributeValueClassName NSNumber, defaultValue 0\&quot;;\n    listed = \&quot;(&amp;lt;NSAttributeDescription: 0x7f82d4931060&amp;gt;), name listed, isOptional 1, isTransient 0, entity Item, renamingIdentifier listed, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 800 , attributeValueClassName NSNumber, defaultValue 1\&quot;;\n    name = \&quot;(&amp;lt;NSAttributeDescription: 0x7f82d49310f0&amp;gt;), name name, isOptional 1, isTransient 0, entity Item, renamingIdentifier name, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 700 , attributeValueClassName NSString, defaultValue New Item\&quot;;\n    photoData = \&quot;(&amp;lt;NSAttributeDescription: 0x7f82d4931180&amp;gt;), name photoData, isOptional 1, isTransient 0, entity Item, renamingIdentifier photoData, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 1000 , attributeValueClassName NSData, defaultValue (null)\&quot;;\n    quantity = \&quot;(&amp;lt;NSAttributeDescription: 0x7f82d4931210&amp;gt;), name quantity, isOptional 1, isTransient 0, entity Item, renamingIdentifier quantity, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 600 , attributeValueClassName NSNumber, defaultValue 1\&quot;;\n}, subentities {\n}, userInfo {\n}, versionHashModifier (null), uniquenessConstraints (\n)&quot;;**
-**}, fetch request templates {**
-**    Test = &quot;&amp;lt;NSFetchRequest: 0x7f82d49316c0&amp;gt; (entity: Item; predicate: (name CONTAINS \&quot;e\&quot;); sortDescriptors: ((null)); type: NSManagedObjectResultType; )&quot;;**
-**}, sourceModel=(&amp;lt;NSManagedObjectModel: 0x7f82d488e930&amp;gt;) isEditable 1, entities {**
-**    Amount = &quot;(&amp;lt;NSEntityDescription: 0x7f82d488f880&amp;gt;) name Amount, managedObjectClassName NSManagedObject, renamingIdentifier Amount, isAbstract 0, superentity name (null), properties {\n    abc = \&quot;(&amp;lt;NSAttributeDescription: 0x7f82d488f9d0&amp;gt;), name abc, isOptional 1, isTransient 0, entity Amount, renamingIdentifier abc, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 700 , attributeValueClassName NSString, defaultValue (null)\&quot;;\n}, subentities {\n}, userInfo {\n}, versionHashModifier (null), uniquenessConstraints (\n)&quot;;**
-**    Item = &quot;(&amp;lt;NSEntityDescription: 0x7f82d488fbe0&amp;gt;) name Item, managedObjectClassName NSManagedObject, renamingIdentifier Item, isAbstract 0, superentity name (null), properties {\n    collected = \&quot;(&amp;lt;NSAttributeDescription: 0x7f82d48901c0&amp;gt;), name collected, isOptional 1, isTransient 0, entity Item, renamingIdentifier collected, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 800 , attributeValueClassName NSNumber, defaultValue 0\&quot;;\n    listed = \&quot;(&amp;lt;NSAttributeDescription: 0x7f82d488fd20&amp;gt;), name listed, isOptional 1, isTransient 0, entity Item, renamingIdentifier listed, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 800 , attributeValueClassName NSNumber, defaultValue 1\&quot;;\n    name = \&quot;(&amp;lt;NSAttributeDescription: 0x7f82d488fdb0&amp;gt;), name name, isOptional 1, isTransient 0, entity Item, renamingIdentifier name, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 700 , attributeValueClassName NSString, defaultValue New Item\&quot;;\n    photoData = \&quot;(&amp;lt;NSAttributeDescription: 0x7f82d488fad0&amp;gt;), name photoData, isOptional 1, isTransient 0, entity Item, renamingIdentifier photoData, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 1000 , attributeValueClassName NSData, defaultValue (null)\&quot;;\n    quantity = \&quot;(&amp;lt;NSAttributeDescription: 0x7f82d488fc90&amp;gt;), name quantity, isOptional 1, isTransient 0, entity Item, renamingIdentifier quantity, validation predicates (\\n), warnings (\\n), versionHashModifier (null)\\n userInfo {\\n}, attributeType 600 , attributeValueClassName NSNumber, defaultValue 1\&quot;;\n}, subentities {\n}, userInfo {\n}, versionHashModifier (null), uniquenessConstraints (\n)&quot;;**
-**}, fetch request templates {**
-**    Test = &quot;&amp;lt;NSFetchRequest: 0x7f82d488fa60&amp;gt; (entity: Item; predicate: (name CONTAINS \&quot;e\&quot;); sortDescriptors: ((null)); type: NSManagedObjectResultType; )&quot;;**
-**}, reason=Can&#39;t find mapping model for migration}**
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;直接看最后一行错误的原因Can’t find mapping model for migration，这直接说出了错误的原因，那么接下来我们就创建一个Mapping Model文件。&lt;/p&gt;
-
-&lt;p&gt;在你xcdatamodeld相同的文件夹目录下，“New File” -&amp;gt;”Core Data”-&amp;gt;”Mapping Model”&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-cafd6005b2d41601.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;选择需要Mapping的源数据库
-&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-039eeb0ebb70af99.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;再选择目标数据库&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-bf99eb848bf7397f.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
-接着命名一下Mapping Model文件的名字&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-302f517320b14f37.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
-这里说明一下，名字最好能一眼看上去就能区分出是哪个数据库的版本升级上来的，这里我写的就是ModelV4ToV5，这样一看就知道是V4到V5的升级。&lt;/p&gt;
-
-&lt;p&gt;这里说明一下Mapping文件的重要性，首先，每个版本的数据库之间都最好能加上一个Mapping文件，这样从低版本的数据库升级上来，可以保证每个版本都不会出错，都不会导致用户升级之后就出现闪退的问题。&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-5f8fc071ece9ce46.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;比如上图，每个数据库之间都会对应一个Mapping文件，V0ToV1,V1ToV2,V2ToV3,V3ToV4,V4ToV5,每个Mapping都必须要。&lt;/p&gt;
-
-&lt;p&gt;试想，如果用户实在V3的老版本上，由于appstore的更新规则，每次更新都直接更新到最新，那么用户更新之后就会直接到V5，如果缺少了中间的V3ToV4,V4ToV5，中的任意一个，那么V3的用户都无法升级到V5上来，都会闪退。所以这里就看出了每个版本之间都要加上Mapping文件的重要性了。这样任意低版本的用户，任何时刻都可以通过Mapping文件，随意升级到最新版，而且不会闪退了！&lt;/p&gt;
-
-&lt;p&gt;接下来再说说Mapping文件打开是些什么东西。&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-1a6b8a6d7c7aacff.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;Mapping文件打开对应的就是Source源实体属性，迁移到Target目标实体属性的映射，上面是属性，下面是关系的映射。$source就是代表的源实体&lt;/p&gt;
-
-&lt;p&gt;写到这里，就可以很清楚的区分一下到目前为止，Core Data轻量级迁移和手动创建Mapping进行迁移，这2种方法的异同点了。我简单总结一下：
-1.Core Data轻量级迁移是适用于添加新表，添加新的实体，添加新的实体属性，等简单的，系统能自己推断出来的迁移方式。
-2.手动创建Mapping适用于更加复杂的数据迁移&lt;/p&gt;
-
-&lt;p&gt;举个例子吧，假设我最初有一张很抽象的表，叫Object表，用来存储东西的一些属性，里面假设有name，width，height。突然我有一天有新需求了，需要在Object表里面新增几个字段，比如说colour，weight等，由于这个都是简单的新增，不涉及到数据的转移，这时候用轻量级迁移就可以了。&lt;/p&gt;
-
-&lt;p&gt;不过突然有一个程序又有新需求了，需要增加2张表，一个是Human表，一个是Animal表，需要把当初抽象定义的Object表更加具体化。这时就需要把Object里面的人都抽出来，放到新建的Human表里，动物也都抽出来放到新建的Animal表里。由于新建的2张表都会有name属性，如果这个时候进行轻量级的迁移，系统可能推断不出到底哪些name要到Human表里，哪里要Animal表了。再者，还有一些属性在Human表里面有，在Animal表里面没有。这是时候就必须手动添加一个Mapping Model文件了，手动指定哪些属性是源实体的属性，应该映射到目标实体的哪个属性上面去。这种更加精细的迁移方式，就只能用手动添加Mapping Model来完成了，毕竟iOS系统不知道你的需求和想法。&lt;/p&gt;
-
-&lt;h4 id=&quot;section-2&quot;&gt;三.通过代码实现数据迁移&lt;/h4&gt;
-&lt;p&gt;这个通过代码进行迁移主要是在数据迁移过程中，如果你还想做一些什么其他事情，比如说你想清理一下垃圾数据，实时展示数据迁移的进度，等等，那就需要在这里来实现了。&lt;/p&gt;
-
-&lt;p&gt;首先，我们需要检查一下该存储区存不存在，再把存储区里面的model metadata进行比较，检查一下是否兼容，如果不能兼容，那么就需要我们进行数据迁移了。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;- (BOOL)isMigrationNecessaryForStore:(NSURL*)storeUrl
-{
-    NSLog(@&quot;Running %@ &#39;%@&#39;&quot;, self.class, NSStringFromSelector(_cmd));
-    
-    if (![[NSFileManager defaultManager] fileExistsAtPath:[self storeURL].path])
-    {
-        NSLog(@&quot;SKIPPED MIGRATION: Source database missing.&quot;);
-        return NO;
-    }
-    
-    NSError *error = nil;
-    NSDictionary *sourceMetadata =
-    [NSPersistentStoreCoordinator metadataForPersistentStoreOfType:NSSQLiteStoreType
-                                                               URL:storeUrl error:&amp;amp;error];
-    NSManagedObjectModel *destinationModel = _coordinator.managedObjectModel;
-    
-    if ([destinationModel isConfiguration:nil compatibleWithStoreMetadata:sourceMetadata])
-    {
-        NSLog(@&quot;SKIPPED MIGRATION: Source is already compatible&quot;);
-        return NO;
-    }
-    
-    return YES;
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;当上面函数返回YES，我们就需要合并了，那接下来就是下面的函数了&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;- (BOOL)migrateStore:(NSURL*)sourceStore {
-    
-    NSLog(@&quot;Running %@ &#39;%@&#39;&quot;, self.class, NSStringFromSelector(_cmd));
-    BOOL success = NO;
-    NSError *error = nil;
-    
-    // STEP 1 - 收集 Source源实体, Destination目标实体 和 Mapping Model文件
-    NSDictionary *sourceMetadata = [NSPersistentStoreCoordinator
-                                    metadataForPersistentStoreOfType:NSSQLiteStoreType
-                                    URL:sourceStore
-                                    error:&amp;amp;error];
-    
-    NSManagedObjectModel *sourceModel =
-    [NSManagedObjectModel mergedModelFromBundles:nil
-                                forStoreMetadata:sourceMetadata];
-    
-    NSManagedObjectModel *destinModel = _model;
-    
-    NSMappingModel *mappingModel =
-    [NSMappingModel mappingModelFromBundles:nil
-                             forSourceModel:sourceModel
-                           destinationModel:destinModel];
-    
-    // STEP 2 - 开始执行 migration合并, 前提是 mapping model 不是空，或者存在
-    if (mappingModel) {
-        NSError *error = nil;
-        NSMigrationManager *migrationManager =
-        [[NSMigrationManager alloc] initWithSourceModel:sourceModel
-                                       destinationModel:destinModel];
-        [migrationManager addObserver:self
-                           forKeyPath:@&quot;migrationProgress&quot;
-                              options:NSKeyValueObservingOptionNew
-                              context:NULL];
-        
-        NSURL *destinStore =
-        [[self applicationStoresDirectory]
-         URLByAppendingPathComponent:@&quot;Temp.sqlite&quot;];
-        
-        success =
-        [migrationManager migrateStoreFromURL:sourceStore
-                                         type:NSSQLiteStoreType options:nil
-                             withMappingModel:mappingModel
-                             toDestinationURL:destinStore
-                              destinationType:NSSQLiteStoreType
-                           destinationOptions:nil
-                                        error:&amp;amp;error];
-        if (success)
-        {
-            // STEP 3 - 用新的migrated store替换老的store
-            if ([self replaceStore:sourceStore withStore:destinStore])
-            {
-                NSLog(@&quot;SUCCESSFULLY MIGRATED %@ to the Current Model&quot;,
-                          sourceStore.path);
-                [migrationManager removeObserver:self
-                                      forKeyPath:@&quot;migrationProgress&quot;];
-            }
-        }
-        else
-        {
-            NSLog(@&quot;FAILED MIGRATION: %@&quot;,error);
-        }
-    }
-    else
-    {
-        NSLog(@&quot;FAILED MIGRATION: Mapping Model is null&quot;);
-    }
-    
-    return YES; // migration已经完成
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;上面的函数中，如果迁移进度有变化，会通过观察者，observeValueForKeyPath来告诉用户进度，这里可以监听该进度，如果没有完成，可以来禁止用户执行某些操作&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-- (void)observeValueForKeyPath:(NSString *)keyPath
-                      ofObject:(id)object
-                        change:(NSDictionary *)change
-                       context:(void *)context {
-    
-    if ([keyPath isEqualToString:@&quot;migrationProgress&quot;]) {
-        
-        dispatch_async(dispatch_get_main_queue(), ^{
-            
-            float progress =
-            [[change objectForKey:NSKeyValueChangeNewKey] floatValue];
-          
-            int percentage = progress * 100;
-            NSString *string =
-            [NSString stringWithFormat:@&quot;Migration Progress: %i%%&quot;,
-             percentage];
-            NSLog(@&quot;%@&quot;,string);
-
-        });
-    }
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;当然，这个合并数据迁移的操作肯定是用一个多线程异步的执行，免得造成用户界面卡顿，再加入下面的方法，我们来异步执行&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-- (void)performBackgroundManagedMigrationForStore:(NSURL*)storeURL
-{
-    NSLog(@&quot;Running %@ &#39;%@&#39;&quot;, self.class, NSStringFromSelector(_cmd));
-    
-    dispatch_async(
-                   dispatch_get_global_queue( DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0), ^{
-                       BOOL done = [self migrateStore:storeURL];
-                       if(done) {
-                           dispatch_async(dispatch_get_main_queue(), ^{
-                               NSError *error = nil;
-                               _store =
-                               [_coordinator addPersistentStoreWithType:NSSQLiteStoreType
-                                                          configuration:nil
-                                                                    URL:[self storeURL]
-                                                                options:nil
-                                                                  error:&amp;amp;error];
-                               if (!_store) {
-                                   NSLog(@&quot;Failed to add a migrated store. Error: %@&quot;,
-                                         error);abort();}
-                               else {
-                                   NSLog(@&quot;Successfully added a migrated store: %@&quot;,
-                                         _store);}
-                           });
-                       }
-                   });
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;到这里，数据迁移都完成了，不过目前还有一个问题就是，我们应该何时去执行该迁移的操作，更新完毕之后？appDelegate一进来？都不好，最好的方法还是在把当前存储区添加到coordinator之前，我们就执行好数据迁移！&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;- (void)loadStore
-{
-    NSLog(@&quot;Running %@ &#39;%@&#39;&quot;, self.class, NSStringFromSelector(_cmd));
-    
-    if (_store) {return;} // 不要再次加载了，因为已经加载过了
-    
-    BOOL useMigrationManager = NO;
-    if (useMigrationManager &amp;amp;&amp;amp;
-        [self isMigrationNecessaryForStore:[self storeURL]])
-    {
-        [self performBackgroundManagedMigrationForStore:[self storeURL]];
-    }
-    else
-    {
-        NSDictionary *options =
-        @{
-          NSMigratePersistentStoresAutomaticallyOption:@YES
-          ,NSInferMappingModelAutomaticallyOption:@YES
-          ,NSSQLitePragmasOption: @{@&quot;journal_mode&quot;: @&quot;DELETE&quot;}
-          };
-        NSError *error = nil;
-        _store = [_coordinator addPersistentStoreWithType:NSSQLiteStoreType
-                                            configuration:nil
-                                                      URL:[self storeURL]
-                                                  options:options
-                                                    error:&amp;amp;error];
-        if (!_store)
-        {
-            NSLog(@&quot;Failed to add store. Error: %@&quot;, error);abort();
-        }
-        else
-        {
-            NSLog(@&quot;Successfully added store: %@&quot;, _store);
-        }
-    }
-
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;这样就完成了数据迁移了，并且还能显示出迁移进度，在迁移中还可以自定义一些操作，比如说清理垃圾数据，删除一些不用的表，等等。&lt;/p&gt;
-
-&lt;h4 id=&quot;section-3&quot;&gt;结束&lt;/h4&gt;
-&lt;p&gt;好了，到此，Core Data数据迁移的几种方式我就和大家分享完了，如果文中有不对的地方，欢迎大家提出来，我们一起交流进步！&lt;/p&gt;
-</description>
-        <pubDate>Mon, 09 May 2016 00:35:00 +0800</pubDate>
-        <link>http://vno.onevcat.com/2016/05/iOS-Core-Data-%E6%95%B0%E6%8D%AE%E8%BF%81%E7%A7%BB-%E6%8C%87%E5%8D%97/</link>
-        <guid isPermaLink="true">http://vno.onevcat.com/2016/05/iOS-Core-Data-%E6%95%B0%E6%8D%AE%E8%BF%81%E7%A7%BB-%E6%8C%87%E5%8D%97/</guid>
         
         <category>iOS</category>
         

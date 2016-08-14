@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <title>关于IB_DESIGNABLE / IBInspectable的那些需要注意的事</title>
+  <meta name="description" content="">
+  <meta name="author" content="Wei Wang">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="关于IB_DESIGNABLE / IBInspectable的那些需要注意的事">
+  <meta name="twitter:description" content="">
+
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="关于IB_DESIGNABLE / IBInspectable的那些需要注意的事">
+  <meta property="og:description" content="">
+
+  <link rel="icon" type="image/ico" href="/assets/images/favicon.ico" />
+  <link href="/assets/images/favicon.ico" rel="shortcut icon" type="image/ico">
+
+  <link rel="stylesheet" href="/css/main.css">
+  <link href="//netdna.bootstrapcdn.com/font-awesome/4.6.0/css/font-awesome.min.css" rel="stylesheet">
+
+  <link rel="canonical" href="http://vno.onevcat.com/2016/07/%E5%85%B3%E4%BA%8EIB_DESIGNABLE-IBInspectable%E7%9A%84%E9%82%A3%E4%BA%9B%E9%9C%80%E8%A6%81%E6%B3%A8%E6%84%8F%E7%9A%84%E4%BA%8B/">
+  <link rel="alternate" type="application/rss+xml" title="Halfrost's Field | 冰霜之地" href="http://vno.onevcat.com/feed.xml">
+
+  <meta name="google-site-verification" content="1-1ZlHoRvM0T2FqPbW2S-qLgYXN6rsn52kErlMPd_gw" />
+</head>
+
+
+  <body>
+
+    <span class="mobile btn-mobile-menu">
+        <i class="fa fa-list btn-mobile-menu__icon"></i>
+        <i class="fa fa-angle-up btn-mobile-close__icon hidden"></i>
+    </span>
+    
+    <header class="panel-cover panel-cover--collapsed" style="background-image: url('/assets/images/background-cover.jpg')">
+  <div class="panel-main">
+
+    <div class="panel-main__inner panel-inverted">
+    <div class="panel-main__content">
+
+        <a href="/#blog" title="前往 Halfrost's Field | 冰霜之地 的主页" class="blog-button"><img src="/assets/images/avatar.jpg" width="80" alt="Halfrost's Field | 冰霜之地 logo" class="panel-cover__logo logo" /></a>
+        <h1 class="panel-cover__title panel-title"><a href="/#blog" title="link to homepage for Halfrost's Field | 冰霜之地" class="blog-button">Halfrost's Field | 冰霜之地</a></h1>
+        
+        <span class="panel-cover__subtitle panel-subtitle">一缕殇流化隐半边冰霜</span>
+        
+        <hr class="panel-cover__divider" />
+        <p class="panel-cover__description">嗨，我是于德志 (@halfrost)，一名来自中国的 iOS 开发者，已退役 acmer 。现居上海。吾笃信：德不孤，必有志，技不疏，必有朋。</p>
+        <hr class="panel-cover__divider panel-cover__divider--secondary" />
+
+        
+
+        <div class="navigation-wrapper">
+          <div>
+            <nav class="cover-navigation cover-navigation--primary">
+              <ul class="navigation">
+
+                  
+
+                <li class="navigation__item"><a href="/" title="Home" class="home-button">首页</a></li>
+                <li class="navigation__item"><a href="/#blog" title="Visit blog" class="blog-button">博客</a></li>
+                
+                  <li class="navigation__item"><a href="http://about.halfrost.com" target="_blank" title="About">关于</a></li>
+                
+              </ul>
+            </nav>
+          </div>
+
+          <div><nav class="cover-navigation navigation--social">
+  <ul class="navigation">
+
+    
+    <!-- jianshu-->
+    <li class="navigation__item">
+      <a href="http://jianshu.com/users/12201cdd5d7a/latest_articles" title="@halfrost 的简书" target="_blank">
+        <i class='social fa fa-book'></i>
+        <span class="label">jianshu</span>
+      </a>
+    </li>
+    
+
+    
+    <!-- juejin-->
+    <li class="navigation__item">
+      <a href="http://gold.xitu.io/user/5692e1e000b09aa2e8dcd422" title="@halfrost 的稀土掘金" target="_blank">
+        <i class='social fa fa-forumbee'></i>
+        <span class="label">juejin</span>
+      </a>
+    </li>
+    
+
+  
+  <!-- Weibo -->
+  <li class="navigation__item">
+    <a href="http://weibo.com/halfrost" title="@halfrost 的微博" target="_blank">
+      <i class='social fa fa-weibo'></i>
+      <span class="label">Weibo</span>
+    </a>
+  </li>
+  
+
+  
+  <!-- Github -->
+  <li class="navigation__item">
+    <a href="https://github.com/halfrost" title="@halfrost 的 Github" target="_blank">
+      <i class='social fa fa-github'></i>
+      <span class="label">Github</span>
+    </a>
+  </li>
+  
+
+  
+
+  
+
+  <!-- RSS -->
+  <li class="navigation__item">
+    <a href="/feed.xml" rel="author" title="RSS" target="_blank">
+      <i class='social fa fa-rss'></i>
+      <span class="label">RSS</span>
+    </a>
+  </li>
+
+  
+  <!-- Email -->
+  <li class="navigation__item">
+    <a href="mailto:ydz627@gamil.com" title="Contact me">
+      <i class='social fa fa-envelope'></i>
+      <span class="label">Email</span>
+    </a>
+  </li>
+  
+
+  </ul>
+</nav>
+</div>
+        </div>
+      </div>
+    </div>
+
+    
+    <div class="panel-cover--overlay cover-black"></div>
+    
+  </div>
+</header>
+
+
+    <div class="content-wrapper">
+        <div class="content-wrapper__inner">
+            <article class="post-container post-container--single" itemscope itemtype="http://schema.org/BlogPosting">
+  <header class="post-header">
+    <div class="post-meta">
+      <time datetime="2016-07-22 21:13:00 +0800" itemprop="datePublished" class="post-meta__date date">2016-07-22</time> &#8226; <span class="post-meta__tags tags">iOS</span>
+    </div>
+    <h1 class="post-title">关于IB_DESIGNABLE / IBInspectable的那些需要注意的事</h1>
+  </header>
+
+  <section class="post">
+    <p><img src="http://upload-images.jianshu.io/upload_images/1194012-0c431c95e1f76510.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<h4 id="section">前言</h4>
+
+<p>IB_DESIGNABLE / IBInspectable 这两个关键字是在WWDC 2014年”What’s New in Interface Builder”这个Session里面，用Swift讲过一个例子。也是随着Xcode 6 新加入的关键字。</p>
+
+<p>这两个关键字是用在我们自定义View上的，<strong>目前暂时只能用在UIView的子类中</strong>所以系统自带的原生的那些控件使用这个关键字都没有效果。</p>
+
+<blockquote>
+  <p>Live RenderingYou can use two different attributes—@IBDesignable and @IBInspectable—to enable live, interactive custom view design in Interface Builder. When you create a custom view that inherits from the UIView class or the NSView class, you can add the @IBDesignable attribute just before the class declaration. After you add the custom view to Interface Builder (by setting the custom class of the view in the inspector pane), Interface Builder renders your view in the canvas.You can also add the @IBInspectable attribute to properties with types compatible with user defined runtime attributes. After you add your custom view to Interface Builder, you can edit these properties in the inspector.</p>
+</blockquote>
+
+<p>其大意就是说，“所见即所得”的思想，我们可以将自定义的代码实时渲染到Interface Builder中。而它们之间的桥梁就是通过两个指令来完成，即@IBDesignable和@IBInspectable。我们通过@IBDesignable告诉Interface Builder这个类可以实时渲染到界面中，无论我们drawRect里面多么复杂，自定义有多复杂，Xib / Storyboard都可以把它编译出来，并且渲染展示出来。但是这个类必须是UIView或者NSView的子类。通过@IBInspectable可以定义动态属性，即可在Attributes inspector面板中可视化修改属性值。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code> @IBInspectable var integer: Int = 0
+ @IBInspectable var float: CGFloat = 0
+ @IBInspectable var double: Double = 0
+ @IBInspectable var point: CGPoint = CGPointZero
+ @IBInspectable var size: CGSize = CGSizeZero
+ @IBInspectable var customFrame: CGRect = CGRectZero
+ @IBInspectable var color: UIColor = UIColor.clearColor()
+ @IBInspectable var string: String = ""
+ @IBInspectable var bool: Bool = false
+</code></pre>
+</div>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-19b37e597b722379.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<p>这两个关键字不是今天的重点，看个Demo就会使用了。
+<a href="https://github.com/halfrost/CircleSlider">Demo地址</a></p>
+
+<p>如果想看Session的话，可以看这两个WWDC 2014的链接<br />
+<a href="http://devstreaming.apple.com/videos/wwdc/2014/401xxfkzfrjyb93/401/401_whats_new_in_xcode_6.pdf?dl=1">whats_new_in_xcode_6</a><br />
+<a href="http://devstreaming.apple.com/videos/wwdc/2014/411xx0xo98zzoor/411/411_whats_new_in_interface_builder.pdf?dl=1">whats_new_in_interface_builder</a><br />
+<a href="https://developer.apple.com/library/ios/recipes/xcode_help-IB_objects_media/Chapters/CreatingaLiveViewofaCustomObject.html#//apple_ref/doc/uid/TP40014224-CH41-SW1">苹果官方文档</a></p>
+
+<p>今天来分享一下我使用这两个关键字的时候遇到的一些问题和解决过程。</p>
+
+<h4 id="the-agent-raised-a-nsinternalinconsistencyexception-exception">1.The agent raised a “NSInternalInconsistencyException” exception</h4>
+
+<div class="highlighter-rouge"><pre class="highlight"><code> 
+file://BottomCommentView-master/BottomCommentView/Base.lproj/Main.storyboard: error: 
+IB Designables: Failed to update auto layout status: The agent raised a "NSInternalInconsistencyException" exception: Could not load NIB in bundle: 'NSBundle &lt;/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Xcode/Overlays&gt; (loaded)' with name 'BottomCommentView'
+
+file://BottomCommentView/Base.lproj/Main.storyboard: error:
+ IB Designables: Failed to render instance of BottomCommentView: The agent threw an exception.   
+ 
+
+</code></pre>
+</div>
+
+<p>我们会看到面板上Designables这里显示的是一个Crashed，Xib / Storyboard 居然也会Crashed！整个app是跑起来了，但是报了2个错，不能忍！这两个错其实是编译时候Xib报的错误，并不是运行时的错误。
+<img src="http://upload-images.jianshu.io/upload_images/1194012-548c7e2d005a5da0.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<p>当我们看到Debug的时候，肯定第一想到的就是点Debug。但是很不幸的是，在这种情况下，点击Debug，每次都会告诉你“Finishing debugging instance of XXXX for interface Builder”，即使你在你自定义的View里面打了断点，也无济于事。</p>
+
+<p>回到问题上来，我们来仔细看看崩溃信息。信息上说Could not load NIB in bundle，并且还给了我们一个类似地址一样的东西’NSBundle &lt;/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Xcode/Overlays&gt; (loaded)’，我们可以定位到时Xib在从bundle中读取出来出错了。</p>
+
+<p>通过在网上查找资料，问题其实是这样的。</p>
+
+<blockquote>
+  <p>When loading the nib, we’re relying on the fact that passing bundle: nil defaults to your app’s mainBundle at run time.</p>
+</blockquote>
+
+<p>每次我们取mainBundle的时候，都是用的默认的方法</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>let nib = UINib(nibName: String(StripyView), bundle: nil)
+</code></pre>
+</div>
+<p>这里在Xib / Storyboard 编译的时候，我们需要告诉iOS系统，我们要指定哪一个bundle类去读取。把上面的代码改成下面这样就可以了。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>let bundle = NSBundle(forClass: self.dynamicType)
+let nib = UINib(nibName: String(StripyView), bundle: bundle)
+</code></pre>
+</div>
+<p>或者这样</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>#if TARGET_INTERFACE_BUILDER
+        NSBundle *bundle = [NSBundle bundleForClass:[self class]];
+        [bundle loadNibNamed:@"BottomCommentView" owner:self options:nil];
+#else
+        [[NSBundle mainBundle] loadNibNamed:@"BottomCommentView" owner:self options:nil];
+        
+#endif
+</code></pre>
+</div>
+
+<p>Ps:如果你自定义的View不显示在Xib / Storyboard上，但是程序一运行就又能显示出View来，原因也有可能是这个原因，虽然Xib / Storyboard没有报错，因为app没有运行起来，Xib / Storyboard并不知道上下文，所以没有把我们自定义的View加载出来。</p>
+
+<h4 id="xib">2.代码或者Xib依旧不显示自定义控件的样子</h4>
+
+<p>如果你按照上面的第一个问题里面加上了bundle的代码之后还是不显示，那可能是你代码加的地方不对。</p>
+
+<p>如果是代码手动创建控件的话，会调用initWithFrame方法</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+- (instancetype)initWithFrame:(CGRect)frame
+</code></pre>
+</div>
+
+<p>如果是通过Xib / Storyboard 拖拽显示控件的话，会调用initWithCoder方法</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+- (instancetype)initWithCoder:(NSCoder *)aDecoder
+</code></pre>
+</div>
+
+<p>需要在对应的这两个方法里面去加上bundle的方法。如果为了保险起见，那这两个init方法里面都加上问题一里面的代码吧。</p>
+
+<h4 id="failed-to-update-auto-layout-status-the-agent-crashed--failed-to-render-instance-of-xxxxxxx-the-agent-crashed">3.Failed to update auto layout status: The agent crashed / Failed to render instance of XXXXXXX: The agent crashed</h4>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>file://BottomCommentView/Base.lproj/Main.storyboard: error: 
+IB Designables: Failed to update auto layout status: The agent crashed
+
+file://BottomCommentView/Base.lproj/Main.storyboard: error: 
+IB Designables: Failed to render instance of BottomCommentView: The agent crashed
+
+</code></pre>
+</div>
+
+<p>如果是遇到了这个问题，是比较严重的，这个问题不像问题一，问题一整个app是可以运行的，错误来源于Xib / Storyboard编译时候的错误，但是并不影响这个app的运行。</p>
+
+<p>但是这个问题会直接导致整个app闪退，直接Crashed掉！没办法，我们只能打断点debug一下。</p>
+
+<p>如果你在Designables 那里把Debug打开，然后断点打到initWithCoder 和 initWithFrame那里，会发现程序总是运行到这一行</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+self = [super initWithCoder:aDecoder];
+</code></pre>
+</div>
+
+<p>或者这一行</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+self = [super initWithFrame:frame];
+</code></pre>
+</div>
+
+<p>就崩溃了。其实从下面的栈信息也可以很快看出发生了什么：</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-ee0d98669a4889f8.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-ca3fcc8e1ef9a9e6.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<p>可以很明显的看到，是initWithCoder这个方法陷入了死循环。由于这个死循环导致了程序Crashed了。</p>
+
+<p>可是这里为什么会死循环呢？其实根本原因在于，我们自定义的类的class写成自己了。</p>
+
+<p>来看看到底发生了什么。现在在Xode 7中，我们默认创建一个View，是不给我们默认生成一个XIB文件，ViewController会有下面那个选项，可以选择勾上。</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-747a4d232003df04.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<p>在我们创建完这个类的时候，我们还要再创建一个Xib和这个类进行关联。</p>
+
+<p>再对比一下我们创建TableviewCell的过程</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-736c5bf9967f48af.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<p>一般我们会勾选上那个“Also create XIB file”，创建完成之后，我们就会在Custom Class里面把我们这个cell的类名填上。</p>
+
+<p>如果我们现在自定义View的时候也是相同做法，创建完Xib文件之后，File‘s owner关联好了之后。然后在Custom Class里面填上了我们自定义的类之后，这个时候就错了！</p>
+
+<p>为什么我们平时相同的做法，到这里就错误了呢？</p>
+
+<p>我们来考虑一下我们自定义View加载的过程。我们这个自定义View肯定是放在了一个ViewController上面，代码创建出来或者直接拖拽到Xib / Storyboard 上。用代码或者SB上面拖一个View，这个时候我们需要指定这个类是什么，这个毋庸置疑，是绝对没有问题的。SB上面拖的View的class肯定要选择我们自定义的这个View。</p>
+
+<p>但是在加载我们这个View的时候，会走initWithCoder / initWithFrame 方法，在这里方法里面又会去调用super的这个方法，现在我们把这个class写成了自己，依照我们上面调试的log，可以看到，initWithCoder以后，会按照以下的路线去调用.</p>
+
+<p>[NSBundle loadNibName] —— [UINib instantiateWithOwner:options] ——[UINibDecoder decodeObjectForKey:]——UINibDecoderDecodeObjectForValue——[UIRuntimeConnection initWithCoder]——[UINibDecoder decodeObjectForKey:]——UINibDecoderDecodeObjectForValue——[UIClassSwapper initWithCoder:]——[BottomCommentView initWithCoder:]</p>
+
+<p>从NSBundle加载开始，解析完之后会调用到ClassSwapper 的initWithCoder，由于我们class写了自己，这里就陷入死循环了。程序崩溃！这里就跟set方法里面调用点语法赋值一样，无限的递归调用了。</p>
+
+<p>经过上面的分析之后，我们就知道了问题就出在我们在initWithCoder里面又调用了loadNibName，loadNibName又会去最终调UIClassSwapper initWithCoder。难道是我们custom class不对么？对比一下我们自定义tableViewCell的class就是本身，怎么就没有这个问题呢。</p>
+
+<p>我们来仔细看看tableViewCell我们是怎么加载的，我们的Xib的class还是自己，但是registerWithNibName的方法调用在tableView中，这样就不会无限递归了。</p>
+
+<p>这里当然我们也可以仿照这个方法做，那我们需要把loadNibName写到另外一个类中去。class还是写自己本身，用那个类来加载我们这个View，这样就可以不崩溃，不会无限递归了。但是问题又来了，我们无法在Xib/Storyboard上实时预览到我们的View了。</p>
+
+<p>这里需要提一下IB_DESIGNABLE的工作原理。当我们用了IB_DESIGNABLE关键字以后，Xib/StoryBoard会在不运行整个程序的情况下，把这个View代码编译跑一遍，由于没有程序上下文，所有的编译就只在这个view的代码中进行。</p>
+
+<p>我们在ViewController里面拖拽了一个View，并且更改它的class为我们自定义的class，那么接下来所有view的绘制都会交给我们这个自定义view的class，由这个class来管理。这里就分两种情况了。第一种情况就是我文章一开头给的Demo的例子，用DrawRect代码绘制出这个View的样子。这里不会出现任何问题。第二种情况就是我们还想用一个Xib来显示View，这种情况就是Xib/StoryBoard里面再次加载Xib的情况了。由于现在我们自定义的class有了接管整个view的绘制权利，那么我们就应该在initWithCoder中loadNibName，把整个View在初始化的时候load出来。根据上面的分析，我们找到崩溃的原因是无限递归，这里又必须要调用initWithCoder，我们的唯一办法就是把class改成父类的class，即UIView，这时候一切就好了，Xib/Storyboard不报错，也能及时显示出view的样子来了。</p>
+
+<p>总结一下：
+&gt; when using loadNibNamed:owner:options:, the File’s Owner should be NSObject, the main view should be your class type, and all outlets should be hooked up to the view, not the File’s Owner.</p>
+
+<p>Ps.这里说的仅仅是loadNibNamed而不是initWithNibName。顺带提一下他们俩的不同点。initWithNibName要加载的Xib的类为我们定义的ViewController。loadNibNamed要加载的Xib的类为NSOjbect。他们的加载方式也不同，initWithNibName方法：是延迟加载，这个View上的控件是 nil 的，只有到需要显示时，才会不是 nil。loadNibNamed是立即加载，调用这个方法加载的xib对象中的各个元素都已经存在。</p>
+
+<h4 id="section-1">总结</h4>
+<p>当我第一次知道IB_DESIGNABLE / IBInspectable之后，感觉到特别的神奇，连我们自定义化的View也可以及时可见了。不过经过一段研究以后就发现。IB_DESIGNABLE / IBInspectable还是有一些缺陷的。IB_DESIGNABLE暂时只能在UIView的子类中用，常用的UIButton加圆角这些暂时也没法预览。IBInspectable实质是在Runtime Attributes设置了值，这也使得IBInspectable只能使用常用类型。NSDate这种类型没法设置成IBInspectable。</p>
+
+<p>以上就是我和大家分享的IB_DESIGNABLE / IBInspectable使用过程中遇到的一些“坑”。</p>
+
+<h4 id="section-2">更新：</h4>
+<p>下面这一段要感谢@<strong>Andy矢倉</strong> 微博上面指点我，其实系统的子类可以这么做：抽了几个常用的控件的公共类，顺便用External剥离常用属性，更复杂的移步这个库<a href="https://github.com/JakeLin/IBAnimatable">IBAnimatable</a></p>
+
+<p>@<strong>Andy矢倉</strong>还提醒说，用这个特性最好是iOS8 + Swift，OC或者iOS7都会出现Failed to update而且无解，再次感谢@<strong>Andy矢倉</strong>大神的指点！！！下图是他对系统控件的可视化改造！</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-932768201a4dae84.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+  </section>
+</article>
+
+<section class="read-more">
+   
+   
+   <div class="read-more-item">
+       <span class="read-more-item-dim">最近的文章</span>
+       <h2 class="post-list__post-title post-title"><a href="/2016/07/%E6%89%8B%E6%8A%8A%E6%89%8B%E6%95%99%E4%BD%A0%E5%88%A9%E7%94%A8Jenkins%E6%8C%81%E7%BB%AD%E9%9B%86%E6%88%90iOS%E9%A1%B9%E7%9B%AE/" title="link to 手把手教你利用Jenkins持续集成iOS项目">手把手教你利用Jenkins持续集成iOS项目</a></h2>
+       <p class="excerpt">前言众所周知，现在App的竞争已经到了用户体验为王，质量为上的白热化阶段。用户们都是很挑剔的。如果一个公司的推广团队好不容易砸了重金推广了一个APP，好不容易有了一些用户，由于一次线上的bug导致一批的用户在使用中纷纷出现闪退bug，轻则，很可能前期推广砸的钱都白费了，重则，口碑不好，未来也提升不起用户量来了。静下心来分析一下问题的原因，无外乎就是质量没有过关就上线了。除去主观的一些因素，很大部分的客观因素我觉得可以被我们防范的。根据大神们提出的一套开发规范建议，CI + FDD，就可以帮...&hellip;</p>
+       <div class="post-list__meta"><time datetime="2016-07-31 15:04:00 +0800" class="post-list__meta--date date">2016-07-31</time> &#8226; <span class="post-list__meta--tags tags">iOS</span><a class="btn-border-small" href=/2016/07/%E6%89%8B%E6%8A%8A%E6%89%8B%E6%95%99%E4%BD%A0%E5%88%A9%E7%94%A8Jenkins%E6%8C%81%E7%BB%AD%E9%9B%86%E6%88%90iOS%E9%A1%B9%E7%9B%AE/>继续阅读</a></div>
+   </div>
+   
+   
+   
+   
+   <div class="read-more-item">
+       <span class="read-more-item-dim">更早的文章</span>
+       <h2 class="post-list__post-title post-title"><a href="/2016/07/WWDC2016-Session%E7%AC%94%E8%AE%B0-Xcode-8-Auto-Layout%E6%96%B0%E7%89%B9%E6%80%A7/" title="link to WWDC2016 Session笔记 - Xcode 8 Auto Layout新特性">WWDC2016 Session笔记 - Xcode 8 Auto Layout新特性</a></h2>
+       <p class="excerpt">目录  1.Incrementally Adopting Auto Layout  2.Design and Runtime Constraints  3.NSGridView  4.Layout Feedback Loop Debugging一.Incrementally Adopting Auto LayoutIncrementally Adopting Auto Layout是什么意思呢？在我们IB里面布局我们的View的时候，我们并不需要一次性就添加好所有的constraints。...&hellip;</p>
+       <div class="post-list__meta"><time datetime="2016-07-17 19:36:00 +0800" class="post-list__meta--date date">2016-07-17</time> &#8226; <span class="post-list__meta--tags tags">iOS</span><a class="btn-border-small" href=/2016/07/WWDC2016-Session%E7%AC%94%E8%AE%B0-Xcode-8-Auto-Layout%E6%96%B0%E7%89%B9%E6%80%A7/>继续阅读</a></div>
+   </div>
+   
+</section>
+
+<section class="post-comments">
+  
+    <div id="disqus_thread"></div>
+    <script>
+    
+    var disqus_config = function () {
+        this.page.url = "http://vno.onevcat.com/2016/07/%E5%85%B3%E4%BA%8EIB_DESIGNABLE-IBInspectable%E7%9A%84%E9%82%A3%E4%BA%9B%E9%9C%80%E8%A6%81%E6%B3%A8%E6%84%8F%E7%9A%84%E4%BA%8B/";
+        this.page.identifier = "/2016/07/%E5%85%B3%E4%BA%8EIB_DESIGNABLE-IBInspectable%E7%9A%84%E9%82%A3%E4%BA%9B%E9%9C%80%E8%A6%81%E6%B3%A8%E6%84%8F%E7%9A%84%E4%BA%8B/";
+    };
+
+    var disqus_shortname = 'halfrostsfield';
+    
+    (function() { // DON'T EDIT BELOW THIS LINE
+        var d = document, s = d.createElement('script');
+        s.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>要查看<a href="http://disqus.com/?ref_noscript"> Disqus </a>评论，请启用 JavaScript</noscript>
+    
+  
+  
+  
+  
+</section>
+
+
+            <section class="footer">
+    <footer>
+      <span class="footer__copyright">友情链接 ：<a href="https://desgard.com/">Guardia · 瓜地</a>    <a href="https://bestswifter.com/">bestswifter</a>  <a href="http://kuailejim.com/">kuailejim</a>  <a href="http://valiantcat.com/">南栀倾寒</a>  <a href="http://www.jianshu.com/users/9c51a213b02e">Martin_Joy</a>  <a href="http://bluelich.com/">bluelich</a>  <a href="http://yuyang.myportfolio.com/">yuy</a>  </span>
+      <br>
+      <br>
+    	<span class="footer__copyright">本站点采用<a href="http://creativecommons.org/licenses/by-nc-sa/4.0/">知识共享 署名-非商业性使用-相同方式共享 4.0 国际 许可协议</a></span>
+        <span class="footer__copyright">由 <a href="https://jekyllrb.com">Jekyll</a> 于 2016-08-14 生成，感谢<a href="https://pages.github.com"> GitHub Pages</a> 强力驱动</span>
+        <span class="footer__copyright">本站由 <a href="http://halfrost.com">@halfrost</a> 创建，采用 <a href="https://github.com/onevcat/vno-jekyll">Vno - Jekyll</a> 作为主题，您可以在 GitHub 找到<a href="https://github.com/onevcat/OneV-s-Den">本站源码</a> - &copy; 2016</span>
+    </footer>
+</section>
+
+        </div>
+    </div>
+    
+    <script type="text/javascript" src="//code.jquery.com/jquery-1.11.3.min.js"></script>
+
+<script type="text/javascript" src="/js/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+<script type="text/javascript" src="/js/main.js"></script>
+
+
+
+    
+  </body>
+
+</html>

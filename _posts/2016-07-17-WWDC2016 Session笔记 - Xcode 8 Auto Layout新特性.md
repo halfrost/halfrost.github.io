@@ -205,7 +205,7 @@ override var intrinsicContentSize: CGSize
 ```  
 
 
-#### 3.Turn Off Ambiguity Per View
+##### 3.Turn Off Ambiguity Per View
 
 这个是Xcode 8的一个新特性。当上述2种方法都无法解决我们的需求的时候。这个时候就需要用到这种方法了。Xcode 8给了我们可以在constraints产生歧义的时候，可以动态调整警告级别的能力。
 
