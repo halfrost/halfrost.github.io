@@ -5,9 +5,1065 @@
     <description>嗨，我是于德志 (@halfrost)，一名来自中国的 iOS 开发者，已退役 acmer 。现居上海。吾笃信：德不孤，必有志，技不疏，必有朋。</description>
     <link>http://vno.onevcat.com/</link>
     <atom:link href="http://vno.onevcat.com/feed.xml" rel="self" type="application/rss+xml"/>
-    <pubDate>Sun, 14 Aug 2016 19:33:24 +0800</pubDate>
-    <lastBuildDate>Sun, 14 Aug 2016 19:33:24 +0800</lastBuildDate>
+    <pubDate>Sat, 27 Aug 2016 23:47:49 +0800</pubDate>
+    <lastBuildDate>Sat, 27 Aug 2016 23:47:49 +0800</lastBuildDate>
     <generator>Jekyll v3.1.6</generator>
+    
+      <item>
+        <title>深入研究Block捕获外部变量和__block实现原理</title>
+        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-3b6a5c9d5edb1aae.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h4 id=&quot;section&quot;&gt;前言&lt;/h4&gt;
+
+&lt;p&gt;Blocks是C语言的扩充功能，而Apple 在OS X Snow Leopard 和 iOS 4中引入了这个新功能“Blocks”。从那开始，Block就出现在iOS和Mac系统各个API中，并被大家广泛使用。一句话来形容Blocks，带有自动变量（局部变量）的匿名函数。&lt;/p&gt;
+
+&lt;p&gt;Block在OC中的实现如下：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+struct Block_layout {
+    void *isa;
+    int flags;
+    int reserved;
+    void (*invoke)(void *, ...);
+    struct Block_descriptor *descriptor;
+    /* Imported variables. */
+};
+
+struct Block_descriptor {
+    unsigned long int reserved;
+    unsigned long int size;
+    void (*copy)(void *dst, void *src);
+    void (*dispose)(void *);
+};
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;&lt;img src=&quot;https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;从结构图中很容易看到isa，所以OC处理Block是按照对象来处理的。在iOS中，isa常见的就是_NSConcreteStackBlock，_NSConcreteMallocBlock，_NSConcreteGlobalBlock这3种(另外只在GC环境下还有3种使用的_NSConcreteFinalizingBlock，_NSConcreteAutoBlock，_NSConcreteWeakBlockVariable，本文暂不谈论这3种，有兴趣的看看官方文档)&lt;/p&gt;
+
+&lt;p&gt;以上介绍是Block的简要实现，接下来我们来仔细研究一下Block的捕获外部变量的特性以及__block的实现原理。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;研究工具：clang&lt;/strong&gt;
+为了研究编译器的实现原理，我们需要使用 clang 命令。clang 命令可以将 Objetive-C 的源码改写成 C / C++ 语言的，借此可以研究 block 中各个特性的源码实现方式。该命令是&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;clang -rewrite-objc block.c
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;h4 id=&quot;section-1&quot;&gt;目录&lt;/h4&gt;
+&lt;ul&gt;
+  &lt;li&gt;1.Block捕获外部变量实质&lt;/li&gt;
+  &lt;li&gt;2.Block的copy和release&lt;/li&gt;
+  &lt;li&gt;3.Block中__block实现原理&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h4 id=&quot;block&quot;&gt;一.Block捕获外部变量实质&lt;/h4&gt;
+
+&lt;p&gt;&lt;img src=&quot;https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_2.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;拿起我们的Block一起来捕捉外部变量吧。&lt;/p&gt;
+
+&lt;p&gt;说到外部变量，我们要先说一下C语言中变量有哪几种。一般可以分为一下5种：&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;自动变量&lt;/li&gt;
+  &lt;li&gt;函数参数&lt;/li&gt;
+  &lt;li&gt;静态变量&lt;/li&gt;
+  &lt;li&gt;静态全局变量&lt;/li&gt;
+  &lt;li&gt;全局变量&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;研究Block的捕获外部变量就要除去函数参数这一项，下面一一根据这4种变量类型的捕获情况进行分析。&lt;/p&gt;
+
+&lt;p&gt;我们先根据这4种类型
+- 自动变量 
+- 静态变量
+- 静态全局变量
+- 全局变量&lt;/p&gt;
+
+&lt;p&gt;写出Block测试代码。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_3.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;这里很快就出现了一个错误，提示说自动变量没有加__block，由于__block有点复杂，我们先实验静态变量，静态全局变量，全局变量这3类。测试代码如下：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+#import &amp;lt;Foundation/Foundation.h&amp;gt;
+
+int global_i = 1;
+
+static int static_global_j = 2;
+
+int main(int argc, const char * argv[]) {
+   
+    static int static_k = 3;
+    int val = 4;
+    
+    void (^myBlock)(void) = ^{
+        global_i ++;
+        static_global_j ++;
+        static_k ++;
+        NSLog(@&quot;Block中 global_i = %d,static_global_j = %d,static_k = %d,val = %d&quot;,global_i,static_global_j,static_k,val);
+    };
+    
+    global_i ++;
+    static_global_j ++;
+    static_k ++;
+    val ++;
+    NSLog(@&quot;Block外 global_i = %d,static_global_j = %d,static_k = %d,val = %d&quot;,global_i,static_global_j,static_k,val);
+    
+    myBlock();
+    
+    return 0;
+}
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;运行结果&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;Block 外  global_i = 2,static_global_j = 3,static_k = 4,val = 5
+Block 中  global_i = 3,static_global_j = 4,static_k = 5,val = 4
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;这里就有2点需要弄清楚了
+1.为什么在Block里面不加__bolck不允许更改变量？
+2.为什么自动变量的值没有增加，而其他几个变量的值是增加的？自动变量是什么状态下被block捕获进去的？&lt;/p&gt;
+
+&lt;p&gt;为了弄清楚这2点，我们用clang转换一下源码出来分析分析。&lt;/p&gt;
+
+&lt;p&gt;（main.m代码行37行，文件大小832bype， 经过clang转换成main.cpp以后，代码行数飙升至104810行，文件大小也变成了3.1MB）&lt;/p&gt;
+
+&lt;p&gt;源码如下&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+int global_i = 1;
+
+static int static_global_j = 2;
+
+struct __main_block_impl_0 {
+  struct __block_impl impl;
+  struct __main_block_desc_0* Desc;
+  int *static_k;
+  int val;
+  __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, int *_static_k, int _val, int flags=0) : static_k(_static_k), val(_val) {
+    impl.isa = &amp;amp;_NSConcreteStackBlock;
+    impl.Flags = flags;
+    impl.FuncPtr = fp;
+    Desc = desc;
+  }
+};
+static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
+  int *static_k = __cself-&amp;gt;static_k; // bound by copy
+  int val = __cself-&amp;gt;val; // bound by copy
+
+        global_i ++;
+        static_global_j ++;
+        (*static_k) ++;
+        NSLog((NSString *)&amp;amp;__NSConstantStringImpl__var_folders_45_k1d9q7c52vz50wz1683_hk9r0000gn_T_main_6fe658_mi_0,global_i,static_global_j,(*static_k),val);
+    }
+
+static struct __main_block_desc_0 {
+  size_t reserved;
+  size_t Block_size;
+} __main_block_desc_0_DATA = { 0, sizeof(struct __main_block_impl_0)};
+
+
+int main(int argc, const char * argv[]) {
+
+    static int static_k = 3;
+    int val = 4;
+
+    void (*myBlock)(void) = ((void (*)())&amp;amp;__main_block_impl_0((void *)__main_block_func_0, &amp;amp;__main_block_desc_0_DATA, &amp;amp;static_k, val));
+
+    global_i ++;
+    static_global_j ++;
+    static_k ++;
+    val ++;
+    NSLog((NSString *)&amp;amp;__NSConstantStringImpl__var_folders_45_k1d9q7c52vz50wz1683_hk9r0000gn_T_main_6fe658_mi_1,global_i,static_global_j,static_k,val);
+
+    ((void (*)(__block_impl *))((__block_impl *)myBlock)-&amp;gt;FuncPtr)((__block_impl *)myBlock);
+
+    return 0;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;首先全局变量global_i和静态全局变量static_global_j的值增加，以及它们被Block捕获进去，这一点很好理解，因为是全局的，作用域很广，所以Block捕获了它们进去之后，在Block里面进行++操作，Block结束之后，它们的值依旧可以得以保存下来。&lt;/p&gt;
+
+&lt;p&gt;接下来仔细看看自动变量和静态变量的问题。
+在__main_block_impl_0中，可以看到静态变量static_k和自动变量val，被Block从外面捕获进来，成为__main_block_impl_0这个结构体的成员变量了。&lt;/p&gt;
+
+&lt;p&gt;接着看构造函数，&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+__main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, int *_static_k, int _val, int flags=0) : static_k(_static_k), val(_val)
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;这个构造函数中，自动变量和静态变量被捕获为成员变量追加到了构造函数中。&lt;/p&gt;
+
+&lt;p&gt;main里面的myBlock闭包中的__main_block_impl_0结构体，初始化如下&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;void (*myBlock)(void) = ((void (*)())&amp;amp;__main_block_impl_0((void *)__main_block_func_0, &amp;amp;__main_block_desc_0_DATA, &amp;amp;static_k, val));
+
+
+impl.isa = &amp;amp;_NSConcreteStackBlock;
+impl.Flags = 0;
+impl.FuncPtr = __main_block_impl_0; 
+Desc = &amp;amp;__main_block_desc_0_DATA;
+*_static_k = 4；
+val = 4; 
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;到此，__main_block_impl_0结构体就是这样把自动变量捕获进来的。也就是说，在执行Block语法的时候，Block语法表达式所使用的自动变量的值是被保存进了Block的结构体实例中，也就是Block自身中。&lt;/p&gt;
+
+&lt;p&gt;这里值得说明的一点是，如果Block外面还有很多自动变量，静态变量，等等，这些变量在Block里面并不会被使用到。那么这些变量并不会被Block捕获进来，也就是说并不会在构造函数里面传入它们的值。&lt;/p&gt;
+
+&lt;p&gt;Block捕获外部变量仅仅只捕获Block闭包里面会用到的值，其他用不到的值，它并不会去捕获。&lt;/p&gt;
+
+&lt;p&gt;再研究一下源码，我们注意到__main_block_func_0这个函数的实现&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
+  int *static_k = __cself-&amp;gt;static_k; // bound by copy
+  int val = __cself-&amp;gt;val; // bound by copy
+
+        global_i ++;
+        static_global_j ++;
+        (*static_k) ++;
+        NSLog((NSString *)&amp;amp;__NSConstantStringImpl__var_folders_45_k1d9q7c52vz50wz1683_hk9r0000gn_T_main_6fe658_mi_0,global_i,static_global_j,(*static_k),val);
+    }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;我们可以发现，系统自动给我们加上的注释，bound by copy，自动变量val虽然被捕获进来了，但是是用 __cself-&amp;gt;val来访问的。Block仅仅捕获了val的值，并没有捕获val的内存地址。所以在__main_block_func_0这个函数中即使我们重写这个自动变量val的值，依旧没法去改变Block外面自动变量val的值。&lt;/p&gt;
+
+&lt;p&gt;OC可能是基于这一点，在编译的层面就防止开发者可能犯的错误，因为自动变量没法在Block中改变外部变量的值，所以编译过程中就报编译错误。错误就是最开始的那张截图。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;Variable is not assignable(missing __block type specifier)
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;小结一下：
+到此为止，上面提出的第二个问题就解开答案了。自动变量是以值传递方式传递到Block的构造函数里面去的。Block只捕获Block中会用到的变量。由于只捕获了自动变量的值，并内存地址，所以Block内部不能改变自动变量的值。Block捕获的外表变量可以改变值的是静态变量，静态全局变量，全局变量。上面例子也都证明过了。&lt;/p&gt;
+
+&lt;p&gt;剩下问题一我们还没有解决。&lt;/p&gt;
+
+&lt;p&gt;回到上面的例子上面来，4种变量里面只有静态变量，静态全局变量，全局变量这3种是可以在Block里面被改变值的。仔细观看源码，我们能看出这3个变量可以改变值的原因。&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;
+    &lt;p&gt;静态全局变量，全局变量由于作用域的原因，于是可以直接在Block里面被改变。他们也都存储在全局区。
+&lt;img src=&quot;https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_4.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;静态变量传递给Block是内存地址值，所以能在Block里面直接改变值。&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;根据&lt;a href=&quot;developer.apple.com/library/ios/documentation/Cocoa/Conceptual/Blocks/Articles/bxVariables.html#//apple_ref/doc/uid/TP40007502-CH6-SW1&quot;&gt;官方文档&lt;/a&gt;我们可以了解到，苹果要求我们在自动变量前加入 &lt;strong&gt;__block&lt;/strong&gt;关键字(__block storage-class-specifier存储域类说明符)，就可以在Block里面改变外部自动变量的值了。&lt;/p&gt;
+
+&lt;p&gt;总结一下在Block中改变变量值有2种方式，一是传递内存地址指针到Block中，二是改变存储区方式(__block)。&lt;/p&gt;
+
+&lt;p&gt;先来实验一下第一种方式，传递内存地址到Block中，改变变量的值。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+#import &amp;lt;Foundation/Foundation.h&amp;gt;
+
+int main(int argc, const char * argv[]) {
+    
+  NSMutableString * str = [[NSMutableString alloc]initWithString:@&quot;Hello,&quot;];
+    
+        void (^myBlock)(void) = ^{
+            [str appendString:@&quot;World!&quot;];
+            NSLog(@&quot;Block中 str = %@&quot;,str);
+        };
+    
+    NSLog(@&quot;Block外 str = %@&quot;,str);
+    
+    myBlock();
+    
+    return 0;
+}
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;控制台输出：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;Block 外  str = Hello,
+Block 中  str = Hello,World!
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;看结果是成功改变了变量的值了，转换一下源码。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+struct __main_block_impl_0 {
+  struct __block_impl impl;
+  struct __main_block_desc_0* Desc;
+  NSMutableString *str;
+  __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, NSMutableString *_str, int flags=0) : str(_str) {
+    impl.isa = &amp;amp;_NSConcreteStackBlock;
+    impl.Flags = flags;
+    impl.FuncPtr = fp;
+    Desc = desc;
+  }
+};
+static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
+  NSMutableString *str = __cself-&amp;gt;str; // bound by copy
+
+            ((void (*)(id, SEL, NSString *))(void *)objc_msgSend)((id)str, sel_registerName(&quot;appendString:&quot;), (NSString *)&amp;amp;__NSConstantStringImpl__var_folders_45_k1d9q7c52vz50wz1683_hk9r0000gn_T_main_33ff12_mi_1);
+            NSLog((NSString *)&amp;amp;__NSConstantStringImpl__var_folders_45_k1d9q7c52vz50wz1683_hk9r0000gn_T_main_33ff12_mi_2,str);
+        }
+static void __main_block_copy_0(struct __main_block_impl_0*dst, struct __main_block_impl_0*src) {_Block_object_assign((void*)&amp;amp;dst-&amp;gt;str, (void*)src-&amp;gt;str, 3/*BLOCK_FIELD_IS_OBJECT*/);}
+
+static void __main_block_dispose_0(struct __main_block_impl_0*src) {_Block_object_dispose((void*)src-&amp;gt;str, 3/*BLOCK_FIELD_IS_OBJECT*/);}
+
+static struct __main_block_desc_0 {
+  size_t reserved;
+  size_t Block_size;
+  void (*copy)(struct __main_block_impl_0*, struct __main_block_impl_0*);
+  void (*dispose)(struct __main_block_impl_0*);
+} __main_block_desc_0_DATA = { 0, sizeof(struct __main_block_impl_0), __main_block_copy_0, __main_block_dispose_0};
+
+int main(int argc, const char * argv[]) {
+    NSMutableString * str = ((NSMutableString *(*)(id, SEL, NSString *))(void *)objc_msgSend)((id)((NSMutableString *(*)(id, SEL))(void *)objc_msgSend)((id)objc_getClass(&quot;NSMutableString&quot;), sel_registerName(&quot;alloc&quot;)), sel_registerName(&quot;initWithString:&quot;), (NSString *)&amp;amp;__NSConstantStringImpl__var_folders_45_k1d9q7c52vz50wz1683_hk9r0000gn_T_main_33ff12_mi_0);
+
+        void (*myBlock)(void) = ((void (*)())&amp;amp;__main_block_impl_0((void *)__main_block_func_0, &amp;amp;__main_block_desc_0_DATA, str, 570425344));
+
+    NSLog((NSString *)&amp;amp;__NSConstantStringImpl__var_folders_45_k1d9q7c52vz50wz1683_hk9r0000gn_T_main_33ff12_mi_3,str);
+
+    ((void (*)(__block_impl *))((__block_impl *)myBlock)-&amp;gt;FuncPtr)((__block_impl *)myBlock);
+
+    return 0;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;在__main_block_func_0里面可以看到传递的是指针。所以成功改变了变量的值。&lt;/p&gt;
+
+&lt;p&gt;至于源码里面的copy和dispose下一节会讲到。&lt;/p&gt;
+
+&lt;p&gt;改变外部变量值的第二种方式是加 __block这个放在第三章里面讨论，接下来我们先讨论一下Block的copy的问题，因为这个问题会关系到 __block存储域的问题。&lt;/p&gt;
+
+&lt;h4 id=&quot;blockcopydispose&quot;&gt;二.Block的copy和dispose&lt;/h4&gt;
+
+&lt;p&gt;&lt;img src=&quot;https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_5.jpg&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;OC中，一般Block就分为一下3种，_NSConcreteStackBlock，_NSConcreteMallocBlock，_NSConcreteGlobalBlock。先来说明一下3者的区别。&lt;/p&gt;
+
+&lt;h5 id=&quot;section-2&quot;&gt;1.从捕获外部变量的角度上来看&lt;/h5&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;_NSConcreteStackBlock：
+只用到外部局部变量、成员属性变量，且没有强指针引用的block都是StackBlock。
+StackBlock的生命周期由系统控制的，一旦返回之后，就被系统销毁了。&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;_NSConcreteMallocBlock：
+有强指针引用或copy修饰的成员属性引用的block会被复制一份到堆中成为MallocBlock，没有强指针引用即销毁，生命周期由程序员控制&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;_NSConcreteGlobalBlock：
+没有用到外界变量或只用到全局变量、静态变量的block为_NSConcreteGlobalBlock，生命周期从创建到应用程序结束。&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;没有用到外部变量肯定是_NSConcreteGlobalBlock，这点很好理解。不过只用到全局变量、静态变量的block也是_NSConcreteGlobalBlock。举例如下：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+#import &amp;lt;Foundation/Foundation.h&amp;gt;
+
+int global_i = 1;
+static int static_global_j = 2;
+
+int main(int argc, const char * argv[]) {
+   
+    static int static_k = 3;
+
+    void (^myBlock)(void) = ^{
+            NSLog(@&quot;Block中 变量 = %d %d %d&quot;,static_global_j ,static_k, global_i);
+        };
+    
+    NSLog(@&quot;%@&quot;,myBlock);
+    
+    myBlock();
+    
+    return 0;
+}
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;输出：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&amp;lt;__NSGlobalBlock__: 0x100001050&amp;gt;
+Block中 变量 = 2 3 1
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;可见，只用到全局变量、静态变量的block也可以是_NSConcreteGlobalBlock。&lt;/p&gt;
+
+&lt;p&gt;所以在ARC环境下，3种类型都可以捕获外部变量。&lt;/p&gt;
+
+&lt;h5 id=&quot;section-3&quot;&gt;2.从持有对象的角度上来看：&lt;/h5&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;_NSConcreteStackBlock是不持有对象的。&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+//以下是在MRC下执行的
+    NSObject * obj = [[NSObject alloc]init];
+    NSLog(@&quot;1.Block外 obj = %lu&quot;,(unsigned long)obj.retainCount);
+    
+    void (^myBlock)(void) = ^{
+        NSLog(@&quot;Block中 obj = %lu&quot;,(unsigned long)obj.retainCount);
+    };
+    
+    NSLog(@&quot;2.Block外 obj = %lu&quot;,(unsigned long)obj.retainCount);
+    
+    myBlock();
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;输出：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;1.Block外 obj = 1
+2.Block外 obj = 1
+Block中 obj = 1
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;_NSConcreteMallocBlock是持有对象的。&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;//以下是在MRC下执行的
+    NSObject * obj = [[NSObject alloc]init];
+    NSLog(@&quot;1.Block外 obj = %lu&quot;,(unsigned long)obj.retainCount);
+    
+    void (^myBlock)(void) = [^{
+        NSLog(@&quot;Block中 obj = %lu&quot;,(unsigned long)obj.retainCount);
+    }copy];
+    
+    NSLog(@&quot;2.Block外 obj = %lu&quot;,(unsigned long)obj.retainCount);
+    
+    myBlock();
+    
+    [myBlock release];
+    
+    NSLog(@&quot;3.Block外 obj = %lu&quot;,(unsigned long)obj.retainCount);
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;输出：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;1.Block外 obj = 1
+2.Block外 obj = 2
+Block中 obj = 2
+3.Block外 obj = 1
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;_NSConcreteGlobalBlock也不持有对象&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;//以下是在MRC下执行的
+    void (^myBlock)(void) = ^{
+        
+        NSObject * obj = [[NSObject alloc]init];
+        NSLog(@&quot;Block中 obj = %lu&quot;,(unsigned long)obj.retainCount);
+    };
+    
+    myBlock();
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;输出：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+Block 中 obj = 1
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;由于_NSConcreteStackBlock所属的变量域一旦结束，那么该Block就会被销毁。在ARC环境下，编译器会自动的判断，把Block自动的从栈copy到堆。比如当Block作为函数返回值的时候，肯定会copy到堆上。&lt;/p&gt;
+
+&lt;p&gt;1.手动调用copy
+2.Block是函数的返回值
+3.Block被强引用，Block被赋值给__strong或者id类型
+4.调用系统API入参中含有usingBlcok的方法&lt;/p&gt;
+
+&lt;p&gt;以上4种情况，系统都会默认调用copy方法把Block赋复制&lt;/p&gt;
+
+&lt;p&gt;但是当Block为函数参数的时候，就需要我们手动的copy一份到堆上了。这里除去系统的API我们不需要管，比如GCD等方法中本身带usingBlock的方法，其他我们自定义的方法传递Block为参数的时候都需要手动copy一份到堆上。&lt;/p&gt;
+
+&lt;p&gt;copy函数把Block从栈上拷贝到堆上，dispose函数是把堆上的函数在废弃的时候销毁掉。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+#define Block_copy(...) ((__typeof(__VA_ARGS__))_Block_copy((const void *)(__VA_ARGS__)))
+#define Block_release(...) _Block_release((const void *)(__VA_ARGS__))
+
+// Create a heap based copy of a Block or simply add a reference to an existing one.
+// This must be paired with Block_release to recover memory, even when running
+// under Objective-C Garbage Collection.
+BLOCK_EXPORT void *_Block_copy(const void *aBlock)
+    __OSX_AVAILABLE_STARTING(__MAC_10_6, __IPHONE_3_2);
+
+// Lose the reference, and if heap based and last reference, recover the memory
+BLOCK_EXPORT void _Block_release(const void *aBlock)
+    __OSX_AVAILABLE_STARTING(__MAC_10_6, __IPHONE_3_2);
+
+// Used by the compiler. Do not call this function yourself.
+BLOCK_EXPORT void _Block_object_assign(void *, const void *, const int)
+    __OSX_AVAILABLE_STARTING(__MAC_10_6, __IPHONE_3_2);
+
+// Used by the compiler. Do not call this function yourself.
+BLOCK_EXPORT void _Block_object_dispose(const void *, const int)
+    __OSX_AVAILABLE_STARTING(__MAC_10_6, __IPHONE_3_2);
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;上面是源码中2个常用的宏定义和4个常用的方法，一会我们就会看到这4个方法。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+static void *_Block_copy_internal(const void *arg, const int flags) {
+    struct Block_layout *aBlock;
+    const bool wantsOne = (WANTS_ONE &amp;amp; flags) == WANTS_ONE;
+    
+    // 1
+    if (!arg) return NULL;
+    
+    // 2
+    aBlock = (struct Block_layout *)arg;
+    
+    // 3
+    if (aBlock-&amp;gt;flags &amp;amp; BLOCK_NEEDS_FREE) {
+        // latches on high
+        latching_incr_int(&amp;amp;aBlock-&amp;gt;flags);
+        return aBlock;
+    }
+    
+    // 4
+    else if (aBlock-&amp;gt;flags &amp;amp; BLOCK_IS_GLOBAL) {
+        return aBlock;
+    }
+    
+    // 5
+    struct Block_layout *result = malloc(aBlock-&amp;gt;descriptor-&amp;gt;size);
+    if (!result) return (void *)0;
+    
+    // 6
+    memmove(result, aBlock, aBlock-&amp;gt;descriptor-&amp;gt;size); // bitcopy first
+    
+    // 7
+    result-&amp;gt;flags &amp;amp;= ~(BLOCK_REFCOUNT_MASK);    // XXX not needed
+    result-&amp;gt;flags |= BLOCK_NEEDS_FREE | 1;
+    
+    // 8
+    result-&amp;gt;isa = _NSConcreteMallocBlock;
+    
+    // 9
+    if (result-&amp;gt;flags &amp;amp; BLOCK_HAS_COPY_DISPOSE) {
+        (*aBlock-&amp;gt;descriptor-&amp;gt;copy)(result, aBlock); // do fixup
+    }
+    
+    return result;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;上面这一段是Block_copy的一个实现，实现了从_NSConcreteStackBlock复制到_NSConcreteMallocBlock的过程。对应有9个步骤。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+void _Block_release(void *arg) {
+    // 1
+    struct Block_layout *aBlock = (struct Block_layout *)arg;
+    if (!aBlock) return;
+    
+    // 2
+    int32_t newCount;
+    newCount = latching_decr_int(&amp;amp;aBlock-&amp;gt;flags) &amp;amp; BLOCK_REFCOUNT_MASK;
+    
+    // 3
+    if (newCount &amp;gt; 0) return;
+    
+    // 4
+    if (aBlock-&amp;gt;flags &amp;amp; BLOCK_NEEDS_FREE) {
+        if (aBlock-&amp;gt;flags &amp;amp; BLOCK_HAS_COPY_DISPOSE)(*aBlock-&amp;gt;descriptor-&amp;gt;dispose)(aBlock);
+        _Block_deallocator(aBlock);
+    }
+    
+    // 5
+    else if (aBlock-&amp;gt;flags &amp;amp; BLOCK_IS_GLOBAL) {
+        ;
+    }
+    
+    // 6
+    else {
+        printf(&quot;Block_release called upon a stack Block: %p, ignored\n&quot;, (void *)aBlock);
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;上面这一段是Block_release的一个实现，实现了怎么释放一个Block。对应有6个步骤。&lt;/p&gt;
+
+&lt;p&gt;上述2个方法的详细解析可以看这篇&lt;a href=&quot;http://www.galloway.me.uk/2013/05/a-look-inside-blocks-episode-3-block-copy/&quot;&gt;文章&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;回到上一章节中最后的例子，字符串的例子中来，转换源码之后，我们会发现多了一个copy和dispose方法。&lt;/p&gt;
+
+&lt;p&gt;因为在C语言的结构体中，编译器没法很好的进行初始化和销毁操作。这样对内存管理来说是很不方便的。所以就在 __main_block_desc_0结构体中间增加成员变量 void (*copy)(struct  __main_block_impl_0*, struct __main_block_impl_0*)和void (*dispose)(struct __main_block_impl_0*)，利用OC的Runtime进行内存管理。&lt;/p&gt;
+
+&lt;p&gt;相应的增加了2个方法。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;static void __main_block_copy_0(struct __main_block_impl_0*dst, struct __main_block_impl_0*src) {_Block_object_assign((void*)&amp;amp;dst-&amp;gt;str, (void*)src-&amp;gt;str, 3/*BLOCK_FIELD_IS_OBJECT*/);}
+
+static void __main_block_dispose_0(struct __main_block_impl_0*src) {_Block_object_dispose((void*)src-&amp;gt;str, 3/*BLOCK_FIELD_IS_OBJECT*/);}
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;这里的_Block_object_assign和_Block_object_dispose就对应着retain和release方法。&lt;/p&gt;
+
+&lt;p&gt;BLOCK_FIELD_IS_OBJECT 是Block截获对象时候的特殊标示，如果是截获的__block，那么是BLOCK_FIELD_IS_BYREF。&lt;/p&gt;
+
+&lt;h4 id=&quot;blockblock&quot;&gt;三.Block中__block实现原理&lt;/h4&gt;
+
+&lt;p&gt;我们继续研究一下__block实现原理。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+#import &amp;lt;Foundation/Foundation.h&amp;gt;
+
+int main(int argc, const char * argv[]) {
+    
+    __block int i = 0;
+    
+    void (^myBlock)(void) = ^{
+        i ++;
+        NSLog(@&quot;%d&quot;,i);
+    };
+    
+    myBlock();
+    
+    return 0;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;把上述代码用clang转换成源码。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+struct __Block_byref_i_0 {
+  void *__isa;
+__Block_byref_i_0 *__forwarding;
+ int __flags;
+ int __size;
+ int i;
+};
+
+struct __main_block_impl_0 {
+  struct __block_impl impl;
+  struct __main_block_desc_0* Desc;
+  __Block_byref_i_0 *i; // by ref
+  __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, __Block_byref_i_0 *_i, int flags=0) : i(_i-&amp;gt;__forwarding) {
+    impl.isa = &amp;amp;_NSConcreteStackBlock;
+    impl.Flags = flags;
+    impl.FuncPtr = fp;
+    Desc = desc;
+  }
+};
+static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
+  __Block_byref_i_0 *i = __cself-&amp;gt;i; // bound by ref
+
+        (i-&amp;gt;__forwarding-&amp;gt;i) ++;
+        NSLog((NSString *)&amp;amp;__NSConstantStringImpl__var_folders_45_k1d9q7c52vz50wz1683_hk9r0000gn_T_main_3b0837_mi_0,(i-&amp;gt;__forwarding-&amp;gt;i));
+    }
+static void __main_block_copy_0(struct __main_block_impl_0*dst, struct __main_block_impl_0*src) {_Block_object_assign((void*)&amp;amp;dst-&amp;gt;i, (void*)src-&amp;gt;i, 8/*BLOCK_FIELD_IS_BYREF*/);}
+
+static void __main_block_dispose_0(struct __main_block_impl_0*src) {_Block_object_dispose((void*)src-&amp;gt;i, 8/*BLOCK_FIELD_IS_BYREF*/);}
+
+static struct __main_block_desc_0 {
+  size_t reserved;
+  size_t Block_size;
+  void (*copy)(struct __main_block_impl_0*, struct __main_block_impl_0*);
+  void (*dispose)(struct __main_block_impl_0*);
+} __main_block_desc_0_DATA = { 0, sizeof(struct __main_block_impl_0), __main_block_copy_0, __main_block_dispose_0};
+int main(int argc, const char * argv[]) {
+    __attribute__((__blocks__(byref))) __Block_byref_i_0 i = {(void*)0,(__Block_byref_i_0 *)&amp;amp;i, 0, sizeof(__Block_byref_i_0), 0};
+
+    void (*myBlock)(void) = ((void (*)())&amp;amp;__main_block_impl_0((void *)__main_block_func_0, &amp;amp;__main_block_desc_0_DATA, (__Block_byref_i_0 *)&amp;amp;i, 570425344));
+
+    ((void (*)(__block_impl *))((__block_impl *)myBlock)-&amp;gt;FuncPtr)((__block_impl *)myBlock);
+
+    return 0;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;从源码我们能发现，带有 __block的变量也被转化成了一个结构体__Block_byref_i_0,这个结构体有5个成员变量。第一个是isa指针，第二个是指向自身类型的__forwarding指针，第三个是一个标记flag，第四个是它的大小，第五个是变量值，名字和变量名同名。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;__attribute__((__blocks__(byref))) __Block_byref_i_0 i = {(void*)0,(__Block_byref_i_0 *)&amp;amp;i, 0, sizeof(__Block_byref_i_0), 0};
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;源码中是这样初始化的。__forwarding指针初始化传递的是自己的地址。然而这里__forwarding指针真的永远指向自己么？我们来做一个实验。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+//以下代码在MRC中运行
+    __block int i = 0;
+    NSLog(@&quot;%p&quot;,&amp;amp;i);
+    
+    void (^myBlock)(void) = [^{
+        i ++;
+        NSLog(@&quot;这是Block 里面%p&quot;,&amp;amp;i);
+    }copy];
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;我们把Block拷贝到了堆上，这个时候打印出来的2个i变量的地址就不同了。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;0x7fff5fbff818
+&amp;lt;__NSMallocBlock__: 0x100203cc0&amp;gt;
+这是Block 里面 0x1002038a8
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;地址不同就可以很明显的说明__forwarding指针并没有指向之前的自己了。那__forwarding指针现在指向到哪里了呢？&lt;/p&gt;
+
+&lt;p&gt;Block里面的__block的地址和Block的地址就相差1052。我们可以很大胆的猜想，__block现在也在堆上了。&lt;/p&gt;
+
+&lt;p&gt;出现这个不同的原因在于这里把Block拷贝到了堆上。&lt;/p&gt;
+
+&lt;p&gt;由第二章里面详细分析的，堆上的Block会持有对象。我们把Block通过copy到了堆上，堆上也会重新复制一份Block，并且该Block也会继续持有该__block。当Block释放的时候，__block没有被任何对象引用，也会被释放销毁。&lt;/p&gt;
+
+&lt;p&gt;__forwarding指针这里的作用就是针对堆的Block，把原来__forwarding指针指向自己，换成指向_NSConcreteMallocBlock上复制之后的__block自己。然后堆上的变量的__forwarding再指向自己。这样不管__block怎么复制到堆上，还是在栈上，都可以通过(i-&amp;gt;__forwarding-&amp;gt;i)来访问到变量值。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_6.jpg&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;所以在__main_block_func_0函数里面就是写的(i-&amp;gt;__forwarding-&amp;gt;i)。&lt;/p&gt;
+
+&lt;p&gt;这里还有一个需要注意的地方。还是从例子说起：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;//以下代码在MRC中运行
+    __block int i = 0;
+    NSLog(@&quot;%p&quot;,&amp;amp;i);
+    
+    void (^myBlock)(void) = ^{
+        i ++;
+        NSLog(@&quot;Block 里面的%p&quot;,&amp;amp;i);
+    };
+    
+    
+    NSLog(@&quot;%@&quot;,myBlock);
+    
+    myBlock();
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;结果和之前copy的例子完全不同。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+ 0x7fff5fbff818
+&amp;lt;__NSStackBlock__: 0x7fff5fbff7c0&amp;gt;**
+ 0x7fff5fbff818
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Block在捕获住__block变量之后，并不会复制到堆上，所以地址也一直都在栈上。这与ARC环境下的不一样。&lt;/p&gt;
+
+&lt;p&gt;ARC环境下，不管有没有copy，__block都会变copy到堆上，Block也是__NSMallocBlock。
+MRC环境下，只有copy，__block才会被复制到堆上，否则，__block一直都在栈上，block也只是__NSStackBlock，这个时候__forwarding指针就只指向自己了。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_7.jpg&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;至此，文章开头提出的问题一，也解答了。__block的实现原理也已经明了。&lt;/p&gt;
+
+&lt;h4 id=&quot;section-4&quot;&gt;最后&lt;/h4&gt;
+
+&lt;p&gt;关于Block捕获外部变量有很多用途，用途也很广，只有弄清了捕获变量和持有的变量的概念以后，之后才能清楚的解决Block循环引用的问题。&lt;/p&gt;
+
+&lt;p&gt;再次回到文章开头，5种变量，自动变量，函数参数 ，静态变量，静态全局变量，全局变量，如果严格的来说，捕获是必须在Block结构体__main_block_impl_0里面有成员变量的话，Block能捕获的变量就只有带有自动变量和静态变量了。捕获进Block的对象会被Block持有。&lt;/p&gt;
+
+&lt;p&gt;自动变量的值，被copy进了Block，不带__block的自动变量只能在里面被访问，并不能改变值。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_8.jpg&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;带__block的自动变量 和 静态变量 就是直接地址访问。所以在Block里面可以直接改变变量的值。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_9.jpg&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;而剩下的静态全局变量，全局变量，函数参数，也是可以在直接在Block中改变变量值的，但是他们并没有变成Block结构体__main_block_impl_0的成员变量，因为他们的作用域大，所以可以直接更改他们的值。&lt;/p&gt;
+
+&lt;p&gt;值得注意的是，静态全局变量，全局变量，函数参数他们并不会被Block持有，也就是说不会增加retainCount值。&lt;/p&gt;
+
+&lt;p&gt;请大家多多指点。&lt;/p&gt;
+</description>
+        <pubDate>Sat, 27 Aug 2016 22:05:00 +0800</pubDate>
+        <link>http://vno.onevcat.com/2016/08/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E6%8D%95%E8%8E%B7%E5%A4%96%E9%83%A8%E5%8F%98%E9%87%8F%E5%92%8C__block%E5%AE%9E%E7%8E%B0%E5%8E%9F%E7%90%86/</link>
+        <guid isPermaLink="true">http://vno.onevcat.com/2016/08/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E6%8D%95%E8%8E%B7%E5%A4%96%E9%83%A8%E5%8F%98%E9%87%8F%E5%92%8C__block%E5%AE%9E%E7%8E%B0%E5%8E%9F%E7%90%86/</guid>
+        
+        <category>iOS</category>
+        
+        
+        <category>Blog</category>
+        
+      </item>
+    
+      <item>
+        <title>给iOS 模拟器“安装”app文件</title>
+        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-aa54e17eb79b1ce4.jpeg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h4 id=&quot;section&quot;&gt;前言&lt;/h4&gt;
+&lt;p&gt;刚刚接触iOS的时候，我就一直很好奇，模拟器上面能不能直接安装app呢？如果可以，我们就直接在模拟器上面聊QQ和微信了。直到昨天和朋友们聊到了这个话题，没有想到还真的可以给模拟器“安装”app！&lt;/p&gt;
+
+&lt;h4 id=&quot;section-1&quot;&gt;一.应用场景&lt;/h4&gt;
+
+&lt;p&gt;先来谈谈是什么情况下，会有在模拟器上安装app的需求。&lt;/p&gt;
+
+&lt;p&gt;在一个大公司里，对源码的管理有严格的制度，非开发人员是没有权限接触到源码的。对苹果的开发证书管理也非常严格，甚至连开发人员也没有发布证书，证书只在持续集成环境或者Appstore产线里面，或者只在最后打包上架的人手上。&lt;/p&gt;
+
+&lt;p&gt;那么现在就有这样的需求，开发人员搭建好UI以后，要把开发完成的Alapha版给到UI设计师那边去评审，看看是否完全达到要求，达不到要求就需要打回来重做。&lt;/p&gt;
+
+&lt;p&gt;一般做法就是直接拿手机去安装一遍了。直接真机看效果。不过要是设计师和开发不在同一个地方的公司，一个在北京一个在上海，这种就没法安装了。源码又无法导出给设计师，让他运行一下Xcode跑一下模拟器。打release的ipa通过扫码安装，如果公司大了，UDID全部都用完了，也没法安装。这个时候就比较麻烦了。(一般也没人遇到这么蛋疼的事情吧)&lt;/p&gt;
+
+&lt;p&gt;那么现在就有给模拟器安装app的需求了，那开发人员如何能把开发版的app给打包出来给其他模拟器安装呢？&lt;/p&gt;
+
+&lt;h4 id=&quot;section-2&quot;&gt;二.解决办法&lt;/h4&gt;
+
+&lt;p&gt;解决思路，想要别人的模拟器运行起我们开发的app，最简单的办法就是把我们DerivedData的数据直接拷贝到别人模拟器上面，就可以了。当然还要考虑到设计师也许并不会一些命令行命令，我们的操作越傻瓜越好。&lt;/p&gt;
+
+&lt;h5 id=&quot;deriveddatadebug&quot;&gt;1.拷贝本地的DerivedData里面的debug包&lt;/h5&gt;
+
+&lt;p&gt;Mac的拷贝命令有cp和ditto，建议用ditto进行拷贝工作。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+Usage: ditto [ &amp;lt;options&amp;gt; ] src [ ... src ] dst
+
+    &amp;lt;options&amp;gt; are any of:
+    -h                         print full usage
+    -v                         print a line of status for each source copied
+    -V                         print a line of status for every file copied
+    -X                         do not descend into directories with a different device ID
+
+    -c                         create an archive at dst (by default CPIO format)
+    -x                         src(s) are archives
+    -z                         gzip compress CPIO archive
+    -j                         bzip2 compress CPIO archive
+    -k                         archives are PKZip
+    --keepParent               parent directory name src is embedded in dst_archive
+    --arch archVal             fat files will be thinned to archVal
+                               multiple -arch options can be specified
+                               archVal should be one of &quot;ppc&quot;, &quot;i386&quot;, etc
+    --bom bomFile              only objects present in bomFile are copied
+    --norsrc                   don&#39;t preserve resource data
+    --noextattr                don&#39;t preserve extended attributes
+    --noqtn                    don&#39;t preserve quarantine information
+    --noacl                    don&#39;t preserve ACLs
+    --sequesterRsrc            copy resources via polite directory (PKZip only)
+    --nocache                  don&#39;t use filesystem cache for reads/writes
+    --hfsCompression           compress files at destination if appropriate
+    --nopreserveHFSCompression don&#39;t preserve HFS+ compression when copying files
+    --zlibCompressionLevel num use compression level &#39;num&#39; when creating a PKZip archive
+    --password                 request password for reading from encrypted PKZip archive
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Ditto比cp命令更好的地方在于：
+1. 它在复制过程中不仅能保留源文件或者文件夹的属性与权限，还能保留源文件的资源分支结构和文件夹的源结构。
+2. 此命令能确保文件或者文件夹被如实复制。
+3. 如果目标文件或者文件夹不存在，ditto将直接复制过去或创建新的文件和文件夹，相反，对于已经存在的文件，命令将与目标文件（夹）合并。
+4. ditto还能提供完整符号链接。&lt;/p&gt;
+
+&lt;p&gt;那么我们就拷贝出本地的debug包&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;ditto -ck --sequesterRsrc --keepParent `ls -1 -d -t ~/Library/Developer/Xcode/DerivedData/*/Build/Products/*-iphonesimulator/*.app | head -n 1` /Users/YDZ/Desktop/app.zip
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;有几点需要说明的：&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;
+    &lt;p&gt;上面命令最后一个路径(/Users/YDZ/Desktop/app.zip)，这个是自定义的，我这里举的例子是直接放在桌面。除了这里改一下路径，前面的都不需要改，包括 * 也都不用改。&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;再来说一下命令里面的 * 的问题。当我们打开自己本地的~/Library/Developer/Xcode/DerivedData/ ，这个路径下，会发现里面装的都是在我们本地模拟器上运行过的app程序。前面是app的Bundle Identifier，横线后面是一堆字符串。上面的ditto里面带 * 的那个路径是为了动态匹配一个地址的，* 在这里也是一个通配符。后面的head说明了匹配的规则。head其实是找出最近一次我们运行模拟器的app的路径。&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;为了保证我们打包是正确的，建议先运行一下我们要打包的app，一般我们Scheme里面的Run都是debug product(如果这里有更改，那就改成对应debug的Scheme)，确保是我们要给设计师审核的app，之后再运行这个ditto命令。&lt;/p&gt;
+
+&lt;h5 id=&quot;debug&quot;&gt;2.把debug包拷贝到另一个模拟器中&lt;/h5&gt;
+
+&lt;p&gt;我们运行完上面的ditto命令会产生一个zip文件，解压出来，会得到一个app文件，这个就是debug包了。debug包就是我们要给设计师的app包了。&lt;/p&gt;
+
+&lt;p&gt;如何能让设计师傻瓜式的安装这个app呢？&lt;/p&gt;
+
+&lt;p&gt;这里介绍一个命令行工具，&lt;a href=&quot;https://github.com/appcelerator/ios-sim&quot;&gt;ios-sim&lt;/a&gt;命令行工具。&lt;/p&gt;
+
+&lt;p&gt;ios-sim 是一个可以在命令控制iOS模拟器的工具。利用这个命令，我们可以启动一个模拟器，安装app，启动app，查询iOS SDK。它可以使我们像自动化测试一样不用打开Xcode。&lt;/p&gt;
+
+&lt;p&gt;不过 ios-sim 只支持Xcode 6 以后的版本。&lt;/p&gt;
+
+&lt;p&gt;安装ios-sim&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;    $ npm install ios-sim -g
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;说明文档：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+    Usage: ios-sim &amp;lt;command&amp;gt; &amp;lt;options&amp;gt; [--args ...]
+        
+    Commands:
+      showsdks                        List the available iOS SDK versions
+      showdevicetypes                 List the available device types
+      launch &amp;lt;application path&amp;gt;       Launch the application at the specified path on the iOS Simulator
+      start                           Launch iOS Simulator without an app
+      install &amp;lt;application path&amp;gt;      Install the application at the specified path on the iOS Simulator without launching the app
+
+    Options:
+      --version                       Print the version of ios-sim
+      --help                          Show this help text
+      --exit                          Exit after startup
+      --log &amp;lt;log file path&amp;gt;           The path where log of the app running in the Simulator will be redirected to
+      --devicetypeid &amp;lt;device type&amp;gt;    The id of the device type that should be simulated (Xcode6+). Use &#39;showdevicetypes&#39; to list devices.
+                                      e.g &quot;com.apple.CoreSimulator.SimDeviceType.Resizable-iPhone6, 8.0&quot;
+                                  
+    Removed in version 4.x:
+      --stdout &amp;lt;stdout file path&amp;gt;     The path where stdout of the simulator will be redirected to (defaults to stdout of ios-sim)
+      --stderr &amp;lt;stderr file path&amp;gt;     The path where stderr of the simulator will be redirected to (defaults to stderr of ios-sim)
+      --sdk &amp;lt;sdkversion&amp;gt;              The iOS SDK version to run the application on (defaults to the latest)
+      --family &amp;lt;device family&amp;gt;        The device type that should be simulated (defaults to `iphone&#39;)
+      --retina                        Start a retina device
+      --tall                          In combination with --retina flag, start the tall version of the retina device (e.g. iPhone 5 (4-inch))
+      --64bit                         In combination with --retina flag and the --tall flag, start the 64bit version of the tall retina device (e.g. iPhone 5S (4-inch 64bit))
+                                    
+    Unimplemented in this version:
+      --verbose                       Set the output level to verbose
+      --timeout &amp;lt;seconds&amp;gt;             The timeout time to wait for a response from the Simulator. Default value: 30 seconds
+      --args &amp;lt;...&amp;gt;                    All following arguments will be passed on to the application
+      --env &amp;lt;environment file path&amp;gt;   A plist file containing environment key-value pairs that should be set
+      --setenv NAME=VALUE             Set an environment variable
+                                  
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;用法不难&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;ios-sim launch /Users/YDZ/Desktop/app.app --devicetypeid iPhone-6s 
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;其中，/Users/YDZ/Desktop/app.app这个是设计师收到app之后的路径。–devicetypeid参数后面是给定一个模拟器的版本。&lt;/p&gt;
+
+&lt;p&gt;只需要把上面的命令发给设计师，无脑粘贴到命令行，装好app的模拟器就会自动启动，打开app了。&lt;/p&gt;
+
+&lt;h4 id=&quot;section-3&quot;&gt;三.额外的尝试&lt;/h4&gt;
+
+&lt;p&gt;好奇的同学肯定不会满足只给模拟器安装debug包吧，既然可以不用代码就可以给模拟器安装app，那我们能安装release包么？我好奇的尝试了一下。&lt;/p&gt;
+
+&lt;p&gt;先从Appstore上面下载最新的微信，把ipa后缀改成zip，解压，把Payload文件夹里面的“WeChat”取出来，然后运行ios-sim命令。&lt;/p&gt;
+
+&lt;p&gt;结果微信确实是安装到了模拟器了。不过一点击app，看见了月亮界面就退出了。控制台打印了一堆信息。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;An error was encountered processing the command (domain=FBSOpenApplicationErrorDomain, code=1):
+The operation couldn’t be completed. (FBSOpenApplicationErrorDomain error 1.)
+Aug 18 16:29:17 YDZdeMacBook-Pro nsurlsessiond[19213]: Task 1 for client &amp;lt;CFString 0x7fa810c047d0 [0x1073daa40]&amp;gt;{contents = &quot;com.apple.mobileassetd&quot;} completed with error - code: -999
+Aug 18 16:29:17 YDZdeMacBook-Pro com.apple.CoreSimulator.SimDevice.D6BD3967-9BC4-4A8D-9AD0-23176B22B12A.launchd_sim[19096] (UIKitApplication:com.tencent.xin[0xdf6d][19774]): Program specified by service does not contain one of the requested architectures:
+Aug 18 16:29:17 YDZdeMacBook-Pro SpringBoard[19181]: Unable to get pid for &#39;UIKitApplication:com.tencent.xin[0xdf6d]&#39;: No such process (err 3)
+Aug 18 16:29:17 YDZdeMacBook-Pro SpringBoard[19181]: Bootstrapping failed for &amp;lt;FBApplicationProcess: 0x7fa83cd91840; com.tencent.xin; pid: -1&amp;gt;
+Aug 18 16:29:17 YDZdeMacBook-Pro SpringBoard[19181]: Unable to delete job with label UIKitApplication:com.tencent.xin[0xdf6d]. Error: Operation now in progress
+Aug 18 16:29:17 YDZdeMacBook-Pro SpringBoard[19181]: Application &#39;UIKitApplication:com.tencent.xin[0xdf6d]&#39; exited for an unknown reason.
+Aug 18 16:29:17 YDZdeMacBook-Pro com.apple.CoreSimulator.SimDevice.D6BD3967-9BC4-4A8D-9AD0-23176B22B12A.launchd_sim[19096] (UIKitApplication:com.tencent.xin[0xdf6d][19774]): Trampoline was terminated before jumping to service: Killed: 9
+Aug 18 16:29:18 YDZdeMacBook-Pro fileproviderd[19169]: (Note ) FileProvider: /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/System/Library/PrivateFrameworks/FileProvider.framework/Support/fileproviderd starting.
+Aug 18 16:29:20 YDZdeMacBook-Pro pkd[19238]: assigning plug-in com.apple.ServerDocuments.ServerFileProvider(1.0) to plugin sandbox
+Aug 18 16:29:20 YDZdeMacBook-Pro pkd[19238]: enabling pid=19169 for plug-in com.apple.ServerDocuments.ServerFileProvider(1.0) D12B6280-6DF1-434C-9BAA-BD9B0D0FB756 /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/Applications/ServerDocuments.app/PlugIns/ServerFileProvider.appex
+Aug 18 16:29:22 YDZdeMacBook-Pro SpringBoard[19181]: Weekly asset update check did fire (force=NO)
+Aug 18 16:29:22 YDZdeMacBook-Pro SpringBoard[19181]: Beginning check for asset updates (force: 0
+Aug 18 16:29:22 YDZdeMacBook-Pro SpringBoard[19181]: Did not complete check for asset updates (force: 0, isVoiceOverRunning: 0
+Aug 18 16:29:23 YDZdeMacBook-Pro mstreamd[19171]: (Note ) mstreamd: mstreamd starting up.
+Aug 18 16:29:23 YDZdeMacBook-Pro DTServiceHub[19191]: DTServiceHub(19191) [error]: &#39;mach_msg_send&#39; failed: (ipc/send) invalid destination port (268435459)
+Aug 18 16:29:25 YDZdeMacBook-Pro itunesstored[19744]: iTunes Store environment is: MR22
+Aug 18 16:29:25 YDZdeMacBook-Pro itunesstored[19744]: Normal message received by listener connection. Ignoring.
+Aug 18 16:29:25 --- last message repeated 1 time ---
+Aug 18 16:29:25 YDZdeMacBook-Pro mstreamd[19171]: (Note ) PS: The subscription plugin class does not support push notification refreshing.
+Aug 18 16:29:25 YDZdeMacBook-Pro itunesstored[19744]: libMobileGestalt MGIOKitSupport.c:387: value for udid-version property of IODeviceTree:/product is invalid ((null))
+Aug 18 16:29:25 YDZdeMacBook-Pro itunesstored[19744]: Normal message received by listener connection. Ignoring.
+Aug 18 16:29:25 YDZdeMacBook-Pro itunesstored[19744]: libMobileGestalt MGBasebandSupport.c:60: _CTServerConnectionCopyMobileEquipmentInfo: CommCenter error: 1:45 (Operation not supported)
+Aug 18 16:29:25 YDZdeMacBook-Pro itunesstored[19744]: libMobileGestalt MGBasebandSupport.c:189: No CT mobile equipment info dictionary while fetching kCTMobileEquipmentInfoIMEI
+Aug 18 16:29:26 YDZdeMacBook-Pro mstreamd[19171]: (Note ) PS: Media stream daemon starting...
+Aug 18 16:29:27 YDZdeMacBook-Pro itunesstored[19744]: UpdateAssetsOperation: Error downloading manifest from URL https://apps.itunes.com/files/ios-music-app/: Error Domain=SSErrorDomain Code=109 &quot;无法连接到 iTunes Store&quot; UserInfo={NSLocalizedDescription=无法连接到 iTunes Store, SSErrorHTTPStatusCodeKey=503}
+Aug 18 16:29:31 YDZdeMacBook-Pro healthd[19174]: (Error) MC: MobileContainerManager gave us a path we weren&#39;t expecting; file a radar against them
+       	Expected: /private/var/containers/Shared/SystemGroup/systemgroup.com.apple.configurationprofiles
+       	Actual: /Users/YDZ/Library/Developer/CoreSimulator/Devices/D6BD3967-9BC4-4A8D-9AD0-23176B22B12A/data/Containers/Shared/SystemGroup/systemgroup.com.apple.configurationprofiles
+       	Overriding MCM with the one true path
+Aug 18 16:29:31 YDZdeMacBook-Pro healthd[19174]: PairedSync, Debugging at level 0 for console and level 0 for log files
+Aug 18 16:29:31 YDZdeMacBook-Pro healthd[19174]: Error: Could not create service from plist at path: file:///Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/System/Library/PairedSyncServices/com.apple.pairedsync.healthd.plist. Returning nil PSYSyncCoordinator for service name com.apple.pairedsync.healthd.  Please check that your plist exists and is in the correct format.
+Aug 18 16:29:31 YDZdeMacBook-Pro healthd[19174]: Error: failed to load bundle &quot;/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/System/Library/Health/Plugins/CompanionHealth.bundle&quot;: Error Domain=NSCocoaErrorDomain Code=4 &quot;未能载入软件包“CompanionHealth.bundle”，因为未能找到其可执行文件的位置。&quot; UserInfo={NSLocalizedFailureReason=未能找到该软件包可执行文件的位置。, NSLocalizedRecoverySuggestion=请尝试重新安装软件包。, NSBundlePath=/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/System/Library/Health/Plugins/CompanionHealth.bundle, NSLocalizedDescription=未能载入软件包“CompanionHealth.bundle”，因为未能找到其可执行文件的位置。}
+Aug 18 16:29:33 YDZdeMacBook-Pro wcd[19180]: libMobileGestalt MobileGestalt.c:2584: Failed to get battery level
+Aug 18 16:29:34 --- last message repeated 1 time ---
+Aug 18 16:29:34 YDZdeMacBook-Pro assertiond[19185]: assertion failed: 15G31 13E230: assertiond + 15801 [3C808658-78EC-3950-A264-79A64E0E463B]: 0x1
+Aug 18 16:29:34 --- last message repeated 1 time ---
+Aug 18 16:29:34 YDZdeMacBook-Pro SpringBoard[19181]: [MPUSystemMediaControls] Updating supported commands for now playing application.
+Aug 18 16:29:34 YDZdeMacBook-Pro assertiond[19185]: assertion failed: 15G31 13E230: assertiond + 15801 [3C808658-78EC-3950-A264-79A64E0E463B]: 0x1
+Aug 18 16:29:34 --- last message repeated 1 time ---
+Aug 18 16:29:34 YDZdeMacBook-Pro fileproviderd[19169]: plugin com.apple.ServerDocuments.ServerFileProvider invalidated
+Aug 18 16:29:34 YDZdeMacBook-Pro ServerFileProvider[19775]: host connection &amp;lt;NSXPCConnection: 0x7f880160bc30&amp;gt; connection from pid 19169 invalidated
+Aug 18 16:30:08 YDZdeMacBook-Pro mstreamd[19171]: (Note ) PS: Media stream daemon stopping.
+Aug 18 16:30:09 YDZdeMacBook-Pro mstreamd[19171]: (Note ) AS: &amp;lt;MSIOSAlbumSharingDaemon: 0x7fd139c0a020&amp;gt;: Shared Streams daemon has shut down.
+Aug 18 16:30:09 YDZdeMacBook-Pro mstreamd[19171]: (Warn ) mstreamd: mstreamd shutting down.
+Aug 18 16:30:09 YDZdeMacBook-Pro CoreSimulatorBridge[19190]: Switching to keyboard: zh-Hans
+Aug 18 16:30:09 YDZdeMacBook-Pro CoreSimulatorBridge[19190]: KEYMAP: Failed to determine iOS keyboard layout for language zh-Hans.
+Aug 18 16:30:09 YDZdeMacBook-Pro CoreSimulatorBridge[19190]: Switching to keyboard: zh-Hans
+Aug 18 16:30:09 YDZdeMacBook-Pro CoreSimulatorBridge[19190]: KEYMAP: Failed to determine iOS keyboard layout for language zh-Hans.
+Aug 18 16:30:10 YDZdeMacBook-Pro CoreSimulatorBridge[19190]: Switching to keyboard: zh-Hans
+Aug 18 16:30:10 YDZdeMacBook-Pro CoreSimulatorBridge[19190]: KEYMAP: Failed to determine iOS keyboard layout for language zh-Hans.
+Aug 18 16:30:10 YDZdeMacBook-Pro CoreSimulatorBridge[19190]: Switching to keyboard: zh-Hans
+Aug 18 16:30:10 YDZdeMacBook-Pro CoreSimulatorBridge[19190]: KEYMAP: Failed to determine iOS keyboard layout for language zh-Hans.
+Aug 18 16:30:16 YDZdeMacBook-Pro sharingd[19183]: 16:30:16.190 : Failed to send SDURLSessionProxy startup message, error Error Domain=com.apple.identityservices.error Code=23 &quot;Timed out&quot; UserInfo={NSLocalizedDescription=Timed out, NSUnderlyingError=0x7ff088e005a0 {Error Domain=com.apple.ids.idssenderrordomain Code=12 &quot;(null)&quot;}}
+Aug 18 16:30:38 YDZdeMacBook-Pro CoreSimulatorBridge[19190]: Switching to keyboard: zh-Hans
+Aug 18 16:30:38 YDZdeMacBook-Pro CoreSimulatorBridge[19190]: KEYMAP: Failed to determine iOS keyboard layout for language zh-Hans.
+Aug 18 16:30:38 YDZdeMacBook-Pro CoreSimulatorBridge[19190]: Switching to keyboard: zh-Hans
+Aug 18 16:30:38 YDZdeMacBook-Pro CoreSimulatorBridge[19190]: KEYMAP: Failed to determine iOS keyboard layout for language zh-Hans.
+Aug 18 16:30:41 YDZdeMacBook-Pro CoreSimulatorBridge[19190]: Switching to keyboard: zh-Hans
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;仔细看了一下log，根本原因还是因为&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;com.apple.CoreSimulator.SimDevice.D6BD3967-9BC4-4A8D-9AD0-23176B22B12A.launchd_sim[19096] (UIKitApplication:com.tencent.xin[0xdf6d][19774]): Program specified by service does not contain one of the requested architectures:
+
+Unable to get pid for &#39;UIKitApplication:com.tencent.xin[0xdf6d]&#39;: No such process (err 3)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;因为release包里面architectures打包的时候不包含模拟器的architectures。debug包里面就有。所以release就没法安装到模拟器了。&lt;/p&gt;
+
+&lt;p&gt;由于笔者逆向方面的东西没有研究，所以也无法继续下去了。不知道逆向技术能不能把release包破壳之后能不能转成debug包呢？如果能转成debug包，通过ios-sim命令应该也是可以直接安装到模拟器的。&lt;/p&gt;
+
+&lt;p&gt;至此，ios-sim给模拟器安装app就尝试到此了。因为只能给模拟器安装debug包，所以在题目上额外给安装加了双引号，并不是所有的app文件都可以安装到模拟器。&lt;/p&gt;
+
+&lt;p&gt;请大家多多指教。&lt;/p&gt;
+</description>
+        <pubDate>Thu, 18 Aug 2016 18:58:00 +0800</pubDate>
+        <link>http://vno.onevcat.com/2016/08/%E7%BB%99iOS-%E6%A8%A1%E6%8B%9F%E5%99%A8-%E5%AE%89%E8%A3%85-app%E6%96%87%E4%BB%B6/</link>
+        <guid isPermaLink="true">http://vno.onevcat.com/2016/08/%E7%BB%99iOS-%E6%A8%A1%E6%8B%9F%E5%99%A8-%E5%AE%89%E8%A3%85-app%E6%96%87%E4%BB%B6/</guid>
+        
+        <category>iOS</category>
+        
+        
+        <category>Blog</category>
+        
+      </item>
     
       <item>
         <title>手把手教你给一个iOS app配置多个环境变量</title>
@@ -2901,959 +3957,6 @@ func requestAsyncOperation(request : String ) -&amp;gt; Async &amp;lt;String&amp
         
         
         <category>Blog</category>
-        
-      </item>
-    
-      <item>
-        <title>如何快速给自己构建一个温馨的&quot;家&quot;——用Jekyll搭建静态博客</title>
-        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-da55e05ede63372b.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;h4 id=&quot;section&quot;&gt;前言&lt;/h4&gt;
-&lt;p&gt;我相信，每个程序员都有一个愿望，都想有一个属于自己的”家”——属于自己的博客，专属的网站。在自己的“家”中，可以和志同道合的兄弟一起分享和讨论任何技术，谈天说地。更重要的是可以当做自己的技术积累，提升自己实力。那么接下来就来说说我博客搭建过程。&lt;/p&gt;
-
-&lt;h4 id=&quot;section-1&quot;&gt;目录：&lt;/h4&gt;
-&lt;ol&gt;
-  &lt;li&gt;本地搭建Jekyll&lt;/li&gt;
-  &lt;li&gt;开发或者选择Jekyll主题&lt;/li&gt;
-  &lt;li&gt;使用Github Pages服务&lt;/li&gt;
-  &lt;li&gt;申请个人域名&lt;/li&gt;
-  &lt;li&gt;给博客增加访客评论功能&lt;/li&gt;
-  &lt;li&gt;申请”小绿锁”HTTPS&lt;/li&gt;
-  &lt;li&gt;日后维护&lt;/li&gt;
-&lt;/ol&gt;
-
-&lt;h4 id=&quot;kekyll&quot;&gt;一.本地搭建Kekyll&lt;/h4&gt;
-&lt;p&gt;Jekyll是什么？它是一个简单静态博客生成工具，相对于动态博客。&lt;br /&gt;
-1. 简单。因为它是不需要数据库的，通过markdown编写静态文件，生成Html页面，它的优点是提升了页面的响应速度，并且让博主可以只专注于写文章，不用再去考虑如何排版。&lt;br /&gt;
-2. 静态。Markdown（或 Textile）、Liquid 和 HTML &amp;amp; CSS 构建可发布的静态网站。&lt;br /&gt;
-3. 博客支持。支持自定义地址、博客分类、页面、文章以及自定义的布局设计。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;//使用gem安装Jekyll
-gem install jekyll
-
-
-//使用Jekyll创建你的博客站点
-jekyll new blog  #创建你的站点
-
-
-//开启Jekyll服务
-//进入blog目录,记得一定要进入创建的目录，否则服务无法开启
-cd blog    	 
-jekyll serve 	 #启动你的http服务 
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;本地服务开启后，Jekyll服务默认端口是4000，所以我打开浏览器，输入：http://localhost:4000 即可访问&lt;/p&gt;
-
-&lt;p&gt;到这里一个简单的博客页面就会显示出来了。&lt;/p&gt;
-
-&lt;p&gt;关于jekyll其他一些命令的用法如下:&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ jekyll build
-# =&amp;gt; 当前文件夹中的内容将会生成到 ./_site 文件夹中。
-
-$ jekyll build --destination &amp;lt;destination&amp;gt;
-# =&amp;gt; 当前文件夹中的内容将会生成到目标文件夹&amp;lt;destination&amp;gt;中。
-
-$ jekyll build --source &amp;lt;source&amp;gt; --destination &amp;lt;destination&amp;gt;
-# =&amp;gt; 指定源文件夹&amp;lt;source&amp;gt;中的内容将会生成到目标文件夹&amp;lt;destination&amp;gt;中。
-
-$ jekyll build --watch
-# =&amp;gt; 当前文件夹中的内容将会生成到 ./_site 文件夹中，
-#    查看改变，并且自动再生成。
-
-$ jekyll serve
-# =&amp;gt; 一个开发服务器将会运行在 http://localhost:4000/
-# Auto-regeneration（自动再生成文件）: 开启。使用 `--no-watch` 来关闭。
-
-$ jekyll serve --detach
-# =&amp;gt; 功能和`jekyll serve`命令相同，但是会脱离终端在后台运行。
-#    如果你想关闭服务器，可以使用`kill -9 1234`命令，&quot;1234&quot; 是进程号（PID）。
-#    如果你找不到进程号，那么就用`ps aux | grep jekyll`命令来查看，然后关闭服务器。[更多](http://unixhelp.ed.ac.uk/shell/jobz5.html).
-
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;Jekyll 的核心其实是一个文本转换引擎。它的概念其实就是：你用你最喜欢的标记语言来写文章，可以是 Markdown, 也可以是 Textile, 或者就是简单的 HTML, 然后 Jekyll 就会帮你套入一个或一系列的布局中。在整个过程中你可以设置 URL 路径，你的文本在布局中的显示样式等等。这些都可以通过纯文本编辑来实现，最终生成的静态页面就是你的成品了。&lt;/p&gt;
-
-&lt;p&gt;接下来再说说jeykll的目录结构：&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;├── _config.yml  			(配置文件)
-├── _drafts  				(drafts（草稿）是未发布的文章)
-|   ├── begin-with-the-crazy-ideas.textile
-|   └── on-simplicity-in-technology.markdown
-├── _includes 			(加载这些包含部分到你的布局)
-|   ├── footer.html
-|   └── header.html
-├── _layouts 			    (包裹在文章外部的模板)
-|   ├── default.html
-|   └── post.html
-├── _posts 				  (这里都是存放文章)
-|   ├── 2007-10-29-why-every-programmer-should-play-nethack.textile
-|   └── 2009-04-26-barcamp-boston-4-roundup.textile
-├── _site 				(生成的页面都会生成在这个目录下)
-├── .jekyll-metadata	  (该文件帮助 Jekyll 跟踪哪些文件从上次建立站点开始到现在没有被修改，哪些文件需要在下一次站点建立时重新生成。该文件不会被包含在生成的站点中。)
-└── index.html 		   (网站的index)
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h4 id=&quot;jekyll&quot;&gt;二.开发或者选择Jekyll主题&lt;/h4&gt;
-&lt;p&gt;再来说说博客的外观，这可能是很多人很看重的，一个高逼格的博客里面看文章也是一种享受。这里就需要自定义主题了。你可以选择自己开发一套，也可以直接选择已有的，然后自己再更改css布局形成自己的。&lt;a href=&quot;http://jekyllthemes.org/&quot;&gt;jekyll主题&lt;/a&gt;在这里，你可以选择到你自己喜欢的主题。下载下来，改改css，或者借用一下，就会有很漂亮的blog就出炉了。&lt;/p&gt;
-
-&lt;h4 id=&quot;github-pages&quot;&gt;三.使用Github Pages服务&lt;/h4&gt;
-
-&lt;h5 id=&quot;section-2&quot;&gt;1. 创建我们自己的仓库&lt;/h5&gt;
-&lt;p&gt;以下用usename代替自己的用户名
-&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-1609f73ca0242750.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;h5 id=&quot;section-3&quot;&gt;2. 配置我们的仓库&lt;/h5&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-35e073b16f96a9aa.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;在Settings里面找到Github Pages&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-a97613e15a848289.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;选择&lt;strong&gt;Launch automatic page generator&lt;/strong&gt;&lt;/p&gt;
-
-&lt;p&gt;接下来的界面就直接选择&lt;strong&gt;Continue to layouts&lt;/strong&gt;&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-a935d6e86644bf94.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;到了这个界面就随便选择一个模板，点击&lt;strong&gt;Publish Page&lt;/strong&gt;即可&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-8984c24b9588e13b.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
-这里就生成了一个静态网页了，直接访问刚刚的设置的&lt;a href=&quot;https://halfrost.com/username.github.io/&quot;&gt;地址https://halfrost.com/username.github.io/&lt;/a&gt;，这个地址，就可以访问到了。&lt;/p&gt;
-
-&lt;p&gt;接下来我们要做的就是把我们的Jekyll生成的blog部署到Github Pages上去即可&lt;/p&gt;
-
-&lt;h5 id=&quot;blog&quot;&gt;3.部署blog&lt;/h5&gt;
-
-&lt;p&gt;我们先把刚刚新建的仓库git clone到本地，然后cd 到仓库的目录下，执行jekyll serve -B&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;cd username.github.com
-jekyll serve -B
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;注意，启动前确保其他目录下没有jekyll服务，可以ps aux|grep jekyll
-查看进程,有的话,用kill -9 进程号 杀掉其他进程。&lt;/p&gt;
-
-&lt;p&gt;现在我们打开&lt;a href=&quot;localhost:4000&quot;&gt;http://localhost:4000&lt;/a&gt;,即可看见我们在Github上创建的主页，理论上和https://username.com/username.github.io/ 访问的应该是一模一样的。&lt;/p&gt;
-
-&lt;p&gt;接着我们把我们自己做好的blog目录整个都拷贝到这个仓库文件夹中，当然，这个仓库之前的文件可以删除了，只留下README即可。把整个文件都push到github上去&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;git add --all                          #添加到暂存区 
-git commit -m &quot;提交jekyll默认页面&quot;       #提交到本地仓库
-git push origin master                 #线上的站点是部署在master下面的
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;注意，在提交前，请确保_config.yml文件里面下面是这样配置的，因为这个是Github Pages的规定，如果选择了其他的模式，会立即收到编译警告的邮件提醒的。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;highlighter: rouge
-markdown: kramdown
-
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;等待大概1-2分钟之后，再次刷新username.github.io，就能看到我们的blog了。&lt;/p&gt;
-
-&lt;h4 id=&quot;section-4&quot;&gt;四.申请个人域名&lt;/h4&gt;
-
-&lt;p&gt;现在很多地方都支持个性化域名，比如新浪微博，就可以自己申请一个个性域名，那么以后只要访问weibo.com/你的名字，这个网址就可以直达你的主页。同理，我们也希望有一个名字直达我们的博客首页，那么我们就需要先买一个域名。一般国内用的比较多的应该就是&lt;strong&gt;万网&lt;/strong&gt;，国外的就是&lt;strong&gt;Go Daddy&lt;/strong&gt;。选择一个你喜欢的用户名，如果没有人先买下那个域名，那就可以恭喜你了，可以去买下来了。&lt;/p&gt;
-
-&lt;p&gt;买好域名以后，就是配置的问题了。 &lt;br /&gt;
-1. 我们要绑定的话需要在username.github.com目录下增加一个CNAME文件。 在里面添加你的域名，假设为example.com，然后推送CNAME文件到远程仓库:&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;git add CNAME
-git push origin master
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;2.到域名服务商增加你的CNAME记录。 添加两条记录，@和www的主机记录，记录类型为CNAME类型，CNAME表示别名记录，该记录可以将多个名字映射到同一台计算机。 记录值请写&lt;strong&gt;username.github.io.&lt;/strong&gt;,值得注意的是io
-后面还有一个圆点，切记。&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-888c87d7134d7ff8.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
-注意，当添加@的记录的时候，很可能会提示冲突了，和MX那条冲突了，这里我就直接删除了MX的@规则。想知道原因，其实可以看这个链接，http://cn.v2ex.com/t/204489 。结论还是自己删除MX的@吧。&lt;/p&gt;
-
-&lt;p&gt;如果是国内的域名，解析会很快，一般10分钟之内就能解析完成。我们就可以直接通过访问我们买的个性域名访问到我们的博客了。&lt;/p&gt;
-
-&lt;h4 id=&quot;section-5&quot;&gt;五.给博客增加访客评论功能&lt;/h4&gt;
-&lt;p&gt;一般静态博客添加访客评论功能都是用&lt;a href=&quot;https://disqus.com/&quot;&gt;disqus&lt;/a&gt;来集成的。一般都是放在博客的一篇文章的最后，当然这个排版就看你自己怎么设计的了。我这里就贴一下我集成disqus的代码。大家估计都类似。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&amp;lt;section class=&quot;post-comments&quot;&amp;gt;
-  
-    &amp;lt;div id=&quot;disqus_thread&quot;&amp;gt;&amp;lt;/div&amp;gt;
-    &amp;lt;script&amp;gt;
-    
-    var disqus_config = function () {
-        this.page.url = &quot;http://vno.onevcat.com/2016/06/%E5%A6%82%E4%BD%95%E5%BF%AB%E9%80%9F%E7%BB%99%E8%87%AA%E5%B7%B1%E6%9E%84%E5%BB%BA%E4%B8%80%E4%B8%AA%E6%B8%A9%E9%A6%A8%E7%9A%84_%E5%AE%B6_-%E7%94%A8Jekyll%E6%90%AD%E5%BB%BA%E9%9D%99%E6%80%81%E5%8D%9A%E5%AE%A2/&quot;;
-        this.page.identifier = &quot;/2016/06/%E5%A6%82%E4%BD%95%E5%BF%AB%E9%80%9F%E7%BB%99%E8%87%AA%E5%B7%B1%E6%9E%84%E5%BB%BA%E4%B8%80%E4%B8%AA%E6%B8%A9%E9%A6%A8%E7%9A%84_%E5%AE%B6_-%E7%94%A8Jekyll%E6%90%AD%E5%BB%BA%E9%9D%99%E6%80%81%E5%8D%9A%E5%AE%A2/&quot;;
-    };
-
-    var disqus_shortname = &#39;halfrostsfield&#39;;
-    
-    (function() { // DON&#39;T EDIT BELOW THIS LINE
-        var d = document, s = d.createElement(&#39;script&#39;);
-        s.src = &#39;//&#39; + disqus_shortname + &#39;.disqus.com/embed.js&#39;;
-        s.setAttribute(&#39;data-timestamp&#39;, +new Date());
-            (d.head || d.body).appendChild(s);
-        })();
-    &amp;lt;/script&amp;gt;
-    &amp;lt;noscript&amp;gt;要查看&amp;lt;a href=&quot;http://disqus.com/?ref_noscript&quot;&amp;gt; Disqus &amp;lt;/a&amp;gt;评论，请启用 JavaScript&amp;lt;/noscript&amp;gt;
-    
-  
-  
-  
-  
-&amp;lt;/section&amp;gt;
-
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;h4 id=&quot;https&quot;&gt;六.申请”小绿锁”HTTPS&lt;/h4&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-fcbd290c62a45816.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
-要想使用HTTPS开头，目前就2种做法，一是申请HTTPS证书，免费的就用Let’s Encrypt 提供的免费 SSL 证书，二是使用kloudsec提供的服务。申请SSL证书的做法我就不说了，我来说说第二种使用kloudsec提供的服务的做法。&lt;/p&gt;
-
-&lt;p&gt;实现原理
-看 Kloudsec 的文档里描述的 &lt;a href=&quot;https://docs.kloudsec.com/#section-how-does-it-work-&quot;&gt;HOW DOES IT WORK?&lt;/a&gt;，它提供的服务处于我们的网站服务器和我们的网站访问者之间，其原理是缓存了我们服务器上的页面，所以实际用户建立的 HTTPS 连接是用户的浏览器与 Kloudsec 之间的。&lt;/p&gt;
-
-&lt;p&gt;首先注册Kloudsec的账户，填写邮箱和密码，接下来会让你填写仓库的地址和域名，它会检测仓库是否存在。然后最后是激活 Kloudsec 账号并登录。&lt;/p&gt;
-
-&lt;p&gt;然后最关键的一步来了，就是要设置域名解析规则。&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-63d0ee7385034236.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;按照上面给的，要设置3个A的解析规则。设置完成之后点击&lt;strong&gt;Verify DNS records&lt;/strong&gt;，如果通过，那么就可以接下来的设置了。&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-e6615fa4f840932f.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;这里会有一些免费和付费的服务，大家看自己需要选取。&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-962aa0ffcb15e729.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;这里的SSL Encryption要选上，打开会有如下的设置。
-&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-ee6c9cc414be8e87.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;这里如果不上传自己的SSL，就会用它帮你生成免费的SSL证书。如果要用自己的，点击ADD CUSTOM CERT按钮上传SSL证书。&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-436818e0d0989824.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
-这里是一些插件。看自己需不需要。&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-1ac0bce6a395d638.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;最后，SETTING里面加上这个IP地址。这个IP是GitHub Pages 的可用 IP地址。&lt;/p&gt;
-
-&lt;p&gt;使用 Kloudsec 的好处&lt;/p&gt;
-
-&lt;ol&gt;
-  &lt;li&gt;摆脱了证书不可信存在安全风险的不友好提示。&lt;/li&gt;
-  &lt;li&gt;配置方便，一劳永逸。&lt;/li&gt;
-  &lt;li&gt;访问速度并未受影响&lt;/li&gt;
-  &lt;li&gt;小绿锁看着舒心&lt;/li&gt;
-&lt;/ol&gt;
-
-&lt;p&gt;后来又发现了第三种方法能用HTTPS访问博客的方法：
-使用 GitLab 提供的 Pages 服务，那它直接支持添加自定义域名的 SSL 证书，可以配合免费申请的 SSL 证书一起使用。详情可见 &lt;a href=&quot;https://www.figotan.org/2016/04/26/using-free-wosign-to-certificate-your-blog-on-gitlab/&quot;&gt;零成本打造安全博客的简单办法&lt;/a&gt;。&lt;/p&gt;
-
-&lt;h4 id=&quot;section-6&quot;&gt;七.日后维护&lt;/h4&gt;
-&lt;p&gt;至此，个人博客也绑定好域名成功上线了。以后的维护工作其实并没有多少。&lt;/p&gt;
-
-&lt;h5 id=&quot;section-7&quot;&gt;1. 本地编辑文章：&lt;/h5&gt;
-&lt;p&gt;用markdown工具，先写好博文，注意，每篇博文前面题头都要带下面这些格式。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;---
-layout: post
-title: 如何快速给自己搭建一个温馨的&quot;家&quot;——用Jekyll生成静态博客
-author: 一缕殇流化隐半边冰霜
-date: 2016.06.21 01:57:32 +0800
-categories: Blog
-tag: Blog
----
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;文章写完之后，通过jekyll build生成页面，jekyll serve -B 通过本地localhost:4000查看文章。&lt;/p&gt;
-
-&lt;h5 id=&quot;section-8&quot;&gt;2. 发布线上博客&lt;/h5&gt;
-&lt;p&gt;本地确认文章无误，可以通过git add,git commit,git push
-等git命令推送文章到Github Pages服务器就可以啦。过1，2分钟，访问自己的域名就可以看到新的博文啦！&lt;/p&gt;
-
-&lt;h4 id=&quot;section-9&quot;&gt;结尾&lt;/h4&gt;
-&lt;p&gt;关于静态博客的搭建就到这里了，如果大家还有什么不清楚了，请直接给我留言就好。静态博客还有一个hexo，也是很优秀的静态博客，如果大家有兴趣，想折腾的，也可以去试试它。唐巧就是用这个搭建博客的。当然也有动态博客，ghost搭建的，搭建动态博客就需要自己买一个服务器，然后去安装node.js环境，日后的维护也都需要自己一个人去完成。有兴趣的同学一样可以去试试！&lt;/p&gt;
-
-</description>
-        <pubDate>Tue, 21 Jun 2016 02:57:00 +0800</pubDate>
-        <link>http://vno.onevcat.com/2016/06/%E5%A6%82%E4%BD%95%E5%BF%AB%E9%80%9F%E7%BB%99%E8%87%AA%E5%B7%B1%E6%9E%84%E5%BB%BA%E4%B8%80%E4%B8%AA%E6%B8%A9%E9%A6%A8%E7%9A%84_%E5%AE%B6_-%E7%94%A8Jekyll%E6%90%AD%E5%BB%BA%E9%9D%99%E6%80%81%E5%8D%9A%E5%AE%A2/</link>
-        <guid isPermaLink="true">http://vno.onevcat.com/2016/06/%E5%A6%82%E4%BD%95%E5%BF%AB%E9%80%9F%E7%BB%99%E8%87%AA%E5%B7%B1%E6%9E%84%E5%BB%BA%E4%B8%80%E4%B8%AA%E6%B8%A9%E9%A6%A8%E7%9A%84_%E5%AE%B6_-%E7%94%A8Jekyll%E6%90%AD%E5%BB%BA%E9%9D%99%E6%80%81%E5%8D%9A%E5%AE%A2/</guid>
-        
-        <category>Blog</category>
-        
-        
-        <category>Blog</category>
-        
-      </item>
-    
-      <item>
-        <title>iOS如何优雅的处理“回调地狱Callback hell”(一)——使用PromiseKit</title>
-        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-2f5b4fb0534c69cd.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;h4 id=&quot;section&quot;&gt;前言&lt;/h4&gt;
-&lt;p&gt;最近看了一些Swift关于封装异步操作过程的文章，比如RxSwift，RAC等等，因为回调地狱我自己也写过，很有感触，于是就翻出了Promise来研究学习一下。现将自己的一些收获分享一下，有错误欢迎大家多多指教。&lt;/p&gt;
-
-&lt;h4 id=&quot;section-1&quot;&gt;目录&lt;/h4&gt;
-&lt;ul&gt;
-  &lt;li&gt;1.PromiseKit简介&lt;/li&gt;
-  &lt;li&gt;2.PromiseKit安装和使用&lt;/li&gt;
-  &lt;li&gt;3.PromiseKit主要函数的使用方法&lt;/li&gt;
-  &lt;li&gt;4.PromiseKit的源码解析&lt;/li&gt;
-  &lt;li&gt;5.使用PromiseKit优雅的处理回调地狱&lt;/li&gt;
-&lt;/ul&gt;
-
-&lt;h4 id=&quot;promisekit&quot;&gt;一.PromiseKit简介&lt;/h4&gt;
-&lt;p&gt;PromiseKit是iOS/OS X 中一个用来出来异步编程框架。这个框架是由Max Howell(Mac下Homebrew的作者，传说中因为”不会”写反转二叉树而没有拿到Google offer)大神级人物开发出来的。&lt;/p&gt;
-
-&lt;p&gt;在PromiseKit中，最重要的一个概念就是Promise的概念，Promise是异步操作后的future的一个值。&lt;/p&gt;
-
-&lt;blockquote&gt;
-  &lt;p&gt;A &lt;a href=&quot;http://wikipedia.org/wiki/Promise_%28programming%29&quot;&gt;promise&lt;/a&gt; represents the future value of an asynchronous task.
-A promise is an object that wraps an asynchronous task&lt;/p&gt;
-&lt;/blockquote&gt;
-
-&lt;p&gt;Promise也是一个包装着异步操作的一个对象。使用PromiseKit，能够编写出整洁，有序的代码，逻辑简单的，将Promise作为参数，模块化的从一个异步任务到下一个异步任务中去。用PromiseKit写出的代码就是这样：&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-[self login].then(^{
-                  
-     // our login method wrapped an async task in a promise
-     return [API fetchData];
-                  
-}).then(^(NSArray *fetchedData){
-                          
-     // our API class wraps our API and returns promises
-     // fetchedData returned a promise that resolves with an array of data
-     self.datasource = fetchedData;
-     [self.tableView reloadData];
-                          
-}).catch(^(NSError *error){
-                                   
-     // any errors in any of the above promises land here
-     [[[UIAlertView alloc] init…] show];
-                                   
-});
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;PromiseKit就是用来干净简洁的代码，来解决异步操作，和奇怪的错误处理回调的。它将异步操作变成了链式的调用，简单的错误处理方式。&lt;/p&gt;
-
-&lt;p&gt;PromiseKit里面目前有2个类，一个是Promise&lt;T&gt;(Swift)，一个是AnyPromise(Objective-C)，2者的区别就在2种语言的特性上，Promise&lt;T&gt;是定义精确严格的，AnyPromise是定义宽松，灵活，动态的。&lt;/T&gt;&lt;/T&gt;&lt;/p&gt;
-
-&lt;p&gt;在异步编程中，有一个最最典型的例子就是回调地狱CallBack hell，要是处理的不优雅，就会出现下图这样:
-&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-76966b54ee252dce.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
-上图的代码是真实存在的，也是朋友告诉我的，来自&lt;a href=&quot;http://www.kuaidadi.com/assets/js/animate.js&quot;&gt;快的的代码&lt;/a&gt;，当然现在人家肯定改掉了。虽然这种代码看着像这样：&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-77a2f359c5a95e9d.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
-代码虽然看上去不优雅，功能都是正确的，但是这种代码基本大家都自己写过，我自己也写过很多。今天就让我们动起手来，用PromiseKit来优雅的处理掉Callback hell吧。&lt;/p&gt;
-
-&lt;h4 id=&quot;promisekit-1&quot;&gt;二.PromiseKit安装和使用&lt;/h4&gt;
-&lt;p&gt;1.下载安装CocoaPods&lt;/p&gt;
-
-&lt;p&gt;在墙外的安装步骤:
-在Terminal里面输入&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;sudo gem install cocoapods &amp;amp;&amp;amp; pod setup
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;大多数在墙内的同学应该看如下步骤了:&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;//移除原有的墙外Ruby 默认源
-$ gem sources --remove https://rubygems.org/
-//添加现有的墙内的淘宝源
-$ gem sources -a https://ruby.taobao.org/
-//验证新源是否替换成功
-$ gem sources -l
-//下载安装cocoapods
-// OS 10.11之前
-$ sudo gem install cocoapods
-//mark：OS 升级 OS X EL Capitan 后命令应该为:
-$ sudo gem install -n /usr/local/bin cocoapods
-//设置cocoapods
-$ pod setup
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;2.找到项目的路径，进入项目文件夹下面，执行：&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ touch Podfile &amp;amp;&amp;amp; open -e Podfile
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;此时会打开TextEdit，然后输入一下命令:&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;platform:ios, ‘7.0’
-
-target &#39;PromisekitDemo&#39; do  //由于最新版cocoapods的要求，所以必须加入这句话
-    pod &#39;PromiseKit&#39;
-end
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;blockquote&gt;
-  &lt;p&gt;Tips：感谢qinfensky大神提醒，其实这里也可以用init命令
-Podfile是CocoaPods的特殊文件，在其中可以列入在项目中想要使用的开源库，若想创建Podfile，有2种方法：
-1.在项目目录中创建空文本文件，命名为Podfile
-2.或者可以再项目目录中运行“$ pod init “，来创建功能性文件（终端中输入cd 文件夹地址，然后再输入 pod init）
-两种方法都可以创建Podfile，使用你最喜欢使用的方法&lt;/p&gt;
-&lt;/blockquote&gt;
-
-&lt;p&gt;3.安装PromiseKit&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ pod install
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;安装完成之后，退出终端，打开新生成的.xcworkspace文件即可&lt;/p&gt;
-
-&lt;h4 id=&quot;promisekit-2&quot;&gt;三.PromiseKit主要函数的使用方法&lt;/h4&gt;
-&lt;ol&gt;
-  &lt;li&gt;then
-经常我们会写出这样的代码:&lt;/li&gt;
-&lt;/ol&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;- (void)showUndoRedoAlert:(UndoRedoState *)state
-{
-     UIAlertView *alert = [[UIAlertView alloc] initWithTitle:……];
-     alert.delegate = self; 
-     self.state = state;
-     [alert show];
-}
-
-- (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex
-{
-    if (buttonIndex == 1) {
-        [self.state do];
-    }
-
-}
-
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;上面的写法也不是错误的，就是它在调用函数中保存了一个属性，在调用alertView会使用到这个属性。其实这个中间属性是不需要存储的。接下来我们就用then来去掉这个中间变量。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-- (void)showUndoRedoAlert:(UndoRedoState *)state
- {
-    UIAlertView *alert = [[UIAlertView alloc] initWithTitle:……];
-    [alert promise].then(^(NSNumber *dismissedButtonIndex){
-        [state do];
-    });
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;这时就有人问了，为啥能调用[alert promise]这个方法？后面点语法跟着then是什么？我来解释一下，原因其实只要打开Promise源码就一清二楚了。在pormise源码中&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-@interface UIAlertView (PromiseKit)
-
-/**
- Displays the alert view.
-
- @return A promise the fulfills with two parameters:
- 1) The index of the button that was tapped to dismiss the alert.
- 2) This alert view.
-*/
-- (PMKPromise *)promise;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;对应的实现是这样的&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;- (PMKPromise *)promise {
-    PMKAlertViewDelegater *d = [PMKAlertViewDelegater new];
-    PMKRetain(d);
-    self.delegate = d;
-    [self show];
-    return [PMKPromise new:^(id fulfiller, id rejecter){
-        d-&amp;gt;fulfiller = fulfiller;
-    }];
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;调用[alert promise]返回还是一个promise对象，在promise的方法中有then的方法，所以上面可以那样链式的调用。上面代码里面的fulfiller放在源码分析里面去讲讲。&lt;/p&gt;
-
-&lt;p&gt;在PromiseKit里面，其实就默认给你创建了几个类的延展，如下图&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-ab9c742c3b4ce5a9.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
-这些扩展类里面就封装了一些常用的生成promise方法，调用这些方法就可以愉快的一路.then执行下去了！&lt;/p&gt;
-
-&lt;p&gt;2.dispatch_promise
-项目中我们经常会异步的下载图片&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;typedefvoid(^onImageReady) (UIImage* image);
-
-+ (void)getImageWithURL:(NSURL *)url onCallback:(onImageReady)callback
-{
-    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0ul);
-    dispatch_async(queue, ^{
-        NSData * imageData = [NSData dataWithContentsOfURL:url];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            UIImage *image = [UIImage imageWithData:imageData];
-            callback(image);
-        });
-    });
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;使用dispatch_promise，我们可以将它改变成下面这样:&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;    dispatch_promise(^{
-        return [NSData dataWithContentsOfURL:url];     
-    }).then(^(NSData * imageData){ 
-        self.imageView.image = [UIImage imageWithData:imageData];  
-    }).then(^{
-        // add code to happen next here
-    });
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;我们看看源码，看看调用的异步过程对不对&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;- (PMKPromise *(^)(id))then {
-    return ^(id block){
-        return self.thenOn(dispatch_get_main_queue(), block);
-    };
-}
-
-PMKPromise *dispatch_promise(id block) {
-    return dispatch_promise_on(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), block);
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;看了源码就知道上述是正确的。&lt;/p&gt;
-
-&lt;p&gt;3.catch
-在异步操作中，处理错误也是一件很头疼的事情，如下面这段代码，每次异步请求回来都必须要处理错误。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-void (^errorHandler)(NSError *) = ^(NSError *error) {
-    [[UIAlertView …] show];
-};
-[NSURLConnection sendAsynchronousRequest:rq queue:q completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError) {
-    if (connectionError) {
-        errorHandler(connectionError);
-    } else {
-        NSError *jsonError = nil;
-        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&amp;amp;jsonError];
-        if (jsonError) {
-            errorHandler(jsonError);
-        } else {
-            id rq = [NSURLRequest requestWithURL:[NSURL URLWithString:json[@&quot;avatar_url&quot;]]];
-            [NSURLConnection sendAsynchronousRequest:rq queue:q completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError) {
-                UIImage *image = [UIImage imageWithData:data];
-                if (!image) {
-                    errorHandler(nil); // NSError TODO!
-                } else {
-                    self.imageView.image = image;
-                }
-            }];
-        }
-    }
-}];
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;我们可以用promise的catch来解决上面的错误处理的问题&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;//oc版
-[NSURLSession GET:url].then(^(NSDictionary *json){
-    return [NSURLConnection GET:json[@&quot;avatar_url&quot;]];
-}).then(^(UIImage *image){
-    self.imageView.image = image;
-}).catch(^(NSError *error){
-    [[UIAlertView …] show];
-})
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;//swift版
-firstly {
-    NSURLSession.GET(url)
-}.then { (json: NSDictionary) in
-    NSURLConnection.GET(json[&quot;avatar_url&quot;])
-}.then { (image: UIImage) in
-    self.imageView.image = image
-}.error { error in
-    UIAlertView(…).show()
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;用了catch以后，在传递promise的链中，一旦中间任何一环产生了错误，都会传递到catch去执行Error Handler。&lt;/p&gt;
-
-&lt;p&gt;4.when
-通常我们有这种需求:
-在执行一个A任务之前还有1，2个异步的任务，在全部异步操作完成之前，需要阻塞A任务。代码可能会写的像下面这样子：&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-__block int x = 0;
-void (^completionHandler)(id, id) = ^(MKLocalSearchResponse *response, NSError *error){
-    if (++x == 2) {
-        [self finish];
-    }
-};
-[[[MKLocalSearch alloc] initWithRequest:rq1] startWithCompletionHandler:completionHandler];
-[[[MKLocalSearch alloc] initWithRequest:rq2] startWithCompletionHandler:completionHandler];
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;这里就可以使用when来优雅的处理这种情况:&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-id search1 = [[[MKLocalSearch alloc] initWithRequest:rq1] promise];
-id search2 = [[[MKLocalSearch alloc] initWithRequest:rq2] promise];
-
-PMKWhen(@[search1, search2]).then(^(NSArray *results){
-    //…
-}).catch(^{
-    // called if either search fails
-});
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;在when后面传入一个数组，里面是2个promise，只有当这2个promise都执行完，才会去执行后面的then的操作。这样就达到了之前所说的需求。&lt;/p&gt;
-
-&lt;p&gt;这里when还有2点要说的，when的参数还可以是字典。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-id coffeeSearch = [[MKLocalSearch alloc] initWithRequest:rq1];
-id beerSearch = [[MKLocalSearch alloc] initWithRequest:rq2];
-id input = @{@&quot;coffee&quot;: coffeeSearch, @&quot;beer&quot;: beerSearch};
-
-PMKWhen(input).then(^(NSDictionary *results){
-    id coffeeResults = results[@&quot;coffee&quot;];
-});
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;这个例子里面when传入了一个input字典，处理完成之后依旧可以生成新的promise传递到下一个then中，在then中可以去到results的字典，获得结果。传入字典的工作原理放在第四章会解释。&lt;/p&gt;
-
-&lt;p&gt;when传入的参数还可以是一个可变的属性：&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;id&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;dataSource&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-
-&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;id&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dataSource&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
-&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;dataSource&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;?:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;PMKPromise&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;new&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;err&quot;&gt;…&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
-&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
-
-&lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;viewDidAppear&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
-&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;PMKPromise&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;when&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;self&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dataSource&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;].&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;then&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;^&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;id&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;result&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;){&lt;/span&gt;
-&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// cache the result
-&lt;/span&gt;&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;self&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dataSource&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;result&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
-&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;});&lt;/span&gt;
-&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;dataSource如果为空就新建一个promise，传入到when中，执行完之后，在then中拿到result，并把result赋值给dataSource，这样dataSource就有数据了。由此看来，when的使用非常灵活！&lt;/p&gt;
-
-&lt;p&gt;5.always &amp;amp; finally&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;//oc版
-[UIApplication sharedApplication].networkActivityIndicatorVisible = YES;
-[self myPromise].then(^{
-    //…
-}).finally(^{
-    [UIApplication sharedApplication].networkActivityIndicatorVisible = NO;
-})
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;//swift版
-UIApplication.sharedApplication().networkActivityIndicatorVisible = true
-myPromise().then {
-    //…
-}.always {
-    UIApplication.sharedApplication().networkActivityIndicatorVisible = false
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;在我们执行完then，处理完error之后，还有一些操作，那么就可以放到finally和always里面去执行。&lt;/p&gt;
-
-&lt;h4 id=&quot;promisekit-3&quot;&gt;四.PromiseKit的源码解析&lt;/h4&gt;
-&lt;p&gt;经过上面对promise的方法的学习，我们已经可以了解到，在异步操作我们可以通过不断的返回promise，传递给后面的then来形成链式调用，所以重点就在then的实现了。在讨论then之前，我先说一下promise的状态和传递机制。&lt;/p&gt;
-
-&lt;p&gt;一个promise可能有三种状态：等待（pending）、已完成（fulfilled）、已拒绝（rejected）。
-一个promise的状态只可能从“等待”转到“完成”态或者“拒绝”态，不能逆向转换，同时“完成”态和“拒绝”态不能相互转换。
-promise必须实现then方法（可以说，then就是promise的核心），而且then必须返回一个promise，同一个promise的then可以调用多次，并且回调的执行顺序跟它们被定义时的顺序一致
-then方法接受两个参数，第一个参数是成功时的回调，在promise由“等待”态转换到“完成”态时调用，另一个是失败时的回调，在promise由“等待”态转换到“拒绝”态时调用。同时，then可以接受另一个promise传入，也接受一个“类then”的对象或方法，即thenable对象&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-2f135482415329ef.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
-总结起来就是上图，pending状态的promise对象既可转换为带着一个成功值的 fulfilled 状态，也可变为带着一个 error 信息的 rejected 状态。当状态发生转换时， promise.then 绑定的方法就会被调用。(当绑定方法时，如果 promise 对象已经处于 fulfilled 或 rejected 状态，那么相应的方法将会被立刻调用， 所以在异步操作的完成情况和它的绑定方法之间不存在竞争关系。)从Pending转换为fulfilled或Rejected之后， 这个promise对象的状态就不会再发生任何变化。因此 then是只被调用一次的函数，从而也能说明，then生成的是一个新的promise，而不是原来的那个。&lt;/p&gt;
-
-&lt;p&gt;了解完流程之后，就可以开始继续研究源码了。在PromiseKit当中，最常用的当属then，thenInBackground，catch，finally&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-- (PMKPromise *(^)(id))then {
-    return ^(id block){
-        return self.thenOn(dispatch_get_main_queue(), block);
-    };
-}
-
-- (PMKPromise *(^)(id))thenInBackground {
-    return ^(id block){
-        return self.thenOn(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), block);
-    };
-}
-
-- (PMKPromise *(^)(id))catch {
-    return ^(id block){
-        return self.catchOn(dispatch_get_main_queue(), block);
-    };
-}
-
-- (PMKPromise *(^)(dispatch_block_t))finally {
-    return ^(dispatch_block_t block) {
-        return self.finallyOn(dispatch_get_main_queue(), block);
-    };
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;这四个方法底层调用了各自的thenon，catchon，finallyon方法，这些on的方法实现基本都差不多，那我就以最重要的thenon来分析一下。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-- (PMKResolveOnQueueBlock)thenOn {
-    return [self resolved:^(id result) {
-        if (IsPromise(result))
-            return ((PMKPromise *)result).thenOn;
-
-        if (IsError(result)) return ^(dispatch_queue_t q, id block) {
-            return [PMKPromise promiseWithValue:result];
-        };
-
-        return ^(dispatch_queue_t q, id block) {
-            block = [block copy];
-            return dispatch_promise_on(q, ^{
-                return pmk_safely_call_block(block, result);
-            });
-        };
-    }
-    pending:^(id result, PMKPromise *next, dispatch_queue_t q, id block, void (^resolve)(id)) {
-        if (IsError(result))
-            PMKResolve(next, result);
-        else dispatch_async(q, ^{
-            resolve(pmk_safely_call_block(block, result));
-        });
-    }];
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;这个thenon就是返回一个方法，所以继续往下看&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;- (id)resolved:(PMKResolveOnQueueBlock(^)(id result))mkresolvedCallback
-       pending:(void(^)(id result, PMKPromise *next, dispatch_queue_t q, id block, void (^resolver)(id)))mkpendingCallback
-{
-    __block PMKResolveOnQueueBlock callBlock;
-    __block id result;
-    
-    dispatch_sync(_promiseQueue, ^{
-        if ((result = _result))
-            return;
-
-        callBlock = ^(dispatch_queue_t q, id block) {
-
-            block = [block copy];
-
-            __block PMKPromise *next = nil;
-
-            dispatch_barrier_sync(_promiseQueue, ^{
-                if ((result = _result))
-                    return;
-
-                __block PMKPromiseFulfiller resolver;
-                next = [PMKPromise new:^(PMKPromiseFulfiller fulfill, PMKPromiseRejecter reject) {
-                    resolver = ^(id o){
-                        if (IsError(o)) reject(o); else fulfill(o);
-                    };
-                }];
-                [_handlers addObject:^(id value){
-                    mkpendingCallback(value, next, q, block, resolver);
-                }];
-            });
-
-            return next ?: mkresolvedCallback(result)(q, block);
-        };
-    });
-
-    // We could just always return the above block, but then every caller would
-    // trigger a barrier_sync on the promise queue. Instead, if we know that the
-    // promise is resolved (since that makes it immutable), we can return a simpler
-    // block that doesn&#39;t use a barrier in those cases.
-
-    return callBlock ?: mkresolvedCallback(result);
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;这个方法看上去很复杂，仔细看看，函数的形参其实就是2个block，一个是resolved的block，还有一个是pending的block。当一个promise经历过resolved之后，可能是fulfill，也可能是reject，之后生成next新的promise，传入到下一个then中，并且状态会变成pending。上面代码中第一个return，如果next为nil，那么意味着promise没有生成，这是会再调用一次mkresolvedCallback，并传入参数result，生成的PMKResolveOnQueueBlock，再次传入(q, block)，直到next的promise生成，并把pendingCallback存入到handler当中。这个handler存了所有待执行的block，如果把这个数组里面的block都执行，那么就相当于依次完成了上面的所有异步操作。第二个return是在callblock为nil的时候，还会再调一次mkresolvedCallback(result)，保证一定要生成next的promise。&lt;/p&gt;
-
-&lt;p&gt;这个函数里面的这里dispatch_barrier_sync这个方法，就是promise后面可以链式调用then的原因，因为GCD的这个方法，让后面then变得像一行行的then顺序执行了。&lt;/p&gt;
-
-&lt;p&gt;可能会有人问了，并没有看到各个block执行，仅仅只是加到handler数组里了，这个问题的答案，就是promise的核心了。promise执行block的操作是放在resove里面的。先来看看源码&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-static void PMKResolve(PMKPromise *this, id result) {
-    void (^set)(id) = ^(id r){
-        NSArray *handlers = PMKSetResult(this, r);
-        for (void (^handler)(id) in handlers)
-            handler(r);
-    };
-
-    if (IsPromise(result)) {
-        PMKPromise *next = result;
-        dispatch_barrier_sync(next-&amp;gt;_promiseQueue, ^{
-            id nextResult = next-&amp;gt;_result;
-            
-            if (nextResult == nil) {  // ie. pending
-                [next-&amp;gt;_handlers addObject:^(id o){
-                    PMKResolve(this, o);
-                }];
-            } else
-                set(nextResult);
-        });
-    } else
-        set(result);
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;这是一个递归函数，能形成递归的条件就是那句PMKResolve(this, o);当nextResult = nil的时候，就代表了这个promise还是pending状态，还没有被执行，这个时候就要递归调用，直到nextResult不为nil。不为nil，就会调用set方法，set方法是一个匿名函数，里面的for循环会依次循环，执行handler数组里面的每一个block。里面的那个if语句，是先判断result是否是一个promise，如果不是promise，就去执行set方法，依次调用各个block。&lt;/p&gt;
-
-&lt;p&gt;至此，一个then的执行原理就到此结束了。接下来我们再看看when的原理。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;    return newPromise = [PMKPromise new:^(PMKPromiseFulfiller fulfiller, PMKPromiseRejecter rejecter){
-        NSPointerArray *results = nil;
-      #if TARGET_OS_IPHONE
-        results = [NSPointerArray strongObjectsPointerArray];
-      #else
-        if ([[NSPointerArray class] respondsToSelector:@selector(strongObjectsPointerArray)]) {
-            results = [NSPointerArray strongObjectsPointerArray];
-        } else {
-          #pragma clang diagnostic push
-          #pragma clang diagnostic ignored &quot;-Wdeprecated-declarations&quot;
-            results = [NSPointerArray pointerArrayWithStrongObjects];
-          #pragma clang diagnostic pop
-        }
-      #endif
-        results.count = count;
-
-        NSUInteger ii = 0;
-
-        for (__strong PMKPromise *promise in promises) {
-            if (![promise isKindOfClass:[PMKPromise class]])
-                promise = [PMKPromise promiseWithValue:promise];
-            promise.catch(rejecter(@(ii)));
-            promise.then(^(id o){
-                [results replacePointerAtIndex:ii withPointer:(__bridge void *)(o ?: [NSNull null])];
-                if (--count == 0)
-                    fulfiller(results.allObjects);
-            });
-            ii++;
-        }
-    }];
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;这里只截取了return的部分，理解了then，这里再看when就好理解了。when就是在传入的promises的数组里面，依次执行各个promise，结果最后传给新生成的一个promise，作为返回值返回。&lt;/p&gt;
-
-&lt;p&gt;这里要额外提一点的就是如果给when传入一个字典，它会如何处理的&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-    if ([promises isKindOfClass:[NSDictionary class]])
-        return newPromise = [PMKPromise new:^(PMKPromiseFulfiller fulfiller, PMKPromiseRejecter rejecter){
-            NSMutableDictionary *results = [NSMutableDictionary new];
-            for (id key in promises) {
-                PMKPromise *promise = promises[key];
-                if (![promise isKindOfClass:[PMKPromise class]])
-                    promise = [PMKPromise promiseWithValue:promise];
-                promise.catch(rejecter(key));
-                promise.then(^(id o){
-                    if (o)
-                        results[key] = o;
-                    if (--count == 0)
-                        fulfiller(results);
-                });
-            }
-        }];
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;方式和when的数组方式基本一样，只不过多了一步，就是从字典里面先取出promise[key]，然后再继续对这个promise执行操作而已。所以when可以传入以promise为value的字典。&lt;/p&gt;
-
-&lt;h4 id=&quot;promisekit-4&quot;&gt;五.使用PromiseKit优雅的处理回调地狱&lt;/h4&gt;
-&lt;p&gt;这里我就举个例子，大家一起来感受感受用promise的简洁。
-先描述一下环境，假设有这样一个提交按钮，当你点击之后，就会提交一次任务。首先要先判断是否有权限提交，没有权限就弹出错误。有权限提交之后，还要请求一次，判断当前任务是否已经存在，如果存在，弹出错误。如果不存在，这个时候就可以安心提交任务了。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-void (^errorHandler)(NSError *) = ^(NSError *error) {
-    [[UIAlertView …] show];
-};
-[NSURLConnection sendAsynchronousRequest:rq queue:q completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError) {
-    if (connectionError) {
-        errorHandler(connectionError);
-    } else {
-        NSError *jsonError = nil;
-        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&amp;amp;jsonError];
-        if (jsonError) {
-            errorHandler(jsonError);
-        } else {
-            id rq = [NSURLRequest requestWithURL:[NSURL URLWithString:json[@&quot;have_authority&quot;]]];
-            [NSURLConnection sendAsynchronousRequest:rq queue:q completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError) {
-                
-                NSError *jsonError = nil;
-                NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&amp;amp;jsonError];
-                
-                if (jsonError) {
-                    errorHandler(jsonError);
-                } else {
-                    id rq = [NSURLRequest requestWithURL:[NSURL URLWithString:json[@&quot;exist&quot;]]];
-                    [NSURLConnection sendAsynchronousRequest:rq queue:q completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError) {
-                        
-                        NSError *jsonError = nil;
-                        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&amp;amp;jsonError];
-                        
-                        if (jsonError) {
-                            errorHandler(jsonError);
-                        } else {
-                            if ([json[@&quot;status&quot;] isEqualToString:@&quot;OK&quot;]) {
-                                [self submitTask];
-                            } else {
-                                errorHandler(json[@&quot;status&quot;]);
-                            }
-                        }
-                    }];
-                }
-            }];
-        }
-    }
-}];
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;上面的代码里面有3层回调，看上去就很晕，接下来我们用promise来整理一下。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-[NSURLSession GET:url].then(^(NSDictionary *json){
-    return [NSURLConnection GET:json[@&quot;have_authority&quot;]];
-}).then(^(NSDictionary *json){
-    return [NSURLConnection GET:json[@&quot;exist&quot;]];
-}).then(^(NSDictionary *json){
-    if ([json[@&quot;status&quot;] isEqualToString:@&quot;OK&quot;]) {
-        return [NSURLConnection GET:submitJson];
-    } else
-        @throw [NSError errorWithDomain:… code:… userInfo:json[@&quot;status&quot;]];
-}).catch(^(NSError *error){
-    [[UIAlertView …] show];
-})
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;之前将近40行代码就一下子变成15行左右，看上去比原来清爽多了，可读性更高。&lt;/p&gt;
-
-&lt;h4 id=&quot;section-2&quot;&gt;最后&lt;/h4&gt;
-&lt;p&gt;看完上面关于PromiseKit的使用方法之后，其实对于PromiseKit，我个人的理解它就是一个Monad（这是最近很火的一个概念，4月底在上海SwiftCon 2016中，唐巧大神分享的主题就是关于Monad，还不是很了解这个概念的可以去他博客看看，或者找视频学习学习。）Promise就是一个盒子里面封装了一堆操作，then对应的就是一组flatmap或map操作。不过缺点也还是有，如果网络用的AFNetWorking，网络请求很有可能会回调多次，这时用PromiseKit，就需要自己封装一个属于自己的promise了。PromiseKit原生的是用的OMGHTTPURLRQ这个网络框架。PromiseKit里面自带的封装的网络请求也还是基于NSURLConnection的。所以用了AFNetWorking的同学，要想再优雅的处理掉网络请求引起的回调地狱的时候，自己还是需要先封装一个自己的Promise，然后优雅的then一下。很多人可能看到这里，觉得我引入一个框架，本来是来解决问题的，但是现在还需要我再次封装才能解决问题，有点不值得。&lt;/p&gt;
-
-&lt;p&gt;我自己的看法是，PromiseKit是个解决异步问题很优秀的一个开源库，尤其是解决回调嵌套，回调地狱的问题，效果非常明显。虽然需要自己封装AFNetWorking的promise，但是它的思想非常值得我们学习的！这也是接下来第二篇想和大家一起分享的内容，利用promise的思想，自己来优雅的处理回调地狱！这一篇PromiseKit先分享到这里。&lt;/p&gt;
-
-&lt;p&gt;如有错误，还请大家请多多指教。&lt;/p&gt;
-
-</description>
-        <pubDate>Fri, 10 Jun 2016 19:51:00 +0800</pubDate>
-        <link>http://vno.onevcat.com/2016/06/iOS%E5%A6%82%E4%BD%95%E4%BC%98%E9%9B%85%E7%9A%84%E5%A4%84%E7%90%86-%E5%9B%9E%E8%B0%83%E5%9C%B0%E7%8B%B1Callback-hell-(%E4%B8%80)-%E4%BD%BF%E7%94%A8PromiseKit/</link>
-        <guid isPermaLink="true">http://vno.onevcat.com/2016/06/iOS%E5%A6%82%E4%BD%95%E4%BC%98%E9%9B%85%E7%9A%84%E5%A4%84%E7%90%86-%E5%9B%9E%E8%B0%83%E5%9C%B0%E7%8B%B1Callback-hell-(%E4%B8%80)-%E4%BD%BF%E7%94%A8PromiseKit/</guid>
-        
-        <category>iOS</category>
-        
-        
-        <category>iOS</category>
         
       </item>
     

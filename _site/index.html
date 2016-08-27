@@ -157,6 +157,20 @@
   <ol class="post-list">
     
     <li>
+      <h2 class="post-list__post-title post-title"><a href="/2016/08/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E6%8D%95%E8%8E%B7%E5%A4%96%E9%83%A8%E5%8F%98%E9%87%8F%E5%92%8C__block%E5%AE%9E%E7%8E%B0%E5%8E%9F%E7%90%86/" title="访问 深入研究Block捕获外部变量和__block实现原理">深入研究Block捕获外部变量和__block实现原理</a></h2>
+      <p class="excerpt">前言Blocks是C语言的扩充功能，而Apple 在OS X Snow Leopard 和 iOS 4中引入了这个新功能“Blocks”。从那开始，Block就出现在iOS和Mac系统各个API中，并被大家广泛使用。一句话来形容Blocks，带有自动变量（局部变量）的匿名函数。Block在OC中的实现如下：struct Block_layout {    void *isa;    int flags;    int reserved;    void (*invoke)(void *, ...&hellip;</p>
+      <div class="post-list__meta"><time datetime="2016-08-27 22:05:00 +0800" class="post-list__meta--date date">2016-08-27</time> &#8226; <span class="post-list__meta--tags tags">iOS</span><a class="btn-border-small" href=/2016/08/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E6%8D%95%E8%8E%B7%E5%A4%96%E9%83%A8%E5%8F%98%E9%87%8F%E5%92%8C__block%E5%AE%9E%E7%8E%B0%E5%8E%9F%E7%90%86/>继续阅读</a></div>
+      <hr class="post-list__divider" />
+    </li>
+    
+    <li>
+      <h2 class="post-list__post-title post-title"><a href="/2016/08/%E7%BB%99iOS-%E6%A8%A1%E6%8B%9F%E5%99%A8-%E5%AE%89%E8%A3%85-app%E6%96%87%E4%BB%B6/" title="访问 给iOS 模拟器“安装”app文件">给iOS 模拟器“安装”app文件</a></h2>
+      <p class="excerpt">前言刚刚接触iOS的时候，我就一直很好奇，模拟器上面能不能直接安装app呢？如果可以，我们就直接在模拟器上面聊QQ和微信了。直到昨天和朋友们聊到了这个话题，没有想到还真的可以给模拟器“安装”app！一.应用场景先来谈谈是什么情况下，会有在模拟器上安装app的需求。在一个大公司里，对源码的管理有严格的制度，非开发人员是没有权限接触到源码的。对苹果的开发证书管理也非常严格，甚至连开发人员也没有发布证书，证书只在持续集成环境或者Appstore产线里面，或者只在最后打包上架的人手上。那么现在就有...&hellip;</p>
+      <div class="post-list__meta"><time datetime="2016-08-18 18:58:00 +0800" class="post-list__meta--date date">2016-08-18</time> &#8226; <span class="post-list__meta--tags tags">iOS</span><a class="btn-border-small" href=/2016/08/%E7%BB%99iOS-%E6%A8%A1%E6%8B%9F%E5%99%A8-%E5%AE%89%E8%A3%85-app%E6%96%87%E4%BB%B6/>继续阅读</a></div>
+      <hr class="post-list__divider" />
+    </li>
+    
+    <li>
       <h2 class="post-list__post-title post-title"><a href="/2016/08/%E6%89%8B%E6%8A%8A%E6%89%8B%E6%95%99%E4%BD%A0%E7%BB%99%E4%B8%80%E4%B8%AAiOS-app%E9%85%8D%E7%BD%AE%E5%A4%9A%E4%B8%AA%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F/" title="访问 手把手教你给一个iOS app配置多个环境变量">手把手教你给一个iOS app配置多个环境变量</a></h2>
       <p class="excerpt">前言谈到多环境，相信现在大多公司都至少有2-3个app环境了，比如Test环境，UAT(User Acceptance Test)用户验收测试环境，Release环境等等。当需要开发打多个包的时候，一般常见做法就是直接代码里面修改环境变量，改完之后Archive一下就打包了。当然这种做法很正确，只不过不是很优雅很高效。如果搭建好了Jenkins(搭建教程)，我们利用它来优雅的打包。如果利用Jenkins来打包，我们就需要来给app来配置一下多个环境变量了。之后Jenkins分别再不同环境下...&hellip;</p>
       <div class="post-list__meta"><time datetime="2016-08-11 09:01:00 +0800" class="post-list__meta--date date">2016-08-11</time> &#8226; <span class="post-list__meta--tags tags">iOS</span><a class="btn-border-small" href=/2016/08/%E6%89%8B%E6%8A%8A%E6%89%8B%E6%95%99%E4%BD%A0%E7%BB%99%E4%B8%80%E4%B8%AAiOS-app%E9%85%8D%E7%BD%AE%E5%A4%9A%E4%B8%AA%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F/>继续阅读</a></div>
@@ -212,27 +226,13 @@
       <hr class="post-list__divider" />
     </li>
     
-    <li>
-      <h2 class="post-list__post-title post-title"><a href="/2016/06/%E5%A6%82%E4%BD%95%E5%BF%AB%E9%80%9F%E7%BB%99%E8%87%AA%E5%B7%B1%E6%9E%84%E5%BB%BA%E4%B8%80%E4%B8%AA%E6%B8%A9%E9%A6%A8%E7%9A%84_%E5%AE%B6_-%E7%94%A8Jekyll%E6%90%AD%E5%BB%BA%E9%9D%99%E6%80%81%E5%8D%9A%E5%AE%A2/" title="访问 如何快速给自己构建一个温馨的"家"——用Jekyll搭建静态博客">如何快速给自己构建一个温馨的"家"——用Jekyll搭建静态博客</a></h2>
-      <p class="excerpt">前言我相信，每个程序员都有一个愿望，都想有一个属于自己的”家”——属于自己的博客，专属的网站。在自己的“家”中，可以和志同道合的兄弟一起分享和讨论任何技术，谈天说地。更重要的是可以当做自己的技术积累，提升自己实力。那么接下来就来说说我博客搭建过程。目录：  本地搭建Jekyll  开发或者选择Jekyll主题  使用Github Pages服务  申请个人域名  给博客增加访客评论功能  申请”小绿锁”HTTPS  日后维护一.本地搭建KekyllJekyll是什么？它是一个简单静态博客生...&hellip;</p>
-      <div class="post-list__meta"><time datetime="2016-06-21 02:57:00 +0800" class="post-list__meta--date date">2016-06-21</time> &#8226; <span class="post-list__meta--tags tags">Blog</span><a class="btn-border-small" href=/2016/06/%E5%A6%82%E4%BD%95%E5%BF%AB%E9%80%9F%E7%BB%99%E8%87%AA%E5%B7%B1%E6%9E%84%E5%BB%BA%E4%B8%80%E4%B8%AA%E6%B8%A9%E9%A6%A8%E7%9A%84_%E5%AE%B6_-%E7%94%A8Jekyll%E6%90%AD%E5%BB%BA%E9%9D%99%E6%80%81%E5%8D%9A%E5%AE%A2/>继续阅读</a></div>
-      <hr class="post-list__divider" />
-    </li>
-    
-    <li>
-      <h2 class="post-list__post-title post-title"><a href="/2016/06/iOS%E5%A6%82%E4%BD%95%E4%BC%98%E9%9B%85%E7%9A%84%E5%A4%84%E7%90%86-%E5%9B%9E%E8%B0%83%E5%9C%B0%E7%8B%B1Callback-hell-(%E4%B8%80)-%E4%BD%BF%E7%94%A8PromiseKit/" title="访问 iOS如何优雅的处理“回调地狱Callback hell”(一)——使用PromiseKit">iOS如何优雅的处理“回调地狱Callback hell”(一)——使用PromiseKit</a></h2>
-      <p class="excerpt">前言最近看了一些Swift关于封装异步操作过程的文章，比如RxSwift，RAC等等，因为回调地狱我自己也写过，很有感触，于是就翻出了Promise来研究学习一下。现将自己的一些收获分享一下，有错误欢迎大家多多指教。目录  1.PromiseKit简介  2.PromiseKit安装和使用  3.PromiseKit主要函数的使用方法  4.PromiseKit的源码解析  5.使用PromiseKit优雅的处理回调地狱一.PromiseKit简介PromiseKit是iOS/OS X 中...&hellip;</p>
-      <div class="post-list__meta"><time datetime="2016-06-10 19:51:00 +0800" class="post-list__meta--date date">2016-06-10</time> &#8226; <span class="post-list__meta--tags tags">iOS</span><a class="btn-border-small" href=/2016/06/iOS%E5%A6%82%E4%BD%95%E4%BC%98%E9%9B%85%E7%9A%84%E5%A4%84%E7%90%86-%E5%9B%9E%E8%B0%83%E5%9C%B0%E7%8B%B1Callback-hell-(%E4%B8%80)-%E4%BD%BF%E7%94%A8PromiseKit/>继续阅读</a></div>
-      <hr class="post-list__divider" />
-    </li>
-    
   </ol>
 
   <hr class="post-list__divider " />
 
 <nav class="pagination" role="navigation">
     
-    <span class="pagination__page-number">1 / 2</span>
+    <span class="pagination__page-number">1 / 3</span>
     
         <a class="older-posts pagination__older btn btn-small btn-tertiary" href="/blog/page/2/#blog">更早 &rarr;</a>
     
@@ -247,7 +247,7 @@
       <br>
       <br>
     	<span class="footer__copyright">本站点采用<a href="http://creativecommons.org/licenses/by-nc-sa/4.0/">知识共享 署名-非商业性使用-相同方式共享 4.0 国际 许可协议</a></span>
-        <span class="footer__copyright">由 <a href="https://jekyllrb.com">Jekyll</a> 于 2016-08-14 生成，感谢<a href="https://pages.github.com"> GitHub Pages</a> 强力驱动</span>
+        <span class="footer__copyright">由 <a href="https://jekyllrb.com">Jekyll</a> 于 2016-08-27 生成，感谢<a href="https://pages.github.com"> GitHub Pages</a> 强力驱动</span>
         <span class="footer__copyright">本站由 <a href="http://halfrost.com">@halfrost</a> 创建，采用 <a href="https://github.com/onevcat/vno-jekyll">Vno - Jekyll</a> 作为主题，您可以在 GitHub 找到<a href="https://github.com/onevcat/OneV-s-Den">本站源码</a> - &copy; 2016</span>
     </footer>
 </section>
