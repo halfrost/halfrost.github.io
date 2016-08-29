@@ -773,7 +773,12 @@ Block里面的\_\_block的地址和Block的地址就相差1052。我们可以很
 
 Block在捕获住\_\_block变量之后，并不会复制到堆上，所以地址也一直都在栈上。这与ARC环境下的不一样。
 
-ARC环境下，不管有没有copy，\_\_block都会变copy到堆上，Block也是\_\_NSMallocBlock。
+~~ARC环境下，不管有没有copy，\_\_block都会变copy到堆上，Block也是\_\_NSMallocBlock。~~
+
+感谢@酷酷的哀殿 指出错误，感谢@bestswifter 指点。上述说法有点不妥，详细见文章末尾更新。
+
+ARC环境下，一旦Block赋值就会触发copy，\_\_block就会copy到堆上，Block也是\_\_NSMallocBlock。ARC环境下也是存在\_\_NSStackBlock的时候，这种情况下，__block就在栈上。
+
 MRC环境下，只有copy，\_\_block才会被复制到堆上，否则，\_\_block一直都在栈上，block也只是\_\_NSStackBlock，这个时候\_\_forwarding指针就只指向自己了。
 
 
@@ -807,3 +812,34 @@ MRC环境下，只有copy，\_\_block才会被复制到堆上，否则，\_\_blo
 值得注意的是，静态全局变量，全局变量，函数参数他们并不会被Block持有，也就是说不会增加retainCount值。
 
 请大家多多指点。
+
+
+**更新**
+
+
+
+在ARC环境下，Block也是存在\_\_NSStackBlock的时候的，平时见到最多的是\_NSConcreteMallocBlock，是因为我们会对Block有赋值操作，所以ARC下，block 类型通过=进行传递时，会导致调用objc\_retainBlock->\_Block\_copy->\_Block\_copy\_internal方法链。并导致 \_\_NSStackBlock\_\_ 类型的 block 转换为 \_\_NSMallocBlock\_\_ 类型。
+
+举例如下：
+
+```
+
+#import <Foundation/Foundation.h>
+
+int main(int argc, const char * argv[]) {
+    
+    __block int temp = 10;
+    
+    NSLog(@"%@",^{NSLog(@"*******%d %p",temp ++,&temp);});
+   
+    return 0;
+}
+```
+
+输出
+
+```
+<__NSStackBlock__: 0x7fff5fbff768>
+```
+
+这种情况就是ARC环境下Block是\_\_NSStackBlock的类型。

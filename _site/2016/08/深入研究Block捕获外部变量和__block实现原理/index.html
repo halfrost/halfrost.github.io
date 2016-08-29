@@ -927,8 +927,13 @@ int main(int argc, const char * argv[]) {
 
 <p>Block在捕获住__block变量之后，并不会复制到堆上，所以地址也一直都在栈上。这与ARC环境下的不一样。</p>
 
-<p>ARC环境下，不管有没有copy，__block都会变copy到堆上，Block也是__NSMallocBlock。
-MRC环境下，只有copy，__block才会被复制到堆上，否则，__block一直都在栈上，block也只是__NSStackBlock，这个时候__forwarding指针就只指向自己了。</p>
+<p><del>ARC环境下，不管有没有copy，__block都会变copy到堆上，Block也是__NSMallocBlock。</del></p>
+
+<p>感谢@酷酷的哀殿 指出错误，感谢@bestswifter 指点。上述说法有点不妥，详细见文章末尾更新。</p>
+
+<p>ARC环境下，一旦Block赋值就会触发copy，__block就会copy到堆上，Block也是__NSMallocBlock。ARC环境下也是存在__NSStackBlock的时候，这种情况下，__block就在栈上。</p>
+
+<p>MRC环境下，只有copy，__block才会被复制到堆上，否则，__block一直都在栈上，block也只是__NSStackBlock，这个时候__forwarding指针就只指向自己了。</p>
 
 <p><img src="https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_7.jpg" alt="" /></p>
 
@@ -953,6 +958,34 @@ MRC环境下，只有copy，__block才会被复制到堆上，否则，__block�
 <p>值得注意的是，静态全局变量，全局变量，函数参数他们并不会被Block持有，也就是说不会增加retainCount值。</p>
 
 <p>请大家多多指点。</p>
+
+<p><strong>更新</strong></p>
+
+<p>在ARC环境下，Block也是存在__NSStackBlock的时候的，平时见到最多的是_NSConcreteMallocBlock，是因为我们会对Block有赋值操作，所以ARC下，block 类型通过=进行传递时，会导致调用objc_retainBlock-&gt;_Block_copy-&gt;_Block_copy_internal方法链。并导致 __NSStackBlock__ 类型的 block 转换为 __NSMallocBlock__ 类型。</p>
+
+<p>举例如下：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+#import &lt;Foundation/Foundation.h&gt;
+
+int main(int argc, const char * argv[]) {
+    
+    __block int temp = 10;
+    
+    NSLog(@"%@",^{NSLog(@"*******%d %p",temp ++,&amp;temp);});
+   
+    return 0;
+}
+</code></pre>
+</div>
+
+<p>输出</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>&lt;__NSStackBlock__: 0x7fff5fbff768&gt;
+</code></pre>
+</div>
+
+<p>这种情况就是ARC环境下Block是__NSStackBlock的类型。</p>
 
   </section>
 </article>
@@ -1005,7 +1038,7 @@ MRC环境下，只有copy，__block才会被复制到堆上，否则，__block�
       <br>
       <br>
     	<span class="footer__copyright">本站点采用<a href="http://creativecommons.org/licenses/by-nc-sa/4.0/">知识共享 署名-非商业性使用-相同方式共享 4.0 国际 许可协议</a></span>
-        <span class="footer__copyright">由 <a href="https://jekyllrb.com">Jekyll</a> 于 2016-08-27 生成，感谢<a href="https://pages.github.com"> GitHub Pages</a> 强力驱动</span>
+        <span class="footer__copyright">由 <a href="https://jekyllrb.com">Jekyll</a> 于 2016-08-30 生成，感谢<a href="https://pages.github.com"> GitHub Pages</a> 强力驱动</span>
         <span class="footer__copyright">本站由 <a href="http://halfrost.com">@halfrost</a> 创建，采用 <a href="https://github.com/onevcat/vno-jekyll">Vno - Jekyll</a> 作为主题，您可以在 GitHub 找到<a href="https://github.com/onevcat/OneV-s-Den">本站源码</a> - &copy; 2016</span>
     </footer>
 </section>

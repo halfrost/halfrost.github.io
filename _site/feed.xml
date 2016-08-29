@@ -5,8 +5,8 @@
     <description>嗨，我是于德志 (@halfrost)，一名来自中国的 iOS 开发者，已退役 acmer 。现居上海。吾笃信：德不孤，必有志，技不疏，必有朋。</description>
     <link>http://vno.onevcat.com/</link>
     <atom:link href="http://vno.onevcat.com/feed.xml" rel="self" type="application/rss+xml"/>
-    <pubDate>Sat, 27 Aug 2016 23:47:49 +0800</pubDate>
-    <lastBuildDate>Sat, 27 Aug 2016 23:47:49 +0800</lastBuildDate>
+    <pubDate>Tue, 30 Aug 2016 01:09:30 +0800</pubDate>
+    <lastBuildDate>Tue, 30 Aug 2016 01:09:30 +0800</lastBuildDate>
     <generator>Jekyll v3.1.6</generator>
     
       <item>
@@ -777,8 +777,13 @@ int main(int argc, const char * argv[]) {
 
 &lt;p&gt;Block在捕获住__block变量之后，并不会复制到堆上，所以地址也一直都在栈上。这与ARC环境下的不一样。&lt;/p&gt;
 
-&lt;p&gt;ARC环境下，不管有没有copy，__block都会变copy到堆上，Block也是__NSMallocBlock。
-MRC环境下，只有copy，__block才会被复制到堆上，否则，__block一直都在栈上，block也只是__NSStackBlock，这个时候__forwarding指针就只指向自己了。&lt;/p&gt;
+&lt;p&gt;&lt;del&gt;ARC环境下，不管有没有copy，__block都会变copy到堆上，Block也是__NSMallocBlock。&lt;/del&gt;&lt;/p&gt;
+
+&lt;p&gt;感谢@酷酷的哀殿 指出错误，感谢@bestswifter 指点。上述说法有点不妥，详细见文章末尾更新。&lt;/p&gt;
+
+&lt;p&gt;ARC环境下，一旦Block赋值就会触发copy，__block就会copy到堆上，Block也是__NSMallocBlock。ARC环境下也是存在__NSStackBlock的时候，这种情况下，__block就在栈上。&lt;/p&gt;
+
+&lt;p&gt;MRC环境下，只有copy，__block才会被复制到堆上，否则，__block一直都在栈上，block也只是__NSStackBlock，这个时候__forwarding指针就只指向自己了。&lt;/p&gt;
 
 &lt;p&gt;&lt;img src=&quot;https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_7.jpg&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
 
@@ -803,6 +808,34 @@ MRC环境下，只有copy，__block才会被复制到堆上，否则，__block�
 &lt;p&gt;值得注意的是，静态全局变量，全局变量，函数参数他们并不会被Block持有，也就是说不会增加retainCount值。&lt;/p&gt;
 
 &lt;p&gt;请大家多多指点。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;更新&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;在ARC环境下，Block也是存在__NSStackBlock的时候的，平时见到最多的是_NSConcreteMallocBlock，是因为我们会对Block有赋值操作，所以ARC下，block 类型通过=进行传递时，会导致调用objc_retainBlock-&amp;gt;_Block_copy-&amp;gt;_Block_copy_internal方法链。并导致 __NSStackBlock__ 类型的 block 转换为 __NSMallocBlock__ 类型。&lt;/p&gt;
+
+&lt;p&gt;举例如下：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+#import &amp;lt;Foundation/Foundation.h&amp;gt;
+
+int main(int argc, const char * argv[]) {
+    
+    __block int temp = 10;
+    
+    NSLog(@&quot;%@&quot;,^{NSLog(@&quot;*******%d %p&quot;,temp ++,&amp;amp;temp);});
+   
+    return 0;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;输出&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&amp;lt;__NSStackBlock__: 0x7fff5fbff768&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;这种情况就是ARC环境下Block是__NSStackBlock的类型。&lt;/p&gt;
 </description>
         <pubDate>Sat, 27 Aug 2016 22:05:00 +0800</pubDate>
         <link>http://vno.onevcat.com/2016/08/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E6%8D%95%E8%8E%B7%E5%A4%96%E9%83%A8%E5%8F%98%E9%87%8F%E5%92%8C__block%E5%AE%9E%E7%8E%B0%E5%8E%9F%E7%90%86/</link>
