@@ -169,7 +169,7 @@
 
 <p>Block在OC中的实现如下：</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>
+<pre><code class="language-objectivec">
 struct Block_layout {
     void *isa;
     int flags;
@@ -186,9 +186,8 @@ struct Block_descriptor {
     void (*dispose)(void *);
 };
 </code></pre>
-</div>
 
-<p><img src="https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_1.png" alt="" /></p>
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-1739b7e85e46b4db.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
 
 <p>从结构图中很容易看到isa，所以OC处理Block是按照对象来处理的。在iOS中，isa常见的就是_NSConcreteStackBlock，_NSConcreteMallocBlock，_NSConcreteGlobalBlock这3种(另外只在GC环境下还有3种使用的_NSConcreteFinalizingBlock，_NSConcreteAutoBlock，_NSConcreteWeakBlockVariable，本文暂不谈论这3种，有兴趣的看看官方文档)</p>
 
@@ -197,21 +196,19 @@ struct Block_descriptor {
 <p><strong>研究工具：clang</strong>
 为了研究编译器的实现原理，我们需要使用 clang 命令。clang 命令可以将 Objetive-C 的源码改写成 C / C++ 语言的，借此可以研究 block 中各个特性的源码实现方式。该命令是</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>clang -rewrite-objc block.c
+<div class="language-vim highlighter-rouge"><pre class="highlight"><code>clang <span class="p">-</span>rewrite<span class="p">-</span>objc block<span class="p">.</span><span class="k">c</span>
 
 </code></pre>
 </div>
 
-<h4 id="section-1">目录</h4>
-<ul>
-  <li>1.Block捕获外部变量实质</li>
-  <li>2.Block的copy和release</li>
-  <li>3.Block中__block实现原理</li>
-</ul>
+<p>####目录
+- 1.Block捕获外部变量实质
+- 2.Block的copy和release
+- 3.Block中__block实现原理</p>
 
 <h4 id="block">一.Block捕获外部变量实质</h4>
 
-<p><img src="https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_2.png" alt="" /></p>
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-b7046feffe189bfa.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
 
 <p>拿起我们的Block一起来捕捉外部变量吧。</p>
 
@@ -235,11 +232,11 @@ struct Block_descriptor {
 
 <p>写出Block测试代码。</p>
 
-<p><img src="https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_3.png" alt="" /></p>
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-cba895ef7fe45179.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
 
 <p>这里很快就出现了一个错误，提示说自动变量没有加__block，由于__block有点复杂，我们先实验静态变量，静态全局变量，全局变量这3类。测试代码如下：</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>
+<pre><code class="language-objectivec">
 #import &lt;Foundation/Foundation.h&gt;
 
 int global_i = 1;
@@ -270,14 +267,12 @@ int main(int argc, const char * argv[]) {
 }
 
 </code></pre>
-</div>
 
-<p>运行结果</p>
-
-<div class="highlighter-rouge"><pre class="highlight"><code>Block 外  global_i = 2,static_global_j = 3,static_k = 4,val = 5
+<p>运行结果
+<code class="highlighter-rouge">vim
+Block 外  global_i = 2,static_global_j = 3,static_k = 4,val = 5
 Block 中  global_i = 3,static_global_j = 4,static_k = 5,val = 4
-</code></pre>
-</div>
+</code></p>
 
 <p>这里就有2点需要弄清楚了
 1.为什么在Block里面不加__bolck不允许更改变量？
@@ -289,7 +284,7 @@ Block 中  global_i = 3,static_global_j = 4,static_k = 5,val = 4
 
 <p>源码如下</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>
+<pre><code class="language-objectivec">
 int global_i = 1;
 
 static int static_global_j = 2;
@@ -340,7 +335,6 @@ int main(int argc, const char * argv[]) {
     return 0;
 }
 </code></pre>
-</div>
 
 <p>首先全局变量global_i和静态全局变量static_global_j的值增加，以及它们被Block捕获进去，这一点很好理解，因为是全局的，作用域很广，所以Block捕获了它们进去之后，在Block里面进行++操作，Block结束之后，它们的值依旧可以得以保存下来。</p>
 
@@ -349,11 +343,10 @@ int main(int argc, const char * argv[]) {
 
 <p>接着看构造函数，</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>
+<pre><code class="language-objectivec">
 __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, int *_static_k, int _val, int flags=0) : static_k(_static_k), val(_val)
 
 </code></pre>
-</div>
 <p>这个构造函数中，自动变量和静态变量被捕获为成员变量追加到了构造函数中。</p>
 
 <p>main里面的myBlock闭包中的__main_block_impl_0结构体，初始化如下</p>
@@ -377,7 +370,7 @@ val = 4;
 
 <p>再研究一下源码，我们注意到__main_block_func_0这个函数的实现</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>
+<pre><code class="language-objectivec">
 static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
   int *static_k = __cself-&gt;static_k; // bound by copy
   int val = __cself-&gt;val; // bound by copy
@@ -388,7 +381,6 @@ static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
         NSLog((NSString *)&amp;__NSConstantStringImpl__var_folders_45_k1d9q7c52vz50wz1683_hk9r0000gn_T_main_6fe658_mi_0,global_i,static_global_j,(*static_k),val);
     }
 </code></pre>
-</div>
 
 <p>我们可以发现，系统自动给我们加上的注释，bound by copy，自动变量val虽然被捕获进来了，但是是用 __cself-&gt;val来访问的。Block仅仅捕获了val的值，并没有捕获val的内存地址。所以在__main_block_func_0这个函数中即使我们重写这个自动变量val的值，依旧没法去改变Block外面自动变量val的值。</p>
 
@@ -400,7 +392,7 @@ static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
 </div>
 
 <p>小结一下：
-到此为止，上面提出的第二个问题就解开答案了。自动变量是以值传递方式传递到Block的构造函数里面去的。Block只捕获Block中会用到的变量。由于只捕获了自动变量的值，并内存地址，所以Block内部不能改变自动变量的值。Block捕获的外表变量可以改变值的是静态变量，静态全局变量，全局变量。上面例子也都证明过了。</p>
+到此为止，上面提出的第二个问题就解开答案了。自动变量是以值传递方式传递到Block的构造函数里面去的。Block只捕获Block中会用到的变量。由于只捕获了自动变量的值，并非内存地址，所以Block内部不能改变自动变量的值。Block捕获的外部变量可以改变值的是静态变量，静态全局变量，全局变量。上面例子也都证明过了。</p>
 
 <p>剩下问题一我们还没有解决。</p>
 
@@ -409,7 +401,7 @@ static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
 <ol>
   <li>
     <p>静态全局变量，全局变量由于作用域的原因，于是可以直接在Block里面被改变。他们也都存储在全局区。
-<img src="https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_4.png" alt="" /></p>
+<img src="http://upload-images.jianshu.io/upload_images/1194012-cf406451fc813cdb.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
   </li>
   <li>
     <p>静态变量传递给Block是内存地址值，所以能在Block里面直接改变值。</p>
@@ -422,7 +414,7 @@ static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
 
 <p>先来实验一下第一种方式，传递内存地址到Block中，改变变量的值。</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>
+<pre><code class="language-objectivec">
 #import &lt;Foundation/Foundation.h&gt;
 
 int main(int argc, const char * argv[]) {
@@ -442,17 +434,16 @@ int main(int argc, const char * argv[]) {
 }
 
 </code></pre>
-</div>
 <p>控制台输出：</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>Block 外  str = Hello,
-Block 中  str = Hello,World!
+<div class="language-vim highlighter-rouge"><pre class="highlight"><code>Block 外  str <span class="p">=</span> Hello<span class="p">,</span>
+Block 中  str <span class="p">=</span> Hello<span class="p">,</span>World<span class="p">!</span>
 
 </code></pre>
 </div>
 <p>看结果是成功改变了变量的值了，转换一下源码。</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>
+<pre><code class="language-objectivec">
 struct __main_block_impl_0 {
   struct __block_impl impl;
   struct __main_block_desc_0* Desc;
@@ -493,7 +484,6 @@ int main(int argc, const char * argv[]) {
     return 0;
 }
 </code></pre>
-</div>
 <p>在__main_block_func_0里面可以看到传递的是指针。所以成功改变了变量的值。</p>
 
 <p>至于源码里面的copy和dispose下一节会讲到。</p>
@@ -502,11 +492,13 @@ int main(int argc, const char * argv[]) {
 
 <h4 id="blockcopydispose">二.Block的copy和dispose</h4>
 
-<p><img src="https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_5.jpg" alt="" /></p>
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-244bd60d4cb8ad27.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
 
-<p>OC中，一般Block就分为一下3种，_NSConcreteStackBlock，_NSConcreteMallocBlock，_NSConcreteGlobalBlock。先来说明一下3者的区别。</p>
+<p>OC中，一般Block就分为以下3种，_NSConcreteStackBlock，_NSConcreteMallocBlock，_NSConcreteGlobalBlock。</p>
 
-<h5 id="section-2">1.从捕获外部变量的角度上来看</h5>
+<p>先来说明一下3者的区别。</p>
+
+<h5 id="section-1">1.从捕获外部变量的角度上来看</h5>
 
 <ul>
   <li>
@@ -526,7 +518,7 @@ StackBlock的生命周期由系统控制的，一旦返回之后，就被系统�
 
 <p>没有用到外部变量肯定是_NSConcreteGlobalBlock，这点很好理解。不过只用到全局变量、静态变量的block也是_NSConcreteGlobalBlock。举例如下：</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>
+<pre><code class="language-objectivec">
 #import &lt;Foundation/Foundation.h&gt;
 
 int global_i = 1;
@@ -548,11 +540,10 @@ int main(int argc, const char * argv[]) {
 }
 
 </code></pre>
-</div>
 <p>输出：</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>&lt;__NSGlobalBlock__: 0x100001050&gt;
-Block中 变量 = 2 3 1
+<div class="language-vim highlighter-rouge"><pre class="highlight"><code><span class="p">&lt;</span>__NSGlobalBlock__<span class="p">:</span> <span class="m">0</span>x100001050<span class="p">&gt;</span>
+Block中 变量 <span class="p">=</span> <span class="m">2</span> <span class="m">3</span> <span class="m">1</span>
 </code></pre>
 </div>
 
@@ -560,13 +551,13 @@ Block中 变量 = 2 3 1
 
 <p>所以在ARC环境下，3种类型都可以捕获外部变量。</p>
 
-<h5 id="section-3">2.从持有对象的角度上来看：</h5>
+<h5 id="section-2">2.从持有对象的角度上来看：</h5>
 
 <ul>
   <li>_NSConcreteStackBlock是不持有对象的。</li>
 </ul>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>
+<pre><code class="language-objectivec">
 //以下是在MRC下执行的
     NSObject * obj = [[NSObject alloc]init];
     NSLog(@"1.Block外 obj = %lu",(unsigned long)obj.retainCount);
@@ -579,13 +570,12 @@ Block中 变量 = 2 3 1
     
     myBlock();
 </code></pre>
-</div>
 
 <p>输出：</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>1.Block外 obj = 1
-2.Block外 obj = 1
-Block中 obj = 1
+<div class="language-vim highlighter-rouge"><pre class="highlight"><code><span class="m">1</span><span class="p">.</span>Block外 obj <span class="p">=</span> <span class="m">1</span>
+<span class="m">2</span><span class="p">.</span>Block外 obj <span class="p">=</span> <span class="m">1</span>
+Block中 obj <span class="p">=</span> <span class="m">1</span>
 </code></pre>
 </div>
 
@@ -593,7 +583,7 @@ Block中 obj = 1
   <li>_NSConcreteMallocBlock是持有对象的。</li>
 </ul>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>//以下是在MRC下执行的
+<pre><code class="language-objectivec">//以下是在MRC下执行的
     NSObject * obj = [[NSObject alloc]init];
     NSLog(@"1.Block外 obj = %lu",(unsigned long)obj.retainCount);
     
@@ -609,14 +599,13 @@ Block中 obj = 1
     
     NSLog(@"3.Block外 obj = %lu",(unsigned long)obj.retainCount);
 </code></pre>
-</div>
 
 <p>输出：</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>1.Block外 obj = 1
-2.Block外 obj = 2
-Block中 obj = 2
-3.Block外 obj = 1
+<div class="language-vim highlighter-rouge"><pre class="highlight"><code><span class="m">1</span><span class="p">.</span>Block外 obj <span class="p">=</span> <span class="m">1</span>
+<span class="m">2</span><span class="p">.</span>Block外 obj <span class="p">=</span> <span class="m">2</span>
+Block中 obj <span class="p">=</span> <span class="m">2</span>
+<span class="m">3</span><span class="p">.</span>Block外 obj <span class="p">=</span> <span class="m">1</span>
 </code></pre>
 </div>
 
@@ -624,7 +613,7 @@ Block中 obj = 2
   <li>_NSConcreteGlobalBlock也不持有对象</li>
 </ul>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>//以下是在MRC下执行的
+<pre><code class="language-objectivec">//以下是在MRC下执行的
     void (^myBlock)(void) = ^{
         
         NSObject * obj = [[NSObject alloc]init];
@@ -634,12 +623,11 @@ Block中 obj = 2
     myBlock();
 
 </code></pre>
-</div>
 
 <p>输出：</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>
-Block 中 obj = 1
+<div class="language-vim highlighter-rouge"><pre class="highlight"><code>
+Block 中 obj <span class="p">=</span> <span class="m">1</span>
 </code></pre>
 </div>
 
@@ -656,7 +644,7 @@ Block 中 obj = 1
 
 <p>copy函数把Block从栈上拷贝到堆上，dispose函数是把堆上的函数在废弃的时候销毁掉。</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>
+<pre><code class="language-objectivec">
 #define Block_copy(...) ((__typeof(__VA_ARGS__))_Block_copy((const void *)(__VA_ARGS__)))
 #define Block_release(...) _Block_release((const void *)(__VA_ARGS__))
 
@@ -678,11 +666,10 @@ BLOCK_EXPORT void _Block_object_assign(void *, const void *, const int)
 BLOCK_EXPORT void _Block_object_dispose(const void *, const int)
     __OSX_AVAILABLE_STARTING(__MAC_10_6, __IPHONE_3_2);
 </code></pre>
-</div>
 
 <p>上面是源码中2个常用的宏定义和4个常用的方法，一会我们就会看到这4个方法。</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>
+<pre><code class="language-objectivec">
 static void *_Block_copy_internal(const void *arg, const int flags) {
     struct Block_layout *aBlock;
     const bool wantsOne = (WANTS_ONE &amp; flags) == WANTS_ONE;
@@ -727,11 +714,10 @@ static void *_Block_copy_internal(const void *arg, const int flags) {
     return result;
 }
 </code></pre>
-</div>
 
 <p>上面这一段是Block_copy的一个实现，实现了从_NSConcreteStackBlock复制到_NSConcreteMallocBlock的过程。对应有9个步骤。</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>
+<pre><code class="language-objectivec">
 void _Block_release(void *arg) {
     // 1
     struct Block_layout *aBlock = (struct Block_layout *)arg;
@@ -757,11 +743,10 @@ void _Block_release(void *arg) {
     
     // 6
     else {
-        printf("Block_release called upon a stack Block: %p, ignored\n", (void *)aBlock);
+        printf("Block_release called upon a stack Block: %p, ignored\\\\n", (void *)aBlock);
     }
 }
 </code></pre>
-</div>
 
 <p>上面这一段是Block_release的一个实现，实现了怎么释放一个Block。对应有6个步骤。</p>
 
@@ -773,12 +758,11 @@ void _Block_release(void *arg) {
 
 <p>相应的增加了2个方法。</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>static void __main_block_copy_0(struct __main_block_impl_0*dst, struct __main_block_impl_0*src) {_Block_object_assign((void*)&amp;dst-&gt;str, (void*)src-&gt;str, 3/*BLOCK_FIELD_IS_OBJECT*/);}
+<pre><code class="language-objectivec">static void __main_block_copy_0(struct __main_block_impl_0*dst, struct __main_block_impl_0*src) {_Block_object_assign((void*)&amp;dst-&gt;str, (void*)src-&gt;str, 3/*BLOCK_FIELD_IS_OBJECT*/);}
 
 static void __main_block_dispose_0(struct __main_block_impl_0*src) {_Block_object_dispose((void*)src-&gt;str, 3/*BLOCK_FIELD_IS_OBJECT*/);}
 
 </code></pre>
-</div>
 <p>这里的_Block_object_assign和_Block_object_dispose就对应着retain和release方法。</p>
 
 <p>BLOCK_FIELD_IS_OBJECT 是Block截获对象时候的特殊标示，如果是截获的__block，那么是BLOCK_FIELD_IS_BYREF。</p>
@@ -787,7 +771,11 @@ static void __main_block_dispose_0(struct __main_block_impl_0*src) {_Block_objec
 
 <p>我们继续研究一下__block实现原理。</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>
+<h5 id="section-3">1.普通非对象的变量</h5>
+
+<p>先来看看普通变量的情况。</p>
+
+<pre><code class="language-objectivec">
 #import &lt;Foundation/Foundation.h&gt;
 
 int main(int argc, const char * argv[]) {
@@ -804,7 +792,6 @@ int main(int argc, const char * argv[]) {
     return 0;
 }
 </code></pre>
-</div>
 <p>把上述代码用clang转换成源码。</p>
 
 <div class="highlighter-rouge"><pre class="highlight"><code>
@@ -856,13 +843,12 @@ int main(int argc, const char * argv[]) {
 </div>
 <p>从源码我们能发现，带有 __block的变量也被转化成了一个结构体__Block_byref_i_0,这个结构体有5个成员变量。第一个是isa指针，第二个是指向自身类型的__forwarding指针，第三个是一个标记flag，第四个是它的大小，第五个是变量值，名字和变量名同名。</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>__attribute__((__blocks__(byref))) __Block_byref_i_0 i = {(void*)0,(__Block_byref_i_0 *)&amp;i, 0, sizeof(__Block_byref_i_0), 0};
+<pre><code class="language-objectivec">__attribute__((__blocks__(byref))) __Block_byref_i_0 i = {(void*)0,(__Block_byref_i_0 *)&amp;i, 0, sizeof(__Block_byref_i_0), 0};
 
 </code></pre>
-</div>
 <p>源码中是这样初始化的。__forwarding指针初始化传递的是自己的地址。然而这里__forwarding指针真的永远指向自己么？我们来做一个实验。</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>
+<pre><code class="language-objectivec">
 //以下代码在MRC中运行
     __block int i = 0;
     NSLog(@"%p",&amp;i);
@@ -873,12 +859,11 @@ int main(int argc, const char * argv[]) {
     }copy];
 
 </code></pre>
-</div>
 <p>我们把Block拷贝到了堆上，这个时候打印出来的2个i变量的地址就不同了。</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>0x7fff5fbff818
-&lt;__NSMallocBlock__: 0x100203cc0&gt;
-这是Block 里面 0x1002038a8
+<div class="language-vim highlighter-rouge"><pre class="highlight"><code><span class="m">0</span>x7fff5fbff818
+<span class="p">&lt;</span>__NSMallocBlock__<span class="p">:</span> <span class="m">0</span>x100203cc0<span class="p">&gt;</span>
+这是Block 里面 <span class="m">0</span>x1002038a8
 </code></pre>
 </div>
 
@@ -892,13 +877,12 @@ int main(int argc, const char * argv[]) {
 
 <p>__forwarding指针这里的作用就是针对堆的Block，把原来__forwarding指针指向自己，换成指向_NSConcreteMallocBlock上复制之后的__block自己。然后堆上的变量的__forwarding再指向自己。这样不管__block怎么复制到堆上，还是在栈上，都可以通过(i-&gt;__forwarding-&gt;i)来访问到变量值。</p>
 
-<p><img src="https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_6.jpg" alt="" /></p>
-
-<p>所以在__main_block_func_0函数里面就是写的(i-&gt;__forwarding-&gt;i)。</p>
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-5f5f486bab68191f.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" />
+所以在__main_block_func_0函数里面就是写的(i-&gt;__forwarding-&gt;i)。</p>
 
 <p>这里还有一个需要注意的地方。还是从例子说起：</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>//以下代码在MRC中运行
+<pre><code class="language-objectivec">//以下代码在MRC中运行
     __block int i = 0;
     NSLog(@"%p",&amp;i);
     
@@ -913,14 +897,13 @@ int main(int argc, const char * argv[]) {
     myBlock();
 
 </code></pre>
-</div>
 
 <p>结果和之前copy的例子完全不同。</p>
 
-<div class="highlighter-rouge"><pre class="highlight"><code>
- 0x7fff5fbff818
-&lt;__NSStackBlock__: 0x7fff5fbff7c0&gt;**
- 0x7fff5fbff818
+<div class="language-vim highlighter-rouge"><pre class="highlight"><code>
+ <span class="m">0</span>x7fff5fbff818
+<span class="p">&lt;</span>__NSStackBlock__<span class="p">:</span> <span class="m">0</span>x7fff5fbff7c0<span class="p">&gt;</span>**
+ <span class="m">0</span>x7fff5fbff818
 
 </code></pre>
 </div>
@@ -935,27 +918,165 @@ int main(int argc, const char * argv[]) {
 
 <p>MRC环境下，只有copy，__block才会被复制到堆上，否则，__block一直都在栈上，block也只是__NSStackBlock，这个时候__forwarding指针就只指向自己了。</p>
 
-<p><img src="https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_7.jpg" alt="" /></p>
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-5e5ae21bfacf7b91.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
 
 <p>至此，文章开头提出的问题一，也解答了。__block的实现原理也已经明了。</p>
 
-<h4 id="section-4">最后</h4>
+<h5 id="section-4">2.对象的变量</h5>
+
+<p>还是先举一个例子：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+//以下代码是在ARC下执行的
+#import &lt;Foundation/Foundation.h&gt;
+
+int main(int argc, const char * argv[]) {
+     
+    __block id block_obj = [[NSObject alloc]init];
+    id obj = [[NSObject alloc]init];
+
+    NSLog(@"block_obj = [%@ , %p] , obj = [%@ , %p]",block_obj , &amp;block_obj , obj , &amp;obj);
+    
+    void (^myBlock)(void) = ^{
+        NSLog(@"***Block中****block_obj = [%@ , %p] , obj = [%@ , %p]",block_obj , &amp;block_obj , obj , &amp;obj);
+    };
+    
+    myBlock();
+   
+    return 0;
+}
+
+</code></pre>
+</div>
+
+<p>输出</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+block_obj = [&lt;NSObject: 0x100b027d0&gt; , 0x7fff5fbff7e8] , obj = [&lt;NSObject: 0x100b03b50&gt; , 0x7fff5fbff7b8]
+Block****中********block_obj = [&lt;NSObject: 0x100b027d0&gt; , 0x100f000a8] , obj = [&lt;NSObject: 0x100b03b50&gt; , 0x100f00070]
+
+</code></pre>
+</div>
+
+<p>我们把上面的代码转换成源码研究一下：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+struct __Block_byref_block_obj_0 {
+  void *__isa;
+__Block_byref_block_obj_0 *__forwarding;
+ int __flags;
+ int __size;
+ void (*__Block_byref_id_object_copy)(void*, void*);
+ void (*__Block_byref_id_object_dispose)(void*);
+ id block_obj;
+};
+
+struct __main_block_impl_0 {
+  struct __block_impl impl;
+  struct __main_block_desc_0* Desc;
+  id obj;
+  __Block_byref_block_obj_0 *block_obj; // by ref
+  __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, id _obj, __Block_byref_block_obj_0 *_block_obj, int flags=0) : obj(_obj), block_obj(_block_obj-&gt;__forwarding) {
+    impl.isa = &amp;_NSConcreteStackBlock;
+    impl.Flags = flags;
+    impl.FuncPtr = fp;
+    Desc = desc;
+  }
+};
+static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
+  __Block_byref_block_obj_0 *block_obj = __cself-&gt;block_obj; // bound by ref
+  id obj = __cself-&gt;obj; // bound by copy
+
+        NSLog((NSString *)&amp;__NSConstantStringImpl__var_folders_45_k1d9q7c52vz50wz1683_hk9r0000gn_T_main_e64910_mi_1,(block_obj-&gt;__forwarding-&gt;block_obj) , &amp;(block_obj-&gt;__forwarding-&gt;block_obj) , obj , &amp;obj);
+    }
+static void __main_block_copy_0(struct __main_block_impl_0*dst, struct __main_block_impl_0*src) {_Block_object_assign((void*)&amp;dst-&gt;block_obj, (void*)src-&gt;block_obj, 8/*BLOCK_FIELD_IS_BYREF*/);_Block_object_assign((void*)&amp;dst-&gt;obj, (void*)src-&gt;obj, 3/*BLOCK_FIELD_IS_OBJECT*/);}
+
+static void __main_block_dispose_0(struct __main_block_impl_0*src) {_Block_object_dispose((void*)src-&gt;block_obj, 8/*BLOCK_FIELD_IS_BYREF*/);_Block_object_dispose((void*)src-&gt;obj, 3/*BLOCK_FIELD_IS_OBJECT*/);}
+
+static struct __main_block_desc_0 {
+  size_t reserved;
+  size_t Block_size;
+  void (*copy)(struct __main_block_impl_0*, struct __main_block_impl_0*);
+  void (*dispose)(struct __main_block_impl_0*);
+} __main_block_desc_0_DATA = { 0, sizeof(struct __main_block_impl_0), __main_block_copy_0, __main_block_dispose_0};
+
+
+int main(int argc, const char * argv[]) {
+
+    __attribute__((__blocks__(byref))) __Block_byref_block_obj_0 block_obj = {(void*)0,(__Block_byref_block_obj_0 *)&amp;block_obj, 33554432, sizeof(__Block_byref_block_obj_0), __Block_byref_id_object_copy_131, __Block_byref_id_object_dispose_131, ((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)objc_getClass("NSObject"), sel_registerName("alloc")), sel_registerName("init"))};
+
+    id obj = ((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)objc_getClass("NSObject"), sel_registerName("alloc")), sel_registerName("init"));
+    NSLog((NSString *)&amp;__NSConstantStringImpl__var_folders_45_k1d9q7c52vz50wz1683_hk9r0000gn_T_main_e64910_mi_0,(block_obj.__forwarding-&gt;block_obj) , &amp;(block_obj.__forwarding-&gt;block_obj) , obj , &amp;obj);
+
+    void (*myBlock)(void) = ((void (*)())&amp;__main_block_impl_0((void *)__main_block_func_0, &amp;__main_block_desc_0_DATA, obj, (__Block_byref_block_obj_0 *)&amp;block_obj, 570425344));
+
+    ((void (*)(__block_impl *))((__block_impl *)myBlock)-&gt;FuncPtr)((__block_impl *)myBlock);
+
+    return 0;
+}
+</code></pre>
+</div>
+
+<p>首先需要说明的一点是对象在OC中，默认声明自带__strong所有权修饰符的，所以main开头我们声明的</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+__block id block_obj = [[NSObject alloc]init];
+id obj = [[NSObject alloc]init];
+
+</code></pre>
+</div>
+<p>等价于</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+__block id __strong block_obj = [[NSObject alloc]init];
+id __strong obj = [[NSObject alloc]init];
+</code></pre>
+</div>
+
+<p>在转换出来的源码中，我们也可以看到，Block捕获了__block，并且强引用了，因为在__Block_byref_block_obj_0结构体中，有一个变量是id block_obj，这个默认也是带__strong所有权修饰符的。</p>
+
+<p>根据打印出来的结果来看，ARC环境下，Block捕获外部对象变量，是都会copy一份的，地址都不同。只不过带有__block修饰符的变量会被捕获到Block内部持有。</p>
+
+<p>我们再来看看MRC环境下的情况，还是将上述代码的例子运行在MRC中。</p>
+
+<p>输出：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+block_obj = [&lt;NSObject: 0x100b001b0&gt; , 0x7fff5fbff7e8] , obj = [&lt;NSObject: 0x100b001c0&gt; , 0x7fff5fbff7b8]
+Block****中********block_obj = [&lt;NSObject: 0x100b001b0&gt; , 0x7fff5fbff7e8] , obj = [&lt;NSObject: 0x100b001c0&gt; , 0x7fff5fbff790]
+
+</code></pre>
+</div>
+
+<p>这个时候block在栈上，__NSStackBlock__，可以打印出来retainCount值都是1。当把这个block copy一下，就变成__NSMallocBlock__，对象的retainCount值就会变成2了。</p>
+
+<p>总结：</p>
+
+<p>在MRC环境下，__block根本不会对指针所指向的对象执行copy操作，而只是把指针进行的复制。
+而在ARC环境下，对于声明为__block的外部对象，在block内部会进行retain，以至于在block环境内能安全的引用外部对象，所以才会产生循环引用的问题！</p>
+
+<h4 id="section-5">最后</h4>
 
 <p>关于Block捕获外部变量有很多用途，用途也很广，只有弄清了捕获变量和持有的变量的概念以后，之后才能清楚的解决Block循环引用的问题。</p>
 
 <p>再次回到文章开头，5种变量，自动变量，函数参数 ，静态变量，静态全局变量，全局变量，如果严格的来说，捕获是必须在Block结构体__main_block_impl_0里面有成员变量的话，Block能捕获的变量就只有带有自动变量和静态变量了。捕获进Block的对象会被Block持有。</p>
 
-<p>自动变量的值，被copy进了Block，不带__block的自动变量只能在里面被访问，并不能改变值。</p>
+<p>对于非对象的变量来说，</p>
 
-<p><img src="https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_8.jpg" alt="" /></p>
+<p>自动变量的值，被copy进了Block，不带__block的自动变量只能在里面被访问，并不能改变值。<br />
+<img src="http://upload-images.jianshu.io/upload_images/1194012-9c34ab1560e75504.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
 
-<p>带__block的自动变量 和 静态变量 就是直接地址访问。所以在Block里面可以直接改变变量的值。</p>
-
-<p><img src="https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_9.jpg" alt="" /></p>
+<p>带__block的自动变量 和 静态变量 就是直接地址访问。所以在Block里面可以直接改变变量的值。<br />
+<img src="http://upload-images.jianshu.io/upload_images/1194012-455842213775d7dd.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
 
 <p>而剩下的静态全局变量，全局变量，函数参数，也是可以在直接在Block中改变变量值的，但是他们并没有变成Block结构体__main_block_impl_0的成员变量，因为他们的作用域大，所以可以直接更改他们的值。</p>
 
 <p>值得注意的是，静态全局变量，全局变量，函数参数他们并不会被Block持有，也就是说不会增加retainCount值。</p>
+
+<p>对于对象来说，</p>
+
+<p>在MRC环境下，__block根本不会对指针所指向的对象执行copy操作，而只是把指针进行的复制。
+而在ARC环境下，对于声明为__block的外部对象，在block内部会进行retain，以至于在block环境内能安全的引用外部对象。</p>
 
 <p>请大家多多指点。</p>
 
@@ -991,6 +1112,14 @@ int main(int argc, const char * argv[]) {
 </article>
 
 <section class="read-more">
+   
+   
+   <div class="read-more-item">
+       <span class="read-more-item-dim">最近的文章</span>
+       <h2 class="post-list__post-title post-title"><a href="/2016/09/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E7%94%A8weakSelf-strongSelf-@weakify-@strongify%E8%A7%A3%E5%86%B3%E5%BE%AA%E7%8E%AF%E5%BC%95%E7%94%A8/" title="link to 深入研究Block用weakSelf、strongSelf、@weakify、@strongify解决循环引用">深入研究Block用weakSelf、strongSelf、@weakify、@strongify解决循环引用</a></h2>
+       <p class="excerpt">前言在上篇中，仔细分析了一下Block的实现原理以及__block捕获外部变量的原理。然而实际使用Block过程中，还是会遇到一些问题，比如Retain Circle的问题。目录  1.Retain Circle的由来  2.__weak、__strong的实现原理  3.weakSelf、strongSelf的用途  4.@weakify、@strongify实现原理一. Retain Circle的由来循环引用的问题相信大家都很理解了，这里还是简单的提一下。当A对象里面强引用了B对象，...&hellip;</p>
+       <div class="post-list__meta"><time datetime="2016-09-05 07:02:00 +0800" class="post-list__meta--date date">2016-09-05</time> &#8226; <span class="post-list__meta--tags tags">iOS</span><a class="btn-border-small" href=/2016/09/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E7%94%A8weakSelf-strongSelf-@weakify-@strongify%E8%A7%A3%E5%86%B3%E5%BE%AA%E7%8E%AF%E5%BC%95%E7%94%A8/>继续阅读</a></div>
+   </div>
    
    
    
@@ -1038,7 +1167,7 @@ int main(int argc, const char * argv[]) {
       <br>
       <br>
     	<span class="footer__copyright">本站点采用<a href="http://creativecommons.org/licenses/by-nc-sa/4.0/">知识共享 署名-非商业性使用-相同方式共享 4.0 国际 许可协议</a></span>
-        <span class="footer__copyright">由 <a href="https://jekyllrb.com">Jekyll</a> 于 2016-08-30 生成，感谢<a href="https://pages.github.com"> GitHub Pages</a> 强力驱动</span>
+        <span class="footer__copyright">由 <a href="https://jekyllrb.com">Jekyll</a> 于 2016-09-07 生成，感谢<a href="https://pages.github.com"> GitHub Pages</a> 强力驱动</span>
         <span class="footer__copyright">本站由 <a href="http://halfrost.com">@halfrost</a> 创建，采用 <a href="https://github.com/onevcat/vno-jekyll">Vno - Jekyll</a> 作为主题，您可以在 GitHub 找到<a href="https://github.com/onevcat/OneV-s-Den">本站源码</a> - &copy; 2016</span>
     </footer>
 </section>

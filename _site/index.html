@@ -157,6 +157,13 @@
   <ol class="post-list">
     
     <li>
+      <h2 class="post-list__post-title post-title"><a href="/2016/09/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E7%94%A8weakSelf-strongSelf-@weakify-@strongify%E8%A7%A3%E5%86%B3%E5%BE%AA%E7%8E%AF%E5%BC%95%E7%94%A8/" title="访问 深入研究Block用weakSelf、strongSelf、@weakify、@strongify解决循环引用">深入研究Block用weakSelf、strongSelf、@weakify、@strongify解决循环引用</a></h2>
+      <p class="excerpt">前言在上篇中，仔细分析了一下Block的实现原理以及__block捕获外部变量的原理。然而实际使用Block过程中，还是会遇到一些问题，比如Retain Circle的问题。目录  1.Retain Circle的由来  2.__weak、__strong的实现原理  3.weakSelf、strongSelf的用途  4.@weakify、@strongify实现原理一. Retain Circle的由来循环引用的问题相信大家都很理解了，这里还是简单的提一下。当A对象里面强引用了B对象，...&hellip;</p>
+      <div class="post-list__meta"><time datetime="2016-09-05 07:02:00 +0800" class="post-list__meta--date date">2016-09-05</time> &#8226; <span class="post-list__meta--tags tags">iOS</span><a class="btn-border-small" href=/2016/09/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E7%94%A8weakSelf-strongSelf-@weakify-@strongify%E8%A7%A3%E5%86%B3%E5%BE%AA%E7%8E%AF%E5%BC%95%E7%94%A8/>继续阅读</a></div>
+      <hr class="post-list__divider" />
+    </li>
+    
+    <li>
       <h2 class="post-list__post-title post-title"><a href="/2016/08/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E6%8D%95%E8%8E%B7%E5%A4%96%E9%83%A8%E5%8F%98%E9%87%8F%E5%92%8C__block%E5%AE%9E%E7%8E%B0%E5%8E%9F%E7%90%86/" title="访问 深入研究Block捕获外部变量和__block实现原理">深入研究Block捕获外部变量和__block实现原理</a></h2>
       <p class="excerpt">前言Blocks是C语言的扩充功能，而Apple 在OS X Snow Leopard 和 iOS 4中引入了这个新功能“Blocks”。从那开始，Block就出现在iOS和Mac系统各个API中，并被大家广泛使用。一句话来形容Blocks，带有自动变量（局部变量）的匿名函数。Block在OC中的实现如下：struct Block_layout {    void *isa;    int flags;    int reserved;    void (*invoke)(void *, ...&hellip;</p>
       <div class="post-list__meta"><time datetime="2016-08-27 22:05:00 +0800" class="post-list__meta--date date">2016-08-27</time> &#8226; <span class="post-list__meta--tags tags">iOS</span><a class="btn-border-small" href=/2016/08/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E6%8D%95%E8%8E%B7%E5%A4%96%E9%83%A8%E5%8F%98%E9%87%8F%E5%92%8C__block%E5%AE%9E%E7%8E%B0%E5%8E%9F%E7%90%86/>继续阅读</a></div>
@@ -219,13 +226,6 @@
       <hr class="post-list__divider" />
     </li>
     
-    <li>
-      <h2 class="post-list__post-title post-title"><a href="/2016/06/iOS%E5%A6%82%E4%BD%95%E4%BC%98%E9%9B%85%E7%9A%84%E5%A4%84%E7%90%86-%E5%9B%9E%E8%B0%83%E5%9C%B0%E7%8B%B1Callback-hell-(%E4%BA%8C)-%E4%BD%BF%E7%94%A8Swift/" title="访问 iOS如何优雅的处理“回调地狱Callback hell”(二)——使用Swift">iOS如何优雅的处理“回调地狱Callback hell”(二)——使用Swift</a></h2>
-      <p class="excerpt">前言在上篇中，我谈到了可以用promise来解决Callback hell的问题，这篇我们换一种方式一样可以解决这个问题。我们先分析一下为何promise能解决多层回调嵌套的问题，经过上篇的分析，我总结也一下几点：1.promise封装了所有异步操作，把异步操作封装成了一个“盒子”。2.promise提供了Monad，then相当于flatMap。3.promise的函数返回对象本身，于是就可形成链式调用好了，既然这些能优雅的解决callback hell，那么我们只要能做到这些，也一样可...&hellip;</p>
-      <div class="post-list__meta"><time datetime="2016-06-22 22:45:00 +0800" class="post-list__meta--date date">2016-06-22</time> &#8226; <span class="post-list__meta--tags tags">iOS</span><a class="btn-border-small" href=/2016/06/iOS%E5%A6%82%E4%BD%95%E4%BC%98%E9%9B%85%E7%9A%84%E5%A4%84%E7%90%86-%E5%9B%9E%E8%B0%83%E5%9C%B0%E7%8B%B1Callback-hell-(%E4%BA%8C)-%E4%BD%BF%E7%94%A8Swift/>继续阅读</a></div>
-      <hr class="post-list__divider" />
-    </li>
-    
   </ol>
 
   <hr class="post-list__divider " />
@@ -247,7 +247,7 @@
       <br>
       <br>
     	<span class="footer__copyright">本站点采用<a href="http://creativecommons.org/licenses/by-nc-sa/4.0/">知识共享 署名-非商业性使用-相同方式共享 4.0 国际 许可协议</a></span>
-        <span class="footer__copyright">由 <a href="https://jekyllrb.com">Jekyll</a> 于 2016-08-30 生成，感谢<a href="https://pages.github.com"> GitHub Pages</a> 强力驱动</span>
+        <span class="footer__copyright">由 <a href="https://jekyllrb.com">Jekyll</a> 于 2016-09-07 生成，感谢<a href="https://pages.github.com"> GitHub Pages</a> 强力驱动</span>
         <span class="footer__copyright">本站由 <a href="http://halfrost.com">@halfrost</a> 创建，采用 <a href="https://github.com/onevcat/vno-jekyll">Vno - Jekyll</a> 作为主题，您可以在 GitHub 找到<a href="https://github.com/onevcat/OneV-s-Den">本站源码</a> - &copy; 2016</span>
     </footer>
 </section>

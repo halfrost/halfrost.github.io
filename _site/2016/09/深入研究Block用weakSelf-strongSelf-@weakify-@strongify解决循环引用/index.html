@@ -1,0 +1,1558 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <title>深入研究Block用weakSelf、strongSelf、@weakify、@strongify解决循环引用</title>
+  <meta name="description" content="">
+  <meta name="author" content="Wei Wang">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="深入研究Block用weakSelf、strongSelf、@weakify、@strongify解决循环引用">
+  <meta name="twitter:description" content="">
+
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="深入研究Block用weakSelf、strongSelf、@weakify、@strongify解决循环引用">
+  <meta property="og:description" content="">
+
+  <link rel="icon" type="image/ico" href="/assets/images/favicon.ico" />
+  <link href="/assets/images/favicon.ico" rel="shortcut icon" type="image/ico">
+
+  <link rel="stylesheet" href="/css/main.css">
+  <link href="//netdna.bootstrapcdn.com/font-awesome/4.6.0/css/font-awesome.min.css" rel="stylesheet">
+
+  <link rel="canonical" href="http://vno.onevcat.com/2016/09/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E7%94%A8weakSelf-strongSelf-@weakify-@strongify%E8%A7%A3%E5%86%B3%E5%BE%AA%E7%8E%AF%E5%BC%95%E7%94%A8/">
+  <link rel="alternate" type="application/rss+xml" title="Halfrost's Field | 冰霜之地" href="http://vno.onevcat.com/feed.xml">
+
+  <meta name="google-site-verification" content="1-1ZlHoRvM0T2FqPbW2S-qLgYXN6rsn52kErlMPd_gw" />
+</head>
+
+
+  <body>
+
+    <span class="mobile btn-mobile-menu">
+        <i class="fa fa-list btn-mobile-menu__icon"></i>
+        <i class="fa fa-angle-up btn-mobile-close__icon hidden"></i>
+    </span>
+    
+    <header class="panel-cover panel-cover--collapsed" style="background-image: url('/assets/images/background-cover.jpg')">
+  <div class="panel-main">
+
+    <div class="panel-main__inner panel-inverted">
+    <div class="panel-main__content">
+
+        <a href="/#blog" title="前往 Halfrost's Field | 冰霜之地 的主页" class="blog-button"><img src="/assets/images/avatar.jpg" width="80" alt="Halfrost's Field | 冰霜之地 logo" class="panel-cover__logo logo" /></a>
+        <h1 class="panel-cover__title panel-title"><a href="/#blog" title="link to homepage for Halfrost's Field | 冰霜之地" class="blog-button">Halfrost's Field | 冰霜之地</a></h1>
+        
+        <span class="panel-cover__subtitle panel-subtitle">一缕殇流化隐半边冰霜</span>
+        
+        <hr class="panel-cover__divider" />
+        <p class="panel-cover__description">嗨，我是于德志 (@halfrost)，一名来自中国的 iOS 开发者，已退役 acmer 。现居上海。吾笃信：德不孤，必有志，技不疏，必有朋。</p>
+        <hr class="panel-cover__divider panel-cover__divider--secondary" />
+
+        
+
+        <div class="navigation-wrapper">
+          <div>
+            <nav class="cover-navigation cover-navigation--primary">
+              <ul class="navigation">
+
+                  
+
+                <li class="navigation__item"><a href="/" title="Home" class="home-button">首页</a></li>
+                <li class="navigation__item"><a href="/#blog" title="Visit blog" class="blog-button">博客</a></li>
+                
+                  <li class="navigation__item"><a href="http://about.halfrost.com" target="_blank" title="About">关于</a></li>
+                
+              </ul>
+            </nav>
+          </div>
+
+          <div><nav class="cover-navigation navigation--social">
+  <ul class="navigation">
+
+    
+    <!-- jianshu-->
+    <li class="navigation__item">
+      <a href="http://jianshu.com/users/12201cdd5d7a/latest_articles" title="@halfrost 的简书" target="_blank">
+        <i class='social fa fa-book'></i>
+        <span class="label">jianshu</span>
+      </a>
+    </li>
+    
+
+    
+    <!-- juejin-->
+    <li class="navigation__item">
+      <a href="http://gold.xitu.io/user/5692e1e000b09aa2e8dcd422" title="@halfrost 的稀土掘金" target="_blank">
+        <i class='social fa fa-forumbee'></i>
+        <span class="label">juejin</span>
+      </a>
+    </li>
+    
+
+  
+  <!-- Weibo -->
+  <li class="navigation__item">
+    <a href="http://weibo.com/halfrost" title="@halfrost 的微博" target="_blank">
+      <i class='social fa fa-weibo'></i>
+      <span class="label">Weibo</span>
+    </a>
+  </li>
+  
+
+  
+  <!-- Github -->
+  <li class="navigation__item">
+    <a href="https://github.com/halfrost" title="@halfrost 的 Github" target="_blank">
+      <i class='social fa fa-github'></i>
+      <span class="label">Github</span>
+    </a>
+  </li>
+  
+
+  
+
+  
+
+  <!-- RSS -->
+  <li class="navigation__item">
+    <a href="/feed.xml" rel="author" title="RSS" target="_blank">
+      <i class='social fa fa-rss'></i>
+      <span class="label">RSS</span>
+    </a>
+  </li>
+
+  
+  <!-- Email -->
+  <li class="navigation__item">
+    <a href="mailto:ydz627@gamil.com" title="Contact me">
+      <i class='social fa fa-envelope'></i>
+      <span class="label">Email</span>
+    </a>
+  </li>
+  
+
+  </ul>
+</nav>
+</div>
+        </div>
+      </div>
+    </div>
+
+    
+    <div class="panel-cover--overlay cover-black"></div>
+    
+  </div>
+</header>
+
+
+    <div class="content-wrapper">
+        <div class="content-wrapper__inner">
+            <article class="post-container post-container--single" itemscope itemtype="http://schema.org/BlogPosting">
+  <header class="post-header">
+    <div class="post-meta">
+      <time datetime="2016-09-05 07:02:00 +0800" itemprop="datePublished" class="post-meta__date date">2016-09-05</time> &#8226; <span class="post-meta__tags tags">iOS</span>
+    </div>
+    <h1 class="post-title">深入研究Block用weakSelf、strongSelf、@weakify、@strongify解决循环引用</h1>
+  </header>
+
+  <section class="post">
+    <p><img src="http://upload-images.jianshu.io/upload_images/1194012-d3d8244be4e6059f.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<h4 id="section">前言</h4>
+<p>在上篇中，仔细分析了一下Block的实现原理以及__block捕获外部变量的原理。然而实际使用Block过程中，还是会遇到一些问题，比如Retain Circle的问题。</p>
+
+<h4 id="section-1">目录</h4>
+<ul>
+  <li>1.Retain Circle的由来</li>
+  <li>2.__weak、__strong的实现原理</li>
+  <li>3.weakSelf、strongSelf的用途</li>
+  <li>4.@weakify、@strongify实现原理</li>
+</ul>
+
+<h4 id="retain-circle">一. Retain Circle的由来</h4>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-2eb65c853e014ed3.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<p>循环引用的问题相信大家都很理解了，这里还是简单的提一下。</p>
+
+<p>当A对象里面强引用了B对象，B对象又强引用了A对象，这样两者的retainCount值一直都无法为0，于是内存始终无法释放，导致内存泄露。所谓的内存泄露就是本应该释放的对象，在其生命周期结束之后依旧存在。</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-aeffe9c77bf9ef5c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<p>这是2个对象之间的，相应的，这种循环还能存在于3，4……个对象之间，只要相互形成环，就会导致Retain Cicle的问题。</p>
+
+<p>当然也存在自身引用自身的，当一个对象内部的一个obj，强引用的自身，也会导致循环引用的问题出现。常见的就是block里面引用的问题。
+<img src="http://upload-images.jianshu.io/upload_images/1194012-e6f47d76a23b40c6.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<h4 id="weakstrong">二.__weak、__strong的实现原理</h4>
+
+<p>在ARC环境下，id类型和对象类型和C语言其他类型不同，类型前必须加上所有权的修饰符。</p>
+
+<p>所有权修饰符总共有4种：</p>
+
+<p>1.__strong修饰符
+2.__weak修饰符
+3.__unsafe_unretained修饰符
+4.__autoreleasing修饰符</p>
+
+<p>一般我们如果不写，默认的修饰符是__strong。</p>
+
+<p>要想弄清楚__strong，__weak的实现原理，我们就需要研究研究clang(LLVM编译器)和objc4 Objective-C runtime库了。</p>
+
+<p>关于clang有一份<a href="http://clang.llvm.org/docs/AutomaticReferenceCounting.html">关于ARC详细的文档</a>，有兴趣的可以仔细研究一下文档里面的说明和例子，很有帮助。</p>
+
+<p>以下的讲解，也会来自于上述文档中的函数说明。</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-8ba2276f15bbfd49.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<h5 id="strong">1.__strong的实现原理</h5>
+
+<h6 id="section-2">(1)对象持有自己</h6>
+
+<p>首先我们先来看看生成的对象持有自己的情况，利用alloc/new/copy/mutableCopy生成对象。</p>
+
+<p>当我们声明了一个__strong对象</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="p">{</span><span class="w">
+    </span><span class="err">id</span><span class="w"> </span><span class="err">__strong</span><span class="w"> </span><span class="err">obj</span><span class="w"> </span><span class="err">=</span><span class="w"> </span><span class="err">[[NSObject</span><span class="w"> </span><span class="err">alloc]</span><span class="w"> </span><span class="err">init];</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre>
+</div>
+
+<p>LLVM编译器会把上述代码转换成下面的样子</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+id __attribute__((objc_ownership(strong))) obj = ((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)objc_getClass("NSObject"), sel_registerName("alloc")), sel_registerName("init"));
+</code></pre>
+</div>
+<p>相应的会调用</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>id obj = objc_msgSend(NSObject, @selector(alloc));
+objc_msgSend(obj,selector(init));
+objc_release(obj);
+</code></pre>
+</div>
+
+<p>上述这些方法都好理解。在ARC有效的时候就会自动插入release代码，在作用域结束的时候自动释放。</p>
+
+<h6 id="section-3">(2)对象不持有自己</h6>
+
+<p>生成对象的时候不用alloc/new/copy/mutableCopy等方法。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="p">{</span><span class="w">
+    </span><span class="err">id</span><span class="w"> </span><span class="err">__strong</span><span class="w"> </span><span class="err">obj</span><span class="w"> </span><span class="err">=</span><span class="w"> </span><span class="err">[NSMutableArray</span><span class="w"> </span><span class="err">array];</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre>
+</div>
+
+<p>LLVM编译器会把上述代码转换成下面的样子</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+id __attribute__((objc_ownership(strong))) array = ((NSMutableArray *(*)(id, SEL))(void *)objc_msgSend)((id)objc_getClass("NSMutableArray"), sel_registerName("array"));
+
+</code></pre>
+</div>
+
+<p>查看LLVM文档，其实是下述的过程</p>
+
+<p>相应的会调用</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>id obj = objc_msgSend(NSMutableArray, @selector(array));
+objc_retainAutoreleasedReturnValue(obj);
+objc_release(obj);
+</code></pre>
+</div>
+<p>与之前对象会持有自己的情况不同，这里多了一个objc_retainAutoreleasedReturnValue函数。</p>
+
+<p>这里有3个函数需要说明：<br />
+1.id objc_retainAutoreleaseReturnValue(id value)</p>
+
+<blockquote>
+  <p><a href="http://clang.llvm.org/docs/AutomaticReferenceCounting.html#id69">id objc_retainAutoreleaseReturnValue(id value);
+</a><a href="http://clang.llvm.org/docs/AutomaticReferenceCounting.html#arc-runtime-objc-retainautoreleasereturnvalue"></a>
+<em>Precondition:</em> value is null or a pointer to a valid object.</p>
+</blockquote>
+
+<blockquote>
+  <p>If value is null, this call has no effect. Otherwise, it performs a retain operation followed by the operation described in <a href="http://clang.llvm.org/docs/AutomaticReferenceCounting.html#arc-runtime-objc-autoreleasereturnvalue">objc_autoreleaseReturnValue</a>.</p>
+</blockquote>
+
+<blockquote>
+  <p>Equivalent to the following code:
+id objc_retainAutoreleaseReturnValue(id value) { <br />
+       return objc_autoreleaseReturnValue(objc_retain(value));
+}</p>
+</blockquote>
+
+<blockquote>
+  <p>Always returns value</p>
+</blockquote>
+
+<p>2.id objc_retainAutoreleaseReturnValue(id value)</p>
+
+<blockquote>
+  <p><a href="http://clang.llvm.org/docs/AutomaticReferenceCounting.html#id70">id objc_retainAutoreleasedReturnValue(id value);
+</a><a href="http://clang.llvm.org/docs/AutomaticReferenceCounting.html#arc-runtime-objc-retainautoreleasedreturnvalue"></a>
+<em>Precondition:</em> value is null or a pointer to a valid object.</p>
+</blockquote>
+
+<blockquote>
+  <p>If value is null, this call has no effect. Otherwise, it attempts to accept a hand off of a retain count from a call to <a href="http://clang.llvm.org/docs/AutomaticReferenceCounting.html#arc-runtime-objc-autoreleasereturnvalue">objc_autoreleaseReturnValue</a> on value in a recently-called function or something it calls. If that fails, it performs a retain operation exactly like <a href="http://clang.llvm.org/docs/AutomaticReferenceCounting.html#arc-runtime-objc-retain">objc_retain</a>.</p>
+</blockquote>
+
+<blockquote>
+  <p>Always returns value</p>
+</blockquote>
+
+<p>3.id objc_autoreleaseReturnValue(id value)</p>
+
+<blockquote>
+  <p><a href="http://clang.llvm.org/docs/AutomaticReferenceCounting.html#id59">id objc_autoreleaseReturnValue(id value);
+</a><a href="http://clang.llvm.org/docs/AutomaticReferenceCounting.html#arc-runtime-objc-autoreleasereturnvalue"></a>
+<em>Precondition:</em> value  is null or a pointer to a valid object.</p>
+</blockquote>
+
+<blockquote>
+  <p>If value  is null, this call has no effect. Otherwise, it makes a best effort to hand off ownership of a retain count on the object to a call to<a href="http://clang.llvm.org/docs/AutomaticReferenceCounting.html#arc-runtime-objc-retainautoreleasedreturnvalue">objc_retainAutoreleasedReturnValue</a> for the same object in an enclosing call frame. If this is not possible, the object is autoreleased as above.</p>
+</blockquote>
+
+<blockquote>
+  <p>Always returns value</p>
+</blockquote>
+
+<p>这3个函数其实都是在描述一件事情。 it makes a best effort to hand off ownership of a retain count on the object to a call to objc_retainAutoreleasedReturnValue for the same object in an enclosing call frame。</p>
+
+<p>这属于LLVM编译器的一个优化。objc_retainAutoreleasedReturnValue函数是用于自己持有(retain)对象的函数，它持有的对象应为返回注册在autoreleasepool中对象的方法或者是函数的返回值。</p>
+
+<p>在ARC中原本对象生成之后是要注册到autoreleasepool中，但是调用了objc_autoreleasedReturnValue 之后，紧接着调用了 objc_retainAutoreleasedReturnValue，objc_autoreleasedReturnValue函数会去检查该函数方法或者函数调用方的执行命令列表，如果里面有objc_retainAutoreleasedReturnValue()方法，那么该对象就直接返回给方法或者函数的调用方。达到了即使对象不注册到autoreleasepool中，也可以返回拿到相应的对象。</p>
+
+<h5 id="weak">2.__weak的实现原理</h5>
+
+<p>声明一个__weak对象</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="p">{</span><span class="w">
+    </span><span class="err">id</span><span class="w"> </span><span class="err">__weak</span><span class="w"> </span><span class="err">obj</span><span class="w"> </span><span class="err">=</span><span class="w"> </span><span class="err">strongObj;</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre>
+</div>
+
+<p>假设这里的strongObj是一个已经声明好了的对象。</p>
+
+<p>LLVM转换成对应的代码</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+id __attribute__((objc_ownership(none))) obj1 = strongObj;
+
+</code></pre>
+</div>
+<p>相应的会调用</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>id obj ;
+objc_initWeak(&amp;obj,strongObj);
+objc_destoryWeak(&amp;obj);
+
+</code></pre>
+</div>
+
+<p>看看文档描述</p>
+
+<blockquote>
+  <p>[id objc_initWeak(id <em>object, id value);
+](http://clang.llvm.org/docs/AutomaticReferenceCounting.html#id62)<a href="http://clang.llvm.org/docs/AutomaticReferenceCounting.html#arc-runtime-objc-initweak"></a>
+*Precondition:</em> object is a valid pointer which has not been registered as a __weak object. </p>
+</blockquote>
+
+<blockquote>
+  <p>value  is null or a pointer to a valid object.
+If value is a null pointer or the object to which it points has begun deallocation, object is zero-initialized. Otherwise, object
+ is registered as a __weak object pointing to value</p>
+</blockquote>
+
+<blockquote>
+  <p>Equivalent to the following code:
+id objc_initWeak(id *object, id value) { <br />
+    *object = nil; 
+    return objc_storeWeak(object, value);
+}</p>
+</blockquote>
+
+<blockquote>
+  <p>Returns the value of object after the call.
+Does not need to be atomic with respect to calls to objc_storeWeak on object</p>
+</blockquote>
+
+<p>objc_initWeak的实现其实是这样的</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+id objc_initWeak(id *object, id value) {   
+    *object = nil; 
+    return objc_storeWeak(object, value);
+}
+</code></pre>
+</div>
+<p>会把传入的object变成0或者nil，然后执行objc_storeWeak函数。</p>
+
+<p>那么objc_destoryWeak函数是干什么的呢？</p>
+
+<blockquote>
+  <p>[void objc_destroyWeak(id <em>object);
+](http://clang.llvm.org/docs/AutomaticReferenceCounting.html#id61)<a href="http://clang.llvm.org/docs/AutomaticReferenceCounting.html#void-objc-destroyweak-id-object"></a>
+*Precondition:</em> object  is a valid pointer which either contains a null pointer or has been registered as a __weak object.</p>
+</blockquote>
+
+<blockquote>
+  <p>object  is unregistered as a weak object, if it ever was. The current value of object is left unspecified; otherwise, equivalent to the following code:</p>
+</blockquote>
+
+<blockquote>
+  <p>void objc_destroyWeak(id *object) { 
+objc_storeWeak(object, nil);
+}</p>
+</blockquote>
+
+<blockquote>
+  <p>Does not need to be atomic with respect to calls to objc_storeWeak on object</p>
+</blockquote>
+
+<p>objc_destoryWeak函数的实现</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>void objc_destroyWeak(id *object) { 
+    objc_storeWeak(object, nil);
+}
+</code></pre>
+</div>
+<p>也是会去调用objc_storeWeak函数。objc_initWeak和objc_destroyWeak函数都会去调用objc_storeWeak函数，唯一不同的是调用的入参不同，一个是value，一个是nil。</p>
+
+<p>那么重点就都落在objc_storeWeak函数上了。</p>
+
+<blockquote>
+  <p>[id objc_storeWeak(id <em>object, id value);
+](http://clang.llvm.org/docs/AutomaticReferenceCounting.html#id73)<a href="http://clang.llvm.org/docs/AutomaticReferenceCounting.html#arc-runtime-objc-storeweak"></a>
+*Precondition:</em> object is a valid pointer which either contains a null pointer or has been registered as a __weak object. value
+ is null or a pointer to a valid object.</p>
+</blockquote>
+
+<blockquote>
+  <p>If value is a null pointer or the object to which it points has begun deallocation, object  is assigned null and unregistered as a __weak object. Otherwise, object is registered as a __weak object or has its registration updated to point to value</p>
+</blockquote>
+
+<blockquote>
+  <p>Returns the value of object after the call.</p>
+</blockquote>
+
+<p>objc_storeWeak函数的用途就很明显了。由于weak表也是用Hash table实现的，所以objc_storeWeak函数就把第一个入参的变量地址注册到weak表中，然后根据第二个入参来决定是否移除。如果第二个参数为0，那么就把__weak变量从weak表中删除记录，并从引用计数表中删除对应的键值记录。</p>
+
+<p>所以如果__weak引用的原对象如果被释放了，那么对应的__weak对象就会被指为nil。原来就是通过objc_storeWeak函数这些函数来实现的。</p>
+
+<p>以上就是ARC中__strong和__weak的简单的实现原理，更加详细的还请大家去看看这一章开头提到的那个LLVM文档，里面说明的很详细。</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-3c3eea3397b741f6.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<h4 id="weakselfstrongself">三.weakSelf、strongSelf的用途</h4>
+
+<p>在提weakSelf、strongSelf之前，我们先引入一个Retain Cicle的例子。</p>
+
+<p>假设自定义的一个student类</p>
+
+<p>例子1：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+<span class="cp">#import &lt;Foundation/Foundation.h&gt;
+</span><span class="k">typedef</span> <span class="kt">void</span><span class="p">(</span><span class="o">^</span><span class="n">Study</span><span class="p">)();</span>
+<span class="k">@interface</span> <span class="nc">Student</span> <span class="p">:</span> <span class="nc">NSObject</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">copy</span> <span class="p">,</span> <span class="n">nonatomic</span><span class="p">)</span> <span class="n">NSString</span> <span class="o">*</span><span class="n">name</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">copy</span> <span class="p">,</span> <span class="n">nonatomic</span><span class="p">)</span> <span class="n">Study</span> <span class="n">study</span><span class="p">;</span>
+<span class="k">@end</span>
+
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+<span class="cp">#import "ViewController.h"
+#import "Student.h"
+</span>
+<span class="k">@interface</span> <span class="nc">ViewController</span> <span class="p">()</span>
+<span class="k">@end</span>
+
+<span class="k">@implementation</span> <span class="nc">ViewController</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">viewDidLoad</span> <span class="p">{</span>
+<span class="err"> </span> <span class="err"> </span> <span class="p">[</span><span class="n">super</span> <span class="nf">viewDidLoad</span><span class="p">];</span>
+<span class="err">  </span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">Student</span> <span class="o">*</span><span class="n">student</span> <span class="o">=</span> <span class="p">[[</span><span class="n">Student</span> <span class="nf">alloc</span><span class="p">]</span><span class="nf">init</span><span class="p">];</span>
+    <span class="n">student</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">@"Hello World"</span><span class="p">;</span>
+
+<span class="err"> </span> <span class="err"> </span> <span class="n">student</span><span class="p">.</span><span class="n">study</span> <span class="o">=</span> <span class="o">^</span><span class="p">{</span>
+<span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="n">NSLog</span><span class="p">(</span><span class="s">@"my name is = %@"</span><span class="p">,</span><span class="n">student</span><span class="p">.</span><span class="n">name</span><span class="p">);</span>
+<span class="err"> </span> <span class="err"> </span> <span class="p">};</span>
+<span class="p">}</span>
+
+</code></pre>
+</div>
+<p>到这里，大家应该看出来了，这里肯定出现了循环引用了。student的study的Block里面强引用了student自身。根据<a href="http://www.jianshu.com/p/ee9756f3d5f6">上篇文章</a>的分析，可以知道，_NSConcreteMallocBlock捕获了外部的对象，会在内部持有它。retainCount值会加一。</p>
+
+<p>我们用Instruments来观察一下。添加Leak观察器。</p>
+
+<p>当程序运行起来之后，在<strong>Leak Checks</strong>观察器里面应该可以看到红色的❌，点击它就会看到内存leak了。有2个泄露的对象。Block和Student相互循环引用了。</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-8c51133ef5b64e01.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<p>打开Cycles &amp; Roots 观察一下循环的环。</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-b32b093f6ddf412c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<p>这里形成环的原因block里面持有student本身，student本身又持有block。</p>
+
+<p>那再看一个例子2：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="cp">#import "ViewController.h"
+#import "Student.h"
+</span>
+<span class="k">@interface</span> <span class="nc">ViewController</span> <span class="p">()</span>
+<span class="k">@end</span>
+
+<span class="k">@implementation</span> <span class="nc">ViewController</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">viewDidLoad</span> <span class="p">{</span>
+<span class="err"> </span> <span class="err"> </span> <span class="p">[</span><span class="n">super</span> <span class="nf">viewDidLoad</span><span class="p">];</span>
+<span class="err">  </span> <span class="err"> </span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">Student</span> <span class="o">*</span><span class="n">student</span> <span class="o">=</span> <span class="p">[[</span><span class="n">Student</span> <span class="nf">alloc</span><span class="p">]</span><span class="nf">init</span><span class="p">];</span>
+<span class="err">  </span> <span class="err"> </span><span class="n">student</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">@"Hello World"</span><span class="p">;</span>
+
+<span class="err"> </span> <span class="err"> </span> <span class="n">student</span><span class="p">.</span><span class="n">study</span> <span class="o">=</span> <span class="o">^</span><span class="p">(</span><span class="n">NSString</span> <span class="o">*</span> <span class="n">name</span><span class="p">){</span>
+<span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="n">NSLog</span><span class="p">(</span><span class="s">@"my name is = %@"</span><span class="p">,</span><span class="n">name</span><span class="p">);</span>
+<span class="err"> </span> <span class="err"> </span> <span class="p">};</span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">student</span><span class="p">.</span><span class="n">study</span><span class="p">(</span><span class="n">student</span><span class="p">.</span><span class="n">name</span><span class="p">);</span>
+<span class="p">}</span>
+
+</code></pre>
+</div>
+
+<p>我把block新传入一个参数，传入的是student.name。这个时候会引起循环引用么？</p>
+
+<p>答案肯定是不会。</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-345a97d7a6eb607c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<p>如上图，并不会出现内存泄露。原因是因为，student是作为形参传递进block的，block并不会捕获形参到block内部进行持有。所以肯定不会造成循环引用。</p>
+
+<p>再改一下。看例子3：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+<span class="cp">#import "ViewController.h"
+#import "Student.h"
+</span>
+<span class="k">@interface</span> <span class="nc">ViewController</span> <span class="p">()</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">copy</span><span class="p">,</span><span class="n">nonatomic</span><span class="p">)</span> <span class="n">NSString</span> <span class="o">*</span><span class="n">name</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">strong</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">)</span> <span class="n">Student</span> <span class="o">*</span><span class="n">stu</span><span class="p">;</span>
+<span class="k">@end</span>
+
+<span class="k">@implementation</span> <span class="nc">ViewController</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">viewDidLoad</span> <span class="p">{</span>
+<span class="err"> </span> <span class="err"> </span> <span class="p">[</span><span class="n">super</span> <span class="nf">viewDidLoad</span><span class="p">];</span>
+<span class="err">  </span> <span class="err"> </span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">Student</span> <span class="o">*</span><span class="n">student</span> <span class="o">=</span> <span class="p">[[</span><span class="n">Student</span> <span class="nf">alloc</span><span class="p">]</span><span class="nf">init</span><span class="p">];</span>
+<span class="err">  </span> <span class="err"> </span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">self</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">@"halfrost"</span><span class="p">;</span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">self</span><span class="p">.</span><span class="n">stu</span> <span class="o">=</span> <span class="n">student</span><span class="p">;</span>
+<span class="err">  </span> <span class="err"> </span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">student</span><span class="p">.</span><span class="n">study</span> <span class="o">=</span> <span class="o">^</span><span class="p">{</span>
+<span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="n">NSLog</span><span class="p">(</span><span class="s">@"my name is = %@"</span><span class="p">,</span><span class="n">self</span><span class="p">.</span><span class="n">name</span><span class="p">);</span>
+<span class="err"> </span> <span class="err"> </span> <span class="p">};</span>
+<span class="err">  </span> <span class="err"> </span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">student</span><span class="p">.</span><span class="n">study</span><span class="p">();</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>这样会形成循环引用么？</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-4ec0577cf7a01f6f.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<p>答案也是否定的。</p>
+
+<p>ViewController虽然强引用着student，但是student里面的blcok强引用的是viewController的name属性，并没有形成环。如果把上述的self.name改成self，也依旧不会产生循环引用。因为他们都没有强引用这个block。</p>
+
+<p>那遇到循环引用我们改如何处理呢？？类比平时我们经常写的delegate，可以知道，只要有一边是__weak就可以打破循环。</p>
+
+<p>先说一种做法，利用__block解决循环的做法。例子4：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+<span class="cp">#import "ViewController.h"
+#import "Student.h"
+</span>
+<span class="k">@interface</span> <span class="nc">ViewController</span> <span class="p">()</span>
+<span class="k">@end</span>
+
+<span class="k">@implementation</span> <span class="nc">ViewController</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">viewDidLoad</span> <span class="p">{</span>
+<span class="err"> </span> <span class="err"> </span> <span class="p">[</span><span class="n">super</span> <span class="nf">viewDidLoad</span><span class="p">];</span>
+
+<span class="err"> </span> <span class="err"> </span> <span class="n">Student</span> <span class="o">*</span><span class="n">student</span> <span class="o">=</span> <span class="p">[[</span><span class="n">Student</span> <span class="nf">alloc</span><span class="p">]</span><span class="nf">init</span><span class="p">];</span>
+<span class="err">  </span> <span class="err"> </span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">__block</span> <span class="n">Student</span> <span class="o">*</span><span class="n">stu</span> <span class="o">=</span> <span class="n">student</span><span class="p">;</span>
+    <span class="n">student</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">@"Hello World"</span><span class="p">;</span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">student</span><span class="p">.</span><span class="n">study</span> <span class="o">=</span> <span class="o">^</span><span class="p">{</span>
+<span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="n">NSLog</span><span class="p">(</span><span class="s">@"my name is = %@"</span><span class="p">,</span><span class="n">stu</span><span class="p">.</span><span class="n">name</span><span class="p">);</span>
+        <span class="n">stu</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
+<span class="err"> </span> <span class="err"> </span> <span class="p">};</span>
+<span class="p">}</span>
+
+</code></pre>
+</div>
+
+<p>这样写会循环么？看上去应该不会。但是实际上却是会的。</p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-544bc137d452c71b.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-92ae745538414431.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<p>由于没有执行study这个block，现在student持有该block，block持有__block变量，__block变量又持有student对象。3者形成了环，导致了循环引用了。
+想打破环就需要破坏掉其中一个引用。__block不持有student即可。</p>
+
+<p>只需要执行一下block即可。例子5：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+<span class="cp">#import "ViewController.h"
+#import "Student.h"
+</span>
+<span class="k">@interface</span> <span class="nc">ViewController</span> <span class="p">()</span>
+<span class="k">@end</span>
+
+<span class="k">@implementation</span> <span class="nc">ViewController</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">viewDidLoad</span> <span class="p">{</span>
+<span class="err"> </span> <span class="err"> </span> <span class="p">[</span><span class="n">super</span> <span class="nf">viewDidLoad</span><span class="p">];</span>
+
+<span class="err"> </span> <span class="err"> </span> <span class="n">Student</span> <span class="o">*</span><span class="n">student</span> <span class="o">=</span> <span class="p">[[</span><span class="n">Student</span> <span class="nf">alloc</span><span class="p">]</span><span class="nf">init</span><span class="p">];</span>
+<span class="err">  </span> <span class="err"> </span><span class="n">student</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">@"Hello World"</span><span class="p">;</span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">__block</span> <span class="n">Student</span> <span class="o">*</span><span class="n">stu</span> <span class="o">=</span> <span class="n">student</span><span class="p">;</span>
+
+<span class="err"> </span> <span class="err"> </span> <span class="n">student</span><span class="p">.</span><span class="n">study</span> <span class="o">=</span> <span class="o">^</span><span class="p">{</span>
+<span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="n">NSLog</span><span class="p">(</span><span class="s">@"my name is = %@"</span><span class="p">,</span><span class="n">stu</span><span class="p">.</span><span class="n">name</span><span class="p">);</span>
+<span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="n">stu</span> <span class="o">=</span> <span class="nb">nil</span><span class="p">;</span>
+<span class="err"> </span> <span class="err"> </span> <span class="p">};</span>
+
+<span class="err"> </span> <span class="err"> </span> <span class="n">student</span><span class="p">.</span><span class="n">study</span><span class="p">();</span>
+<span class="p">}</span>
+
+</code></pre>
+</div>
+
+<p>这样就不会循环引用了。
+<img src="http://upload-images.jianshu.io/upload_images/1194012-8d5dc8c77796e5b2.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<p>使用__block解决循环引用虽然可以控制对象持有时间，在block中还能动态的控制是__block变量的值，可以赋值nil，也可以赋值其他的值，但是有一个唯一的缺点就是需要执行一次block才行。否则还是会造成循环引用。</p>
+
+<p><strong>值得注意的是，在ARC下__block会导致对象被retain，有可能导致循环引用。而在MRC下，则不会retain这个对象，也不会导致循环引用。</strong></p>
+
+<p>接下来可以正式开始讲讲weakSelf 和 strongSelf的用法了。</p>
+
+<h5 id="weakself">1.weakSelf</h5>
+
+<p>说道weakSelf，需要先来区分几种写法。
+__weak __typeof(self)weakSelf = self;  这是AFN里面的写法。。</p>
+
+<p>#define WEAKSELF typeof(self) __weak weakSelf = self; 这是我们平时的写法。。</p>
+
+<p>先区分__typeof() 和 typeof()
+由于笔者一直很崇拜AFNetWorking的作者，这个库里面的代码都很整洁，里面各方面的代码都可以当做代码范本来阅读。遇到不懂疑惑的，都要深究，肯定会有收获。这里就是一处，平时我们的写法是不带__的，AFN里面用这种写法有什么特殊的用途么？</p>
+
+<p>在SOF上能找到相关的<a href="http://stackoverflow.com/questions/14877415/difference-between-typeof-typeof-and-typeof-objective-c">答案</a>：</p>
+
+<blockquote>
+  <p>__typeof__() and __typeof() are compiler-specific extensions to the C language, because standard C does not include such an operator. Standard C requires compilers to prefix language extensions with a double-underscore (which is also why you should never do so for your own functions, variables, etc.)
+typeof() is exactly the same, but throws the underscores out the window with the understanding that every modern compiler supports it. (Actually, now that I think about it, Visual C++ might not. It does support decltype() though, which generally provides the same behaviour as typeof().)
+All three mean the same thing, but none are standard C so a conforming compiler may choose to make any mean something different.</p>
+</blockquote>
+
+<p>其实两者都是一样的东西，只不过是C里面不同的标准，兼容性不同罢了。</p>
+
+<p>更加详细的<a href="http://gcc.gnu.org/onlinedocs/gcc/Alternate-Keywords.html#Alternate-Keywords">官方说明</a></p>
+
+<p>那么抽象出来就是这2种写法。  <br />
+#define WEAKSELF  __weak typeof(self)weakSelf = self;
+#define WEAKSELF typeof(self) __weak weakSelf = self;</p>
+
+<p>这样子看就清楚了，两种写法就是完全一样的。</p>
+
+<p>我们可以用WEAKSELF来解决循环引用的问题。例子6：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+<span class="cp">#import "ViewController.h"
+#import "Student.h"
+</span>
+<span class="k">@interface</span> <span class="nc">ViewController</span> <span class="p">()</span>
+<span class="k">@end</span>
+
+<span class="k">@implementation</span> <span class="nc">ViewController</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">viewDidLoad</span> <span class="p">{</span>
+<span class="err"> </span> <span class="err"> </span> <span class="p">[</span><span class="n">super</span> <span class="nf">viewDidLoad</span><span class="p">];</span>
+
+<span class="err"> </span> <span class="err"> </span> <span class="n">Student</span> <span class="o">*</span><span class="n">student</span> <span class="o">=</span> <span class="p">[[</span><span class="n">Student</span> <span class="nf">alloc</span><span class="p">]</span><span class="nf">init</span><span class="p">];</span>
+<span class="err">  </span> <span class="err"> </span><span class="n">student</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">@"Hello World"</span><span class="p">;</span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">__weak</span> <span class="n">typeof</span><span class="p">(</span><span class="n">student</span><span class="p">)</span> <span class="n">weakSelf</span> <span class="o">=</span> <span class="n">student</span><span class="p">;</span>
+<span class="err">  </span> <span class="err"> </span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">student</span><span class="p">.</span><span class="n">study</span> <span class="o">=</span> <span class="o">^</span><span class="p">{</span>
+<span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="n">NSLog</span><span class="p">(</span><span class="s">@"my name is = %@"</span><span class="p">,</span><span class="n">weakSelf</span><span class="p">.</span><span class="n">name</span><span class="p">);</span>
+<span class="err"> </span> <span class="err"> </span> <span class="p">};</span>
+
+<span class="err"> </span> <span class="err"> </span> <span class="n">student</span><span class="p">.</span><span class="n">study</span><span class="p">();</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>这样就解决了循环引用的问题了。</p>
+
+<p>解决循环应用的问题一定要分析清楚哪里出现了循环引用，只需要把其中一环加上weakSelf这类似的宏，就可以解决循环引用。如果分析不清楚，就只能无脑添加weakSelf、strongSelf，这样的做法不可取。</p>
+
+<p>在上面的例子3中，就完全不存在循环引用，要是无脑加weakSelf、strongSelf是不对的。在例子6中，也只需要加一个weakSelf就可以了，也不需要加strongSelf。</p>
+
+<p>曾经在segmentfault也看到过这样一个问题，问：<a href="https://segmentfault.com/q/1010000004343510">为什么iOS的Masonry中的self不会循环引用?</a></p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+
+UIButton *testButton = [[UIButton alloc] init];
+[self.view addSubview:testButton];
+testButton.backgroundColor = [UIColor redColor];
+[testButton mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.width.equalTo(@100);
+    make.height.equalTo(@100);
+    make.left.equalTo(self.view.mas_left);
+    make.top.equalTo(self.view.mas_top);
+}];
+[testButton bk_addEventHandler:^(id sender) {
+    [self dismissViewControllerAnimated:YES completion:nil];
+} forControlEvents:UIControlEventTouchUpInside];
+
+</code></pre>
+</div>
+<blockquote>
+  <p>如果我用blocksKit的bk_addEventHandler
+方法, 其中使用strong self, 该viewController就无法dealloc, 我理解是因为,self retain self.view, retain testButton, retain self. 但是如果只用Mansonry的mas_makeConstraints
+方法, 同样使用strong self, 该viewController却能正常dealloc, 请问这是为什么, 为什么Masonry没有导致循环引用？</p>
+</blockquote>
+
+<p>看到这里，读者应该就应该能回答这个问题了。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+- (NSArray *)mas_makeConstraints:(void(^)(MASConstraintMaker *))block {
+    self.translatesAutoresizingMaskIntoConstraints = NO;
+    MASConstraintMaker *constraintMaker = [[MASConstraintMaker alloc] initWithView:self];
+    block(constraintMaker);
+    return [constraintMaker install];
+}
+</code></pre>
+</div>
+
+<p><del>在Masonry这个block中，block仅仅捕获了self的translatesAutoresizingMaskIntoConstraints变量，但是并没有持有self。</del></p>
+
+<p>上述描述有误，感谢@酷酷的哀殿 耐心指点</p>
+
+<p>更正如下：</p>
+
+<p>关于 Masonry ，它捕获了变量 self，然后对其执行了<code class="highlighter-rouge">setTranslatesAutoresizingMaskIntoConstraints:</code>方法。但是，因为执行完毕后，block会被销毁，没有形成环。所以，没有引起循环依赖。</p>
+
+<h5 id="strongself">2.strongSelf</h5>
+
+<p>上面介绍完了weakSelf，既然weakSelf能完美解决Retain Circle的问题了，那为何还需要strongSelf呢？</p>
+
+<p>还是先从AFN经典说起，以下是AFN其中的一段代码：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+#pragma mark - NSOperation
+
+- (void)setCompletionBlock:(void (^)(void))block {
+    [self.lock lock];
+    if (!block) {
+        [super setCompletionBlock:nil];
+    } else {
+        __weak __typeof(self)weakSelf = self;
+        [super setCompletionBlock:^ {
+            __strong __typeof(weakSelf)strongSelf = weakSelf;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wgnu"
+            dispatch_group_t group = strongSelf.completionGroup ?: url_request_operation_completion_group();
+            dispatch_queue_t queue = strongSelf.completionQueue ?: dispatch_get_main_queue();
+#pragma clang diagnostic pop
+
+            dispatch_group_async(group, queue, ^{
+                block();
+            });
+
+            dispatch_group_notify(group, url_request_operation_completion_queue(), ^{
+                [strongSelf setCompletionBlock:nil];
+            });
+        }];
+    }
+    [self.lock unlock];
+}
+
+</code></pre>
+</div>
+
+<p>如果block里面不加__strong __typeof(weakSelf)strongSelf = weakSelf会如何呢？</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+<span class="cp">#import "ViewController.h"
+#import "Student.h"
+</span>
+<span class="k">@interface</span> <span class="nc">ViewController</span> <span class="p">()</span>
+<span class="k">@end</span>
+
+<span class="k">@implementation</span> <span class="nc">ViewController</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">viewDidLoad</span> <span class="p">{</span>
+<span class="err"> </span> <span class="err"> </span> <span class="p">[</span><span class="n">super</span> <span class="nf">viewDidLoad</span><span class="p">];</span>
+
+<span class="err"> </span> <span class="err"> </span> <span class="n">Student</span> <span class="o">*</span><span class="n">student</span> <span class="o">=</span> <span class="p">[[</span><span class="n">Student</span> <span class="nf">alloc</span><span class="p">]</span><span class="nf">init</span><span class="p">];</span>
+    <span class="n">student</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">@"Hello World"</span><span class="p">;</span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">__weak</span> <span class="n">typeof</span><span class="p">(</span><span class="n">student</span><span class="p">)</span> <span class="n">weakSelf</span> <span class="o">=</span> <span class="n">student</span><span class="p">;</span>
+<span class="err">  </span> <span class="err"> </span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">student</span><span class="p">.</span><span class="n">study</span> <span class="o">=</span> <span class="o">^</span><span class="p">{</span>
+<span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="n">dispatch_after</span><span class="p">(</span><span class="n">dispatch_time</span><span class="p">(</span><span class="n">DISPATCH_TIME_NOW</span><span class="p">,</span> <span class="p">(</span><span class="kt">int64_t</span><span class="p">)(</span><span class="mi">2</span><span class="p">.</span><span class="mi">0</span> <span class="o">*</span> <span class="n">NSEC_PER_SEC</span><span class="p">)),</span> <span class="n">dispatch_get_main_queue</span><span class="p">(),</span> <span class="o">^</span><span class="p">{</span>
+<span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="n">NSLog</span><span class="p">(</span><span class="s">@"my name is = %@"</span><span class="p">,</span><span class="n">weakSelf</span><span class="p">.</span><span class="n">name</span><span class="p">);</span>
+<span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="p">});</span>
+<span class="err"> </span> <span class="err"> </span> <span class="p">};</span>
+
+<span class="err"> </span> <span class="err"> </span> <span class="n">student</span><span class="p">.</span><span class="n">study</span><span class="p">();</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>输出：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>my name is = (null)
+
+</code></pre>
+</div>
+
+<p>为什么输出是这样的呢？</p>
+
+<p>重点就在dispatch_after这个函数里面。在study()的block结束之后，student被自动释放了。又由于dispatch_after里面捕获的__weak的student，根据第二章讲过的__weak的实现原理，在原对象释放之后，__weak对象就会变成null，防止野指针。所以就输出了null了。</p>
+
+<p>那么我们怎么才能在weakSelf之后，block里面还能继续使用weakSelf之后的对象呢？</p>
+
+<p>究其根本原因就是weakSelf之后，无法控制什么时候会被释放，为了保证在block内不会被释放，需要添加__strong。</p>
+
+<p>在block里面使用的__strong修饰的weakSelf是为了在函数生命周期中防止self提前释放。strongSelf是一个自动变量当block执行完毕就会释放自动变量strongSelf不会对self进行一直进行强引用。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+<span class="cp">#import "ViewController.h"
+#import "Student.h"
+</span>
+<span class="k">@interface</span> <span class="nc">ViewController</span> <span class="p">()</span>
+<span class="k">@end</span>
+
+<span class="k">@implementation</span> <span class="nc">ViewController</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">viewDidLoad</span> <span class="p">{</span>
+<span class="err"> </span> <span class="err"> </span> <span class="p">[</span><span class="n">super</span> <span class="nf">viewDidLoad</span><span class="p">];</span>
+
+<span class="err"> </span> <span class="err"> </span> <span class="n">Student</span> <span class="o">*</span><span class="n">student</span> <span class="o">=</span> <span class="p">[[</span><span class="n">Student</span> <span class="nf">alloc</span><span class="p">]</span><span class="nf">init</span><span class="p">];</span>
+<span class="err">  </span> <span class="err"> </span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">student</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">@"Hello World"</span><span class="p">;</span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">__weak</span> <span class="n">typeof</span><span class="p">(</span><span class="n">student</span><span class="p">)</span> <span class="n">weakSelf</span> <span class="o">=</span> <span class="n">student</span><span class="p">;</span>
+<span class="err">  </span> <span class="err"> </span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">student</span><span class="p">.</span><span class="n">study</span> <span class="o">=</span> <span class="o">^</span><span class="p">{</span>
+<span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="n">__strong</span> <span class="n">typeof</span><span class="p">(</span><span class="n">student</span><span class="p">)</span> <span class="n">strongSelf</span> <span class="o">=</span> <span class="n">weakSelf</span><span class="p">;</span>
+<span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="n">dispatch_after</span><span class="p">(</span><span class="n">dispatch_time</span><span class="p">(</span><span class="n">DISPATCH_TIME_NOW</span><span class="p">,</span> <span class="p">(</span><span class="kt">int64_t</span><span class="p">)(</span><span class="mi">2</span><span class="p">.</span><span class="mi">0</span> <span class="o">*</span> <span class="n">NSEC_PER_SEC</span><span class="p">)),</span> <span class="n">dispatch_get_main_queue</span><span class="p">(),</span> <span class="o">^</span><span class="p">{</span>
+<span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="n">NSLog</span><span class="p">(</span><span class="s">@"my name is = %@"</span><span class="p">,</span><span class="n">strongSelf</span><span class="p">.</span><span class="n">name</span><span class="p">);</span>
+<span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="p">});</span>
+<span class="err">  </span> <span class="err"> </span> <span class="err"> </span> <span class="err"> </span>
+<span class="err"> </span> <span class="err"> </span> <span class="p">};</span>
+
+<span class="err"> </span> <span class="err"> </span> <span class="n">student</span><span class="p">.</span><span class="n">study</span><span class="p">();</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>输出</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>my name is = Hello World
+
+</code></pre>
+</div>
+
+<p>至此，我们就明白了weakSelf、strongSelf的用途了。</p>
+
+<p>weakSelf 是为了block不持有self，避免Retain Circle循环引用。在 Block 内如果需要访问 self 的方法、变量，建议使用 weakSelf。</p>
+
+<p>strongSelf的目的是因为一旦进入block执行，假设不允许self在这个执行过程中释放，就需要加入strongSelf。block执行完后这个strongSelf 会自动释放，没有不会存在循环引用问题。如果在 Block 内需要多次 访问 self，则需要使用 strongSelf。</p>
+
+<p>关于Retain Circle最后总结一下，有3种方式可以解决循环引用。</p>
+
+<p>结合《Effective Objective-C 2.0》(编写高质量iOS与OS X代码的52个有效方法)这本书的例子，来总结一下。</p>
+
+<p>EOCNetworkFetcher.h</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code><span class="k">typedef</span> <span class="kt">void</span> <span class="p">(</span><span class="o">^</span><span class="n">EOCNetworkFetcherCompletionHandler</span><span class="p">)(</span><span class="n">NSData</span> <span class="o">*</span><span class="n">data</span><span class="p">);</span>
+
+<span class="k">@interface</span> <span class="nc">EOCNetworkFetcher</span> <span class="p">:</span> <span class="nc">NSObject</span>
+
+<span class="k">@property</span> <span class="p">(</span><span class="n">nonatomic</span><span class="p">,</span> <span class="n">strong</span><span class="p">,</span> <span class="n">readonly</span><span class="p">)</span> <span class="n">NSURL</span> <span class="o">*</span><span class="n">url</span><span class="p">;</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="n">id</span><span class="p">)</span><span class="nf">initWithURL</span><span class="p">:(</span><span class="n">NSURL</span> <span class="o">*</span><span class="p">)</span><span class="nv">url</span><span class="p">;</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">startWithCompletionHandler</span><span class="p">:(</span><span class="n">EOCNetworkFetcherCompletionHandler</span><span class="p">)</span><span class="nv">completion</span><span class="p">;</span>
+
+<span class="k">@end</span>
+
+</code></pre>
+</div>
+
+<p>EOCNetworkFetcher.m</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+<span class="k">@interface</span> <span class="nc">EOCNetworkFetcher</span> <span class="p">()</span>
+
+<span class="k">@property</span> <span class="p">(</span><span class="n">nonatomic</span><span class="p">,</span> <span class="n">strong</span><span class="p">,</span> <span class="n">readwrite</span><span class="p">)</span> <span class="n">NSURL</span> <span class="o">*</span><span class="n">url</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">nonatomic</span><span class="p">,</span> <span class="n">copy</span><span class="p">)</span> <span class="n">EOCNetworkFetcherCompletionHandler</span> <span class="n">completionHandler</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">nonatomic</span><span class="p">,</span> <span class="n">strong</span><span class="p">)</span> <span class="n">NSData</span> <span class="o">*</span><span class="n">downloadData</span><span class="p">;</span>
+
+<span class="k">@end</span>
+
+<span class="k">@implementation</span> <span class="nc">EOCNetworkFetcher</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="n">id</span><span class="p">)</span><span class="nf">initWithURL</span><span class="p">:(</span><span class="n">NSURL</span> <span class="o">*</span><span class="p">)</span><span class="nv">url</span> <span class="p">{</span>
+    <span class="k">if</span><span class="p">(</span><span class="n">self</span> <span class="o">=</span> <span class="p">[</span><span class="n">super</span> <span class="nf">init</span><span class="p">])</span> <span class="p">{</span>
+        <span class="n">_url</span> <span class="o">=</span> <span class="n">url</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">self</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="nf">startWithCompletionHandler</span><span class="p">:(</span><span class="n">EOCNetworkFetcherCompletionHandler</span><span class="p">)</span><span class="nv">completion</span> <span class="p">{</span>
+    <span class="n">self</span><span class="p">.</span><span class="n">completionHandler</span> <span class="o">=</span> <span class="n">completion</span><span class="p">;</span>
+    <span class="c1">//开始网络请求
+</span>    <span class="n">dispatch_async</span><span class="p">(</span><span class="n">dispatch_get_global_queue</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="o">^</span><span class="p">{</span>
+        <span class="n">_downloadData</span> <span class="o">=</span> <span class="p">[[</span><span class="n">NSData</span> <span class="nf">alloc</span><span class="p">]</span> <span class="nf">initWithContentsOfURL</span><span class="p">:</span><span class="n">_url</span><span class="p">];</span>
+        <span class="n">dispatch_async</span><span class="p">(</span><span class="n">dispatch_get_main_queue</span><span class="p">(),</span> <span class="o">^</span><span class="p">{</span>
+             <span class="c1">//网络请求完成
+</span>            <span class="p">[</span><span class="n">self</span> <span class="nf">p_requestCompleted</span><span class="p">];</span>
+        <span class="p">});</span>
+    <span class="p">});</span>
+<span class="p">}</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">p_requestCompleted</span> <span class="p">{</span>
+    <span class="k">if</span><span class="p">(</span><span class="n">_completionHandler</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">_completionHandler</span><span class="p">(</span><span class="n">_downloadData</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">@end</span>
+
+</code></pre>
+</div>
+
+<p>EOCClass.m</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+<span class="k">@implementation</span> <span class="nc">EOCClass</span> <span class="p">{</span>
+    <span class="n">EOCNetworkFetcher</span> <span class="o">*</span><span class="n">_networkFetcher</span><span class="p">;</span>
+    <span class="n">NSData</span> <span class="o">*</span><span class="n">_fetchedData</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">downloadData</span> <span class="p">{</span>
+    <span class="n">NSURL</span> <span class="o">*</span><span class="n">url</span> <span class="o">=</span> <span class="p">[</span><span class="n">NSURL</span> <span class="nf">URLWithString</span><span class="p">:</span><span class="s">@"http://www.baidu.com"</span><span class="p">];</span>
+    <span class="n">_networkFetcher</span> <span class="o">=</span> <span class="p">[[</span><span class="n">EOCNetworkFetcher</span> <span class="nf">alloc</span><span class="p">]</span> <span class="nf">initWithURL</span><span class="p">:</span><span class="n">url</span><span class="p">];</span>
+    <span class="p">[</span><span class="n">_networkFetcher</span> <span class="nf">startWithCompletionHandler</span><span class="p">:</span><span class="o">^</span><span class="p">(</span><span class="n">NSData</span> <span class="o">*</span><span class="n">data</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">_fetchedData</span> <span class="o">=</span> <span class="n">data</span><span class="p">;</span>
+    <span class="p">}];</span>
+<span class="p">}</span>
+<span class="k">@end</span>
+
+</code></pre>
+</div>
+
+<p>在这个例子中，存在3者之间形成环</p>
+
+<p>1、completion handler的block因为要设置_fetchedData实例变量的值，所以它必须捕获self变量，也就是说handler块保留了EOCClass实例；</p>
+
+<p>2、EOCClass实例通过strong实例变量保留了EOCNetworkFetcher，最后EOCNetworkFetcher实例对象也会保留了handler的block。</p>
+
+<p>书上说的3种方法来打破循环。</p>
+
+<p>方法一：手动释放EOCNetworkFetcher使用之后持有的_networkFetcher，这样可以打破循环引用</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>- (void)downloadData {
+    NSURL *url = [NSURL URLWithString:@"http://www.baidu.com"];
+    _networkFetcher = [[EOCNetworkFetcher alloc] initWithURL:url];
+    [_networkFetcher startWithCompletionHandler:^(NSData *data) {
+        _fetchedData = data;
+        _networkFetcher = nil;//加上此行，打破循环引用
+    }];
+}
+</code></pre>
+</div>
+
+<p>方法二：直接释放block。因为在使用完对象之后需要人为手动释放，如果忘记释放就会造成循环引用了。如果使用完completion handler之后直接释放block即可。打破循环引用</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+- (void)p_requestCompleted {
+    if(_completionHandler) {
+        _completionHandler(_downloadData);
+    }
+    self.completionHandler = nil;//加上此行，打破循环引用
+}
+</code></pre>
+</div>
+
+<p>方法三：使用weakSelf、strongSelf</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>- (void)downloadData {
+   __weak __typeof(self) weakSelf = self;
+   NSURL *url = [NSURL URLWithString:@"http://www.baidu.com"];
+   _networkFetcher = [[EOCNetworkFetcher alloc] initWithURL:url];
+   [_networkFetcher startWithCompletionHandler:^(NSData *data) {
+        __typeof(&amp;*weakSelf) strongSelf = weakSelf;
+        if (strongSelf) {
+            strongSelf.fetchedData = data;
+        }
+   }];
+}
+</code></pre>
+</div>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-59b08429238b088d.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<h4 id="weakifystrongify">四.@weakify、@strongify实现原理</h4>
+
+<p>上面讲完了weakSelf、strongSelf之后，接下来再讲讲@weakify、@strongify，这两个关键字是RAC中避免Block循环引用而开发的2个宏，这2个宏的实现过程很牛，值得我们学习。</p>
+
+<p>@weakify、@strongify的作用和weakSelf、strongSelf对应的一样。这里我们具体看看大神是怎么实现这2个宏的。</p>
+
+<p>直接从源码看起来。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>#define weakify(...) \
+    rac_keywordify \
+    metamacro_foreach_cxt(rac_weakify_,, __weak, __VA_ARGS__)
+
+
+#define strongify(...) \
+    rac_keywordify \
+    _Pragma("clang diagnostic push") \
+    _Pragma("clang diagnostic ignored \"-Wshadow\"") \
+    metamacro_foreach(rac_strongify_,, __VA_ARGS__) \
+    _Pragma("clang diagnostic pop")
+</code></pre>
+</div>
+
+<p>看到这种宏定义，咋一看什么都不知道。那就只能一层层的往下看。</p>
+
+<h5 id="weakify">1. weakify</h5>
+<p>先从weakify(…)开始。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+#if DEBUG
+#define rac_keywordify autoreleasepool {}
+#else
+#define rac_keywordify try {} @catch (...) {}
+#endif
+</code></pre>
+</div>
+<p>这里在debug模式下使用@autoreleasepool是为了维持编译器的分析能力，而使用@try/@catch 是为了防止插入一些不必要的autoreleasepool。rac_keywordify 实际上就是autoreleasepool {}
+的宏替换。因为有了autoreleasepool {}的宏替换，所以weakify要加上@，形成@autoreleasepool {}。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+#define metamacro_foreach_cxt(MACRO, SEP, CONTEXT, ...) \
+        metamacro_concat(metamacro_foreach_cxt, metamacro_argcount(__VA_ARGS__))(MACRO, SEP, CONTEXT, __VA_ARGS__)
+
+</code></pre>
+</div>
+
+<p>__VA_ARGS__：总体来说就是将左边宏中 … 的内容原样抄写在右边 __VA_ARGS__ 所在的位置。它是一个可变参数的宏，是新的C99规范中新增的，目前似乎只有gcc支持（VC从VC2005开始支持）。</p>
+
+<p>那么我们使用@weakify(self)传入进去。__VA_ARGS__相当于self。此时我们可以把最新开始的weakify套下来。于是就变成了这样：</p>
+
+<p>rac_weakify_,, __weak, __VA_ARGS__整体替换MACRO, SEP, CONTEXT, …</p>
+
+<p>这里需要注意的是，源码中就是给的两个”,”逗号是连着的，所以我们也要等效替换参数，相当于SEP是空值。</p>
+
+<p>替换完成之后就是下面这个样子：</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>autoreleasepool {}
+metamacro_concat(metamacro_foreach_cxt, metamacro_argcount(self))(rac_weakify_, , __weak, self)
+</code></pre>
+</div>
+
+<p>现在我们需要弄懂的就是metamacro_concat 和 metamacro_argcount是干什么用的。</p>
+
+<p>继续看看metamacro_concat  的实现</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+
+#define metamacro_concat(A, B) \
+        metamacro_concat_(A, B)
+
+
+#define metamacro_concat_(A, B) A ## B
+
+</code></pre>
+</div>
+
+<p>## 是宏连接符。举个例子：</p>
+
+<p>假设宏定义为#define XNAME(n) x##n，代码为：XNAME(4)，则在预编译时，宏发现XNAME(4)与XNAME(n)匹配，则令 n 为 4，然后将右边的n的内容也变为4，然后将整个XNAME(4)替换为 x##n，亦即 x4，故 最终结果为 XNAME(4) 变为 x4。所以A##B就是AB。</p>
+
+<p>metamacro_argcount 的实现</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>#define metamacro_argcount(...) \
+        metamacro_at(20, __VA_ARGS__, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
+
+
+#define metamacro_at(N, ...) \
+        metamacro_concat(metamacro_at, N)(__VA_ARGS__)
+
+</code></pre>
+</div>
+<p>metamacro_concat是上面讲过的连接符，那么metamacro_at, N = metamacro_atN，由于N = 20，于是metamacro_atN = metamacro_at20。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+#define metamacro_at0(...) metamacro_head(__VA_ARGS__)
+#define metamacro_at1(_0, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at2(_0, _1, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at3(_0, _1, _2, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at4(_0, _1, _2, _3, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at5(_0, _1, _2, _3, _4, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at6(_0, _1, _2, _3, _4, _5, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at7(_0, _1, _2, _3, _4, _5, _6, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at8(_0, _1, _2, _3, _4, _5, _6, _7, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at9(_0, _1, _2, _3, _4, _5, _6, _7, _8, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at10(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at11(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at12(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at13(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at14(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at15(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at16(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at17(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at18(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at19(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at20(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, ...) metamacro_head(__VA_ARGS__)
+
+</code></pre>
+</div>
+
+<p>metamacro_at20的作用就是截取前20个参数，剩下的参数传入metamacro_head。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+#define metamacro_head(...) \
+        metamacro_head_(__VA_ARGS__, 0)
+
+
+#define metamacro_head_(FIRST, ...) FIRST
+
+</code></pre>
+</div>
+<p>metamacro_head的作用返回第一个参数。返回到上一级metamacro_at20，如果我们从最源头的@weakify(self)，传递进来，那么metamacro_at20(self,20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1)，截取前20个参数，最后一个留给metamacro_head_(1)，那么就应该返回1。</p>
+
+<p>metamacro_concat(metamacro_foreach_cxt, metamacro_argcount(self)) = metamacro_concat(metamacro_foreach_cxt, 1) 最终可以替换成metamacro_foreach_cxt1。</p>
+
+<p>在源码中继续搜寻。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+// metamacro_foreach_cxt expansions
+#define metamacro_foreach_cxt0(MACRO, SEP, CONTEXT)
+#define metamacro_foreach_cxt1(MACRO, SEP, CONTEXT, _0) MACRO(0, CONTEXT, _0)
+
+#define metamacro_foreach_cxt2(MACRO, SEP, CONTEXT, _0, _1) \
+    metamacro_foreach_cxt1(MACRO, SEP, CONTEXT, _0) \
+    SEP \
+    MACRO(1, CONTEXT, _1)
+
+#define metamacro_foreach_cxt3(MACRO, SEP, CONTEXT, _0, _1, _2) \
+    metamacro_foreach_cxt2(MACRO, SEP, CONTEXT, _0, _1) \
+    SEP \
+    MACRO(2, CONTEXT, _2)
+
+#define metamacro_foreach_cxt4(MACRO, SEP, CONTEXT, _0, _1, _2, _3) \
+    metamacro_foreach_cxt3(MACRO, SEP, CONTEXT, _0, _1, _2) \
+    SEP \
+    MACRO(3, CONTEXT, _3)
+
+#define metamacro_foreach_cxt5(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4) \
+    metamacro_foreach_cxt4(MACRO, SEP, CONTEXT, _0, _1, _2, _3) \
+    SEP \
+    MACRO(4, CONTEXT, _4)
+
+#define metamacro_foreach_cxt6(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5) \
+    metamacro_foreach_cxt5(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4) \
+    SEP \
+    MACRO(5, CONTEXT, _5)
+
+#define metamacro_foreach_cxt7(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6) \
+    metamacro_foreach_cxt6(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5) \
+    SEP \
+    MACRO(6, CONTEXT, _6)
+
+#define metamacro_foreach_cxt8(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7) \
+    metamacro_foreach_cxt7(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6) \
+    SEP \
+    MACRO(7, CONTEXT, _7)
+
+#define metamacro_foreach_cxt9(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8) \
+    metamacro_foreach_cxt8(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7) \
+    SEP \
+    MACRO(8, CONTEXT, _8)
+
+#define metamacro_foreach_cxt10(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9) \
+    metamacro_foreach_cxt9(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8) \
+    SEP \
+    MACRO(9, CONTEXT, _9)
+
+#define metamacro_foreach_cxt11(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10) \
+    metamacro_foreach_cxt10(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9) \
+    SEP \
+    MACRO(10, CONTEXT, _10)
+
+#define metamacro_foreach_cxt12(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11) \
+    metamacro_foreach_cxt11(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10) \
+    SEP \
+    MACRO(11, CONTEXT, _11)
+
+#define metamacro_foreach_cxt13(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12) \
+    metamacro_foreach_cxt12(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11) \
+    SEP \
+    MACRO(12, CONTEXT, _12)
+
+#define metamacro_foreach_cxt14(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13) \
+    metamacro_foreach_cxt13(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12) \
+    SEP \
+    MACRO(13, CONTEXT, _13)
+
+#define metamacro_foreach_cxt15(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14) \
+    metamacro_foreach_cxt14(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13) \
+    SEP \
+    MACRO(14, CONTEXT, _14)
+
+#define metamacro_foreach_cxt16(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15) \
+    metamacro_foreach_cxt15(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14) \
+    SEP \
+    MACRO(15, CONTEXT, _15)
+
+#define metamacro_foreach_cxt17(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16) \
+    metamacro_foreach_cxt16(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15) \
+    SEP \
+    MACRO(16, CONTEXT, _16)
+
+#define metamacro_foreach_cxt18(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17) \
+    metamacro_foreach_cxt17(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16) \
+    SEP \
+    MACRO(17, CONTEXT, _17)
+
+#define metamacro_foreach_cxt19(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18) \
+    metamacro_foreach_cxt18(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17) \
+    SEP \
+    MACRO(18, CONTEXT, _18)
+
+#define metamacro_foreach_cxt20(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19) \
+    metamacro_foreach_cxt19(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18) \
+    SEP \
+    MACRO(19, CONTEXT, _19)
+</code></pre>
+</div>
+
+<p>metamacro_foreach_cxt这个宏定义有点像递归，这里可以看到N 最大就是20，于是metamacro_foreach_cxt19就是最大，metamacro_foreach_cxt19会生成rac_weakify_(0,__weak,_18)，然后再把前18个数传入metamacro_foreach_cxt18，并生成rac_weakify_(0,__weak,_17)，依次类推，一直递推到metamacro_foreach_cxt0。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+#define metamacro\_foreach\_cxt0(MACRO, SEP, CONTEXT)
+
+</code></pre>
+</div>
+<p>metamacro_foreach_cxt0就是终止条件，不做任何操作了。</p>
+
+<p>于是最初的@weakify就被替换成</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>autoreleasepool {}
+metamacro_foreach_cxt1(rac_weakify_, , __weak, self)
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+#define metamacro_foreach_cxt1(MACRO, SEP, CONTEXT, _0) MACRO(0, CONTEXT, _0)
+
+</code></pre>
+</div>
+
+<p>代入参数</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>autoreleasepool {}
+rac_weakify_（0,__weak,self）
+
+</code></pre>
+</div>
+
+<p>最终需要解析的就是rac_weakify_</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+
+#define rac_weakify_(INDEX, CONTEXT, VAR) \
+    CONTEXT __typeof__(VAR) metamacro_concat(VAR, _weak_) = (VAR);
+
+</code></pre>
+</div>
+
+<p>把（0,__weak,self）的参数替换进来(INDEX, CONTEXT, VAR)。
+INDEX = 0， CONTEXT = __weak，VAR = self，</p>
+
+<p>于是</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+CONTEXT __typeof__(VAR) metamacro_concat(VAR, _weak_) = (VAR);
+
+
+等效替换为
+
+
+__weak __typeof__(self) self_weak_ = self;
+</code></pre>
+</div>
+
+<p>最终@weakify(self) = __weak __typeof__(self) self_weak_ = self;</p>
+
+<p>这里的self_weak_ 就完全等价于我们之前写的weakSelf。</p>
+
+<h5 id="strongify">2. strongify</h5>
+
+<p>再继续分析strongify(…)</p>
+
+<p>rac_keywordify还是和weakify一样，是autoreleasepool {}，只为了前面能加上@</p>
+
+<pre><code class="language-obejctivec">
+_Pragma("clang diagnostic push") \
+_Pragma("clang diagnostic ignored \"-Wshadow\"") \
+_Pragma("clang diagnostic pop")
+
+</code></pre>
+<p>strongify比weakify多了这些_Pragma语句。</p>
+
+<p>关键字_Pragma是C99里面引入的。_Pragma比#pragma（在设计上）更加合理，因而功能也有所增强。</p>
+
+<p>上面的等效替换</p>
+
+<pre><code class="language-obejctivec">
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+#pragma clang diagnostic pop
+
+</code></pre>
+
+<p>这里的clang语句的作用:忽略当一个局部变量或类型声明遮盖另一个变量的警告。</p>
+
+<p>最初的</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>#define strongify(...) \
+    rac_keywordify \
+    _Pragma("clang diagnostic push") \
+    _Pragma("clang diagnostic ignored \"-Wshadow\"") \
+    metamacro_foreach(rac_strongify_,, __VA_ARGS__) \
+    _Pragma("clang diagnostic pop")
+</code></pre>
+</div>
+
+<p>strongify里面需要弄清楚的就是metamacro_foreach 和 rac_strongify_。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>#define metamacro_foreach(MACRO, SEP, ...) \
+        metamacro_foreach_cxt(metamacro_foreach_iter, SEP, MACRO, __VA_ARGS__)
+
+#define rac_strongify_(INDEX, VAR) \
+    __strong __typeof__(VAR) VAR = metamacro_concat(VAR, _weak_);
+
+</code></pre>
+</div>
+
+<p>我们先替换一次，SEP = 空 ， MACRO = rac_strongify_ ， __VA_ARGS__ , 于是替换成这样。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+metamacro_foreach_cxt(metamacro_foreach_iter,,rac_strongify_,self)
+
+</code></pre>
+</div>
+
+<p>根据之前分析，metamacro_foreach_cxt再次等效替换，metamacro_foreach_cxt##1(metamacro_foreach_iter,,rac_strongify_,self)</p>
+
+<p>根据</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+#define metamacro_foreach_cxt1(MACRO, SEP, CONTEXT, _0) MACRO(0, CONTEXT, _0)
+</code></pre>
+</div>
+<p>再次替换成metamacro_foreach_iter(0, rac_strongify_, self)</p>
+
+<p>继续看看metamacro_foreach_iter的实现</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+
+#define metamacro_foreach_iter(INDEX, MACRO, ARG) MACRO(INDEX, ARG)
+
+</code></pre>
+</div>
+
+<p>最终替换成rac_strongify_(0,self)</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+#define rac_strongify_(INDEX, VAR) \
+    __strong __typeof__(VAR) VAR = metamacro_concat(VAR, _weak_);
+</code></pre>
+</div>
+
+<p>INDEX = 0, VAR = self,于是@strongify(self)就等价于</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+ __strong __typeof__(VAR) VAR = metamacro_concat(VAR, _weak_);
+
+等价于
+
+__strong __typeof__(self) self = self_weak_;
+
+</code></pre>
+</div>
+
+<p>注意@strongify(self)只能使用在block中，如果用在block外面，会报错，因为这里会提示你Redefinition of ‘self’。</p>
+
+<p>总结一下</p>
+
+<p>@weakify(self) = @autoreleasepool{} __weak __typeof__ (self) self_weak_ = self;</p>
+
+<p>@strongify(self) = @autoreleasepool{} __strong __typeof__(self) self = self_weak_;</p>
+
+<p>经过分析以后，其实@weakify(self) 和 @strongify(self) 就是比我们日常写的weakSelf、strongSelf多了一个@autoreleasepool{}而已，至于为何要用这些复杂的宏定义来做，目前我还没有理解。如果有大神指导其中的原因，还请多多指点。</p>
+
+<p><strong>更新</strong></p>
+
+<p>针对文章中给的例子3，大家都提出了疑问，为何没有检测出循环引用？其实这个例子有点不好。因为这个ViewController的引用计数一出来就是6，因为它被其他很多对象引用着。当然它是强引用了student，因为student的retainCount值是2。ViewController释放的时候才会把student的值减一。针对这个例子3，我重新抽取出中间的模型，重新举一个例子。</p>
+
+<p>既然ViewController特殊，那我们就新建一个类。</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+<span class="cp">#import &lt;Foundation/Foundation.h&gt;
+#import "Student.h"
+</span>
+<span class="k">@interface</span> <span class="nc">Teacher</span> <span class="p">:</span> <span class="nc">NSObject</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">copy</span> <span class="p">,</span> <span class="n">nonatomic</span><span class="p">)</span> <span class="n">NSString</span> <span class="o">*</span><span class="n">name</span><span class="p">;</span>
+<span class="k">@property</span> <span class="p">(</span><span class="n">strong</span><span class="p">,</span> <span class="n">nonatomic</span><span class="p">)</span> <span class="n">Student</span> <span class="o">*</span><span class="n">stu</span><span class="p">;</span>
+<span class="k">@end</span>
+
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>
+<span class="cp">#import "ViewController.h"
+#import "Student.h"
+#import "Teacher.h"
+</span>
+<span class="k">@interface</span> <span class="nc">ViewController</span> <span class="p">()</span>
+<span class="k">@end</span>
+
+<span class="k">@implementation</span> <span class="nc">ViewController</span>
+
+<span class="k">-</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">viewDidLoad</span> <span class="p">{</span>
+<span class="err"> </span> <span class="err"> </span> <span class="p">[</span><span class="n">super</span> <span class="nf">viewDidLoad</span><span class="p">];</span>
+<span class="err">  </span> <span class="err"> </span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">Student</span> <span class="o">*</span><span class="n">student</span> <span class="o">=</span> <span class="p">[[</span><span class="n">Student</span> <span class="nf">alloc</span><span class="p">]</span><span class="nf">init</span><span class="p">];</span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">Teacher</span> <span class="o">*</span><span class="n">teacher</span> <span class="o">=</span> <span class="p">[[</span><span class="n">Teacher</span> <span class="nf">alloc</span><span class="p">]</span><span class="nf">init</span><span class="p">];</span>
+<span class="err">  </span> <span class="err"> </span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">teacher</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">@"i'm teacher"</span><span class="p">;</span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">teacher</span><span class="p">.</span><span class="n">stu</span> <span class="o">=</span> <span class="n">student</span><span class="p">;</span>
+<span class="err">  </span> <span class="err"> </span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">student</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">@"halfrost"</span><span class="p">;</span>
+<span class="err">  </span> 
+<span class="err"> </span> <span class="err"> </span> <span class="n">student</span><span class="p">.</span><span class="n">study</span> <span class="o">=</span> <span class="o">^</span><span class="p">{</span>
+<span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="err"> </span> <span class="n">NSLog</span><span class="p">(</span><span class="s">@"my name is = %@"</span><span class="p">,</span><span class="n">teacher</span><span class="p">.</span><span class="n">name</span><span class="p">);</span>
+<span class="err"> </span> <span class="err"> </span> <span class="p">};</span>
+<span class="err">  </span> <span class="err"> </span>
+<span class="err"> </span> <span class="err"> </span> <span class="n">student</span><span class="p">.</span><span class="n">study</span><span class="p">();</span>
+<span class="p">}</span>
+
+
+</code></pre>
+</div>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-81da182083ef4625.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<p><img src="http://upload-images.jianshu.io/upload_images/1194012-3b483f1ccd94e77c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="" /></p>
+
+<p>如图所示，还是出现了循环引用，student的block强引用了teacher，teacher又强引用了student，导致两者都无法释放。</p>
+
+
+  </section>
+</article>
+
+<section class="read-more">
+   
+   
+   
+   
+   <div class="read-more-item">
+       <span class="read-more-item-dim">更早的文章</span>
+       <h2 class="post-list__post-title post-title"><a href="/2016/08/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E6%8D%95%E8%8E%B7%E5%A4%96%E9%83%A8%E5%8F%98%E9%87%8F%E5%92%8C__block%E5%AE%9E%E7%8E%B0%E5%8E%9F%E7%90%86/" title="link to 深入研究Block捕获外部变量和__block实现原理">深入研究Block捕获外部变量和__block实现原理</a></h2>
+       <p class="excerpt">前言Blocks是C语言的扩充功能，而Apple 在OS X Snow Leopard 和 iOS 4中引入了这个新功能“Blocks”。从那开始，Block就出现在iOS和Mac系统各个API中，并被大家广泛使用。一句话来形容Blocks，带有自动变量（局部变量）的匿名函数。Block在OC中的实现如下：struct Block_layout {    void *isa;    int flags;    int reserved;    void (*invoke)(void *, ...&hellip;</p>
+       <div class="post-list__meta"><time datetime="2016-08-27 22:05:00 +0800" class="post-list__meta--date date">2016-08-27</time> &#8226; <span class="post-list__meta--tags tags">iOS</span><a class="btn-border-small" href=/2016/08/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E6%8D%95%E8%8E%B7%E5%A4%96%E9%83%A8%E5%8F%98%E9%87%8F%E5%92%8C__block%E5%AE%9E%E7%8E%B0%E5%8E%9F%E7%90%86/>继续阅读</a></div>
+   </div>
+   
+</section>
+
+<section class="post-comments">
+  
+    <div id="disqus_thread"></div>
+    <script>
+    
+    var disqus_config = function () {
+        this.page.url = "http://vno.onevcat.com/2016/09/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E7%94%A8weakSelf-strongSelf-@weakify-@strongify%E8%A7%A3%E5%86%B3%E5%BE%AA%E7%8E%AF%E5%BC%95%E7%94%A8/";
+        this.page.identifier = "/2016/09/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E7%94%A8weakSelf-strongSelf-@weakify-@strongify%E8%A7%A3%E5%86%B3%E5%BE%AA%E7%8E%AF%E5%BC%95%E7%94%A8/";
+    };
+
+    var disqus_shortname = 'halfrostsfield';
+    
+    (function() { // DON'T EDIT BELOW THIS LINE
+        var d = document, s = d.createElement('script');
+        s.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>要查看<a href="http://disqus.com/?ref_noscript"> Disqus </a>评论，请启用 JavaScript</noscript>
+    
+  
+  
+  
+  
+</section>
+
+
+            <section class="footer">
+    <footer>
+      <span class="footer__copyright">友情链接 ：<a href="https://desgard.com/">Guardia · 瓜地</a>    <a href="https://bestswifter.com/">bestswifter</a>  <a href="http://kuailejim.com/">kuailejim</a>  <a href="http://valiantcat.com/">南栀倾寒</a>  <a href="http://www.jianshu.com/users/9c51a213b02e">Martin_Joy</a>  <a href="http://bluelich.com/">bluelich</a>  <a href="http://yuyang.myportfolio.com/">yuy</a>  </span>
+      <br>
+      <br>
+    	<span class="footer__copyright">本站点采用<a href="http://creativecommons.org/licenses/by-nc-sa/4.0/">知识共享 署名-非商业性使用-相同方式共享 4.0 国际 许可协议</a></span>
+        <span class="footer__copyright">由 <a href="https://jekyllrb.com">Jekyll</a> 于 2016-09-07 生成，感谢<a href="https://pages.github.com"> GitHub Pages</a> 强力驱动</span>
+        <span class="footer__copyright">本站由 <a href="http://halfrost.com">@halfrost</a> 创建，采用 <a href="https://github.com/onevcat/vno-jekyll">Vno - Jekyll</a> 作为主题，您可以在 GitHub 找到<a href="https://github.com/onevcat/OneV-s-Den">本站源码</a> - &copy; 2016</span>
+    </footer>
+</section>
+
+        </div>
+    </div>
+    
+    <script type="text/javascript" src="//code.jquery.com/jquery-1.11.3.min.js"></script>
+
+<script type="text/javascript" src="/js/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+<script type="text/javascript" src="/js/main.js"></script>
+
+
+
+    
+  </body>
+
+</html>

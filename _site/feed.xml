@@ -5,9 +5,1345 @@
     <description>嗨，我是于德志 (@halfrost)，一名来自中国的 iOS 开发者，已退役 acmer 。现居上海。吾笃信：德不孤，必有志，技不疏，必有朋。</description>
     <link>http://vno.onevcat.com/</link>
     <atom:link href="http://vno.onevcat.com/feed.xml" rel="self" type="application/rss+xml"/>
-    <pubDate>Tue, 30 Aug 2016 01:09:30 +0800</pubDate>
-    <lastBuildDate>Tue, 30 Aug 2016 01:09:30 +0800</lastBuildDate>
+    <pubDate>Wed, 07 Sep 2016 02:31:25 +0800</pubDate>
+    <lastBuildDate>Wed, 07 Sep 2016 02:31:25 +0800</lastBuildDate>
     <generator>Jekyll v3.1.6</generator>
+    
+      <item>
+        <title>深入研究Block用weakSelf、strongSelf、@weakify、@strongify解决循环引用</title>
+        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-d3d8244be4e6059f.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h4 id=&quot;section&quot;&gt;前言&lt;/h4&gt;
+&lt;p&gt;在上篇中，仔细分析了一下Block的实现原理以及__block捕获外部变量的原理。然而实际使用Block过程中，还是会遇到一些问题，比如Retain Circle的问题。&lt;/p&gt;
+
+&lt;h4 id=&quot;section-1&quot;&gt;目录&lt;/h4&gt;
+&lt;ul&gt;
+  &lt;li&gt;1.Retain Circle的由来&lt;/li&gt;
+  &lt;li&gt;2.__weak、__strong的实现原理&lt;/li&gt;
+  &lt;li&gt;3.weakSelf、strongSelf的用途&lt;/li&gt;
+  &lt;li&gt;4.@weakify、@strongify实现原理&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h4 id=&quot;retain-circle&quot;&gt;一. Retain Circle的由来&lt;/h4&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-2eb65c853e014ed3.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;循环引用的问题相信大家都很理解了，这里还是简单的提一下。&lt;/p&gt;
+
+&lt;p&gt;当A对象里面强引用了B对象，B对象又强引用了A对象，这样两者的retainCount值一直都无法为0，于是内存始终无法释放，导致内存泄露。所谓的内存泄露就是本应该释放的对象，在其生命周期结束之后依旧存在。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-aeffe9c77bf9ef5c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;这是2个对象之间的，相应的，这种循环还能存在于3，4……个对象之间，只要相互形成环，就会导致Retain Cicle的问题。&lt;/p&gt;
+
+&lt;p&gt;当然也存在自身引用自身的，当一个对象内部的一个obj，强引用的自身，也会导致循环引用的问题出现。常见的就是block里面引用的问题。
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-e6f47d76a23b40c6.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h4 id=&quot;weakstrong&quot;&gt;二.__weak、__strong的实现原理&lt;/h4&gt;
+
+&lt;p&gt;在ARC环境下，id类型和对象类型和C语言其他类型不同，类型前必须加上所有权的修饰符。&lt;/p&gt;
+
+&lt;p&gt;所有权修饰符总共有4种：&lt;/p&gt;
+
+&lt;p&gt;1.__strong修饰符
+2.__weak修饰符
+3.__unsafe_unretained修饰符
+4.__autoreleasing修饰符&lt;/p&gt;
+
+&lt;p&gt;一般我们如果不写，默认的修饰符是__strong。&lt;/p&gt;
+
+&lt;p&gt;要想弄清楚__strong，__weak的实现原理，我们就需要研究研究clang(LLVM编译器)和objc4 Objective-C runtime库了。&lt;/p&gt;
+
+&lt;p&gt;关于clang有一份&lt;a href=&quot;http://clang.llvm.org/docs/AutomaticReferenceCounting.html&quot;&gt;关于ARC详细的文档&lt;/a&gt;，有兴趣的可以仔细研究一下文档里面的说明和例子，很有帮助。&lt;/p&gt;
+
+&lt;p&gt;以下的讲解，也会来自于上述文档中的函数说明。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-8ba2276f15bbfd49.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h5 id=&quot;strong&quot;&gt;1.__strong的实现原理&lt;/h5&gt;
+
+&lt;h6 id=&quot;section-2&quot;&gt;(1)对象持有自己&lt;/h6&gt;
+
+&lt;p&gt;首先我们先来看看生成的对象持有自己的情况，利用alloc/new/copy/mutableCopy生成对象。&lt;/p&gt;
+
+&lt;p&gt;当我们声明了一个__strong对象&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+    &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;id&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;__strong&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;obj&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;[[NSObject&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;alloc]&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;init];&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;LLVM编译器会把上述代码转换成下面的样子&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+id __attribute__((objc_ownership(strong))) obj = ((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)objc_getClass(&quot;NSObject&quot;), sel_registerName(&quot;alloc&quot;)), sel_registerName(&quot;init&quot;));
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;相应的会调用&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;id obj = objc_msgSend(NSObject, @selector(alloc));
+objc_msgSend(obj,selector(init));
+objc_release(obj);
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;上述这些方法都好理解。在ARC有效的时候就会自动插入release代码，在作用域结束的时候自动释放。&lt;/p&gt;
+
+&lt;h6 id=&quot;section-3&quot;&gt;(2)对象不持有自己&lt;/h6&gt;
+
+&lt;p&gt;生成对象的时候不用alloc/new/copy/mutableCopy等方法。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+    &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;id&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;__strong&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;obj&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;[NSMutableArray&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;array];&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;LLVM编译器会把上述代码转换成下面的样子&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+id __attribute__((objc_ownership(strong))) array = ((NSMutableArray *(*)(id, SEL))(void *)objc_msgSend)((id)objc_getClass(&quot;NSMutableArray&quot;), sel_registerName(&quot;array&quot;));
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;查看LLVM文档，其实是下述的过程&lt;/p&gt;
+
+&lt;p&gt;相应的会调用&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;id obj = objc_msgSend(NSMutableArray, @selector(array));
+objc_retainAutoreleasedReturnValue(obj);
+objc_release(obj);
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;与之前对象会持有自己的情况不同，这里多了一个objc_retainAutoreleasedReturnValue函数。&lt;/p&gt;
+
+&lt;p&gt;这里有3个函数需要说明：&lt;br /&gt;
+1.id objc_retainAutoreleaseReturnValue(id value)&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;&lt;a href=&quot;http://clang.llvm.org/docs/AutomaticReferenceCounting.html#id69&quot;&gt;id objc_retainAutoreleaseReturnValue(id value);
+&lt;/a&gt;&lt;a href=&quot;http://clang.llvm.org/docs/AutomaticReferenceCounting.html#arc-runtime-objc-retainautoreleasereturnvalue&quot;&gt;&lt;/a&gt;
+&lt;em&gt;Precondition:&lt;/em&gt; value is null or a pointer to a valid object.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;If value is null, this call has no effect. Otherwise, it performs a retain operation followed by the operation described in &lt;a href=&quot;http://clang.llvm.org/docs/AutomaticReferenceCounting.html#arc-runtime-objc-autoreleasereturnvalue&quot;&gt;objc_autoreleaseReturnValue&lt;/a&gt;.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Equivalent to the following code:
+id objc_retainAutoreleaseReturnValue(id value) { &lt;br /&gt;
+       return objc_autoreleaseReturnValue(objc_retain(value));
+}&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Always returns value&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;2.id objc_retainAutoreleaseReturnValue(id value)&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;&lt;a href=&quot;http://clang.llvm.org/docs/AutomaticReferenceCounting.html#id70&quot;&gt;id objc_retainAutoreleasedReturnValue(id value);
+&lt;/a&gt;&lt;a href=&quot;http://clang.llvm.org/docs/AutomaticReferenceCounting.html#arc-runtime-objc-retainautoreleasedreturnvalue&quot;&gt;&lt;/a&gt;
+&lt;em&gt;Precondition:&lt;/em&gt; value is null or a pointer to a valid object.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;If value is null, this call has no effect. Otherwise, it attempts to accept a hand off of a retain count from a call to &lt;a href=&quot;http://clang.llvm.org/docs/AutomaticReferenceCounting.html#arc-runtime-objc-autoreleasereturnvalue&quot;&gt;objc_autoreleaseReturnValue&lt;/a&gt; on value in a recently-called function or something it calls. If that fails, it performs a retain operation exactly like &lt;a href=&quot;http://clang.llvm.org/docs/AutomaticReferenceCounting.html#arc-runtime-objc-retain&quot;&gt;objc_retain&lt;/a&gt;.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Always returns value&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;3.id objc_autoreleaseReturnValue(id value)&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;&lt;a href=&quot;http://clang.llvm.org/docs/AutomaticReferenceCounting.html#id59&quot;&gt;id objc_autoreleaseReturnValue(id value);
+&lt;/a&gt;&lt;a href=&quot;http://clang.llvm.org/docs/AutomaticReferenceCounting.html#arc-runtime-objc-autoreleasereturnvalue&quot;&gt;&lt;/a&gt;
+&lt;em&gt;Precondition:&lt;/em&gt; value  is null or a pointer to a valid object.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;If value  is null, this call has no effect. Otherwise, it makes a best effort to hand off ownership of a retain count on the object to a call to&lt;a href=&quot;http://clang.llvm.org/docs/AutomaticReferenceCounting.html#arc-runtime-objc-retainautoreleasedreturnvalue&quot;&gt;objc_retainAutoreleasedReturnValue&lt;/a&gt; for the same object in an enclosing call frame. If this is not possible, the object is autoreleased as above.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Always returns value&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;这3个函数其实都是在描述一件事情。 it makes a best effort to hand off ownership of a retain count on the object to a call to objc_retainAutoreleasedReturnValue for the same object in an enclosing call frame。&lt;/p&gt;
+
+&lt;p&gt;这属于LLVM编译器的一个优化。objc_retainAutoreleasedReturnValue函数是用于自己持有(retain)对象的函数，它持有的对象应为返回注册在autoreleasepool中对象的方法或者是函数的返回值。&lt;/p&gt;
+
+&lt;p&gt;在ARC中原本对象生成之后是要注册到autoreleasepool中，但是调用了objc_autoreleasedReturnValue 之后，紧接着调用了 objc_retainAutoreleasedReturnValue，objc_autoreleasedReturnValue函数会去检查该函数方法或者函数调用方的执行命令列表，如果里面有objc_retainAutoreleasedReturnValue()方法，那么该对象就直接返回给方法或者函数的调用方。达到了即使对象不注册到autoreleasepool中，也可以返回拿到相应的对象。&lt;/p&gt;
+
+&lt;h5 id=&quot;weak&quot;&gt;2.__weak的实现原理&lt;/h5&gt;
+
+&lt;p&gt;声明一个__weak对象&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+    &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;id&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;__weak&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;obj&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;w&quot;&gt; &lt;/span&gt;&lt;span class=&quot;err&quot;&gt;strongObj;&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;&lt;span class=&quot;w&quot;&gt;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;假设这里的strongObj是一个已经声明好了的对象。&lt;/p&gt;
+
+&lt;p&gt;LLVM转换成对应的代码&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+id __attribute__((objc_ownership(none))) obj1 = strongObj;
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;相应的会调用&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;id obj ;
+objc_initWeak(&amp;amp;obj,strongObj);
+objc_destoryWeak(&amp;amp;obj);
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;看看文档描述&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;[id objc_initWeak(id &lt;em&gt;object, id value);
+](http://clang.llvm.org/docs/AutomaticReferenceCounting.html#id62)&lt;a href=&quot;http://clang.llvm.org/docs/AutomaticReferenceCounting.html#arc-runtime-objc-initweak&quot;&gt;&lt;/a&gt;
+*Precondition:&lt;/em&gt; object is a valid pointer which has not been registered as a __weak object. &lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;value  is null or a pointer to a valid object.
+If value is a null pointer or the object to which it points has begun deallocation, object is zero-initialized. Otherwise, object
+ is registered as a __weak object pointing to value&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Equivalent to the following code:
+id objc_initWeak(id *object, id value) { &lt;br /&gt;
+    *object = nil; 
+    return objc_storeWeak(object, value);
+}&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Returns the value of object after the call.
+Does not need to be atomic with respect to calls to objc_storeWeak on object&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;objc_initWeak的实现其实是这样的&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+id objc_initWeak(id *object, id value) {   
+    *object = nil; 
+    return objc_storeWeak(object, value);
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;会把传入的object变成0或者nil，然后执行objc_storeWeak函数。&lt;/p&gt;
+
+&lt;p&gt;那么objc_destoryWeak函数是干什么的呢？&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;[void objc_destroyWeak(id &lt;em&gt;object);
+](http://clang.llvm.org/docs/AutomaticReferenceCounting.html#id61)&lt;a href=&quot;http://clang.llvm.org/docs/AutomaticReferenceCounting.html#void-objc-destroyweak-id-object&quot;&gt;&lt;/a&gt;
+*Precondition:&lt;/em&gt; object  is a valid pointer which either contains a null pointer or has been registered as a __weak object.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;object  is unregistered as a weak object, if it ever was. The current value of object is left unspecified; otherwise, equivalent to the following code:&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;void objc_destroyWeak(id *object) { 
+objc_storeWeak(object, nil);
+}&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Does not need to be atomic with respect to calls to objc_storeWeak on object&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;objc_destoryWeak函数的实现&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;void objc_destroyWeak(id *object) { 
+    objc_storeWeak(object, nil);
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;也是会去调用objc_storeWeak函数。objc_initWeak和objc_destroyWeak函数都会去调用objc_storeWeak函数，唯一不同的是调用的入参不同，一个是value，一个是nil。&lt;/p&gt;
+
+&lt;p&gt;那么重点就都落在objc_storeWeak函数上了。&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;[id objc_storeWeak(id &lt;em&gt;object, id value);
+](http://clang.llvm.org/docs/AutomaticReferenceCounting.html#id73)&lt;a href=&quot;http://clang.llvm.org/docs/AutomaticReferenceCounting.html#arc-runtime-objc-storeweak&quot;&gt;&lt;/a&gt;
+*Precondition:&lt;/em&gt; object is a valid pointer which either contains a null pointer or has been registered as a __weak object. value
+ is null or a pointer to a valid object.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;If value is a null pointer or the object to which it points has begun deallocation, object  is assigned null and unregistered as a __weak object. Otherwise, object is registered as a __weak object or has its registration updated to point to value&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;Returns the value of object after the call.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;objc_storeWeak函数的用途就很明显了。由于weak表也是用Hash table实现的，所以objc_storeWeak函数就把第一个入参的变量地址注册到weak表中，然后根据第二个入参来决定是否移除。如果第二个参数为0，那么就把__weak变量从weak表中删除记录，并从引用计数表中删除对应的键值记录。&lt;/p&gt;
+
+&lt;p&gt;所以如果__weak引用的原对象如果被释放了，那么对应的__weak对象就会被指为nil。原来就是通过objc_storeWeak函数这些函数来实现的。&lt;/p&gt;
+
+&lt;p&gt;以上就是ARC中__strong和__weak的简单的实现原理，更加详细的还请大家去看看这一章开头提到的那个LLVM文档，里面说明的很详细。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-3c3eea3397b741f6.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h4 id=&quot;weakselfstrongself&quot;&gt;三.weakSelf、strongSelf的用途&lt;/h4&gt;
+
+&lt;p&gt;在提weakSelf、strongSelf之前，我们先引入一个Retain Cicle的例子。&lt;/p&gt;
+
+&lt;p&gt;假设自定义的一个student类&lt;/p&gt;
+
+&lt;p&gt;例子1：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;span class=&quot;cp&quot;&gt;#import &amp;lt;Foundation/Foundation.h&amp;gt;
+&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;typedef&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;^&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Study&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)();&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;NSObject&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;copy&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;copy&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Study&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;study&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;span class=&quot;cp&quot;&gt;#import &quot;ViewController.h&quot;
+#import &quot;Student.h&quot;
+&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewController&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;@implementation&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewController&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;viewDidLoad&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;super&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;viewDidLoad&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;  &lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;alloc&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;init&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;@&quot;Hello World&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;study&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;^&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSLog&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;@&quot;my name is = %@&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;};&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;到这里，大家应该看出来了，这里肯定出现了循环引用了。student的study的Block里面强引用了student自身。根据&lt;a href=&quot;http://www.jianshu.com/p/ee9756f3d5f6&quot;&gt;上篇文章&lt;/a&gt;的分析，可以知道，_NSConcreteMallocBlock捕获了外部的对象，会在内部持有它。retainCount值会加一。&lt;/p&gt;
+
+&lt;p&gt;我们用Instruments来观察一下。添加Leak观察器。&lt;/p&gt;
+
+&lt;p&gt;当程序运行起来之后，在&lt;strong&gt;Leak Checks&lt;/strong&gt;观察器里面应该可以看到红色的❌，点击它就会看到内存leak了。有2个泄露的对象。Block和Student相互循环引用了。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-8c51133ef5b64e01.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;打开Cycles &amp;amp; Roots 观察一下循环的环。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-b32b093f6ddf412c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;这里形成环的原因block里面持有student本身，student本身又持有block。&lt;/p&gt;
+
+&lt;p&gt;那再看一个例子2：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;cp&quot;&gt;#import &quot;ViewController.h&quot;
+#import &quot;Student.h&quot;
+&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewController&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;@implementation&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewController&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;viewDidLoad&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;super&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;viewDidLoad&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;  &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;alloc&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;init&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;  &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;@&quot;Hello World&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;study&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;^&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;){&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSLog&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;@&quot;my name is = %@&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;};&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;study&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;我把block新传入一个参数，传入的是student.name。这个时候会引起循环引用么？&lt;/p&gt;
+
+&lt;p&gt;答案肯定是不会。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-345a97d7a6eb607c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;如上图，并不会出现内存泄露。原因是因为，student是作为形参传递进block的，block并不会捕获形参到block内部进行持有。所以肯定不会造成循环引用。&lt;/p&gt;
+
+&lt;p&gt;再改一下。看例子3：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;span class=&quot;cp&quot;&gt;#import &quot;ViewController.h&quot;
+#import &quot;Student.h&quot;
+&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewController&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;copy&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;strong&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;stu&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;@implementation&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewController&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;viewDidLoad&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;super&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;viewDidLoad&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;  &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;alloc&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;init&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;  &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;self&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;@&quot;halfrost&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;self&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;stu&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;  &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;study&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;^&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSLog&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;@&quot;my name is = %@&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;self&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;};&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;  &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;study&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;这样会形成循环引用么？&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-4ec0577cf7a01f6f.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;答案也是否定的。&lt;/p&gt;
+
+&lt;p&gt;ViewController虽然强引用着student，但是student里面的blcok强引用的是viewController的name属性，并没有形成环。如果把上述的self.name改成self，也依旧不会产生循环引用。因为他们都没有强引用这个block。&lt;/p&gt;
+
+&lt;p&gt;那遇到循环引用我们改如何处理呢？？类比平时我们经常写的delegate，可以知道，只要有一边是__weak就可以打破循环。&lt;/p&gt;
+
+&lt;p&gt;先说一种做法，利用__block解决循环的做法。例子4：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;span class=&quot;cp&quot;&gt;#import &quot;ViewController.h&quot;
+#import &quot;Student.h&quot;
+&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewController&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;@implementation&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewController&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;viewDidLoad&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;super&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;viewDidLoad&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;alloc&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;init&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;  &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;__block&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;stu&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;@&quot;Hello World&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;study&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;^&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSLog&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;@&quot;my name is = %@&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;stu&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;stu&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;nil&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;};&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;这样写会循环么？看上去应该不会。但是实际上却是会的。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-544bc137d452c71b.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-92ae745538414431.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;由于没有执行study这个block，现在student持有该block，block持有__block变量，__block变量又持有student对象。3者形成了环，导致了循环引用了。
+想打破环就需要破坏掉其中一个引用。__block不持有student即可。&lt;/p&gt;
+
+&lt;p&gt;只需要执行一下block即可。例子5：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;span class=&quot;cp&quot;&gt;#import &quot;ViewController.h&quot;
+#import &quot;Student.h&quot;
+&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewController&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;@implementation&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewController&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;viewDidLoad&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;super&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;viewDidLoad&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;alloc&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;init&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;  &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;@&quot;Hello World&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;__block&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;stu&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;study&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;^&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSLog&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;@&quot;my name is = %@&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;stu&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;stu&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;nil&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;};&lt;/span&gt;
+
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;study&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;这样就不会循环引用了。
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-8d5dc8c77796e5b2.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;使用__block解决循环引用虽然可以控制对象持有时间，在block中还能动态的控制是__block变量的值，可以赋值nil，也可以赋值其他的值，但是有一个唯一的缺点就是需要执行一次block才行。否则还是会造成循环引用。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;值得注意的是，在ARC下__block会导致对象被retain，有可能导致循环引用。而在MRC下，则不会retain这个对象，也不会导致循环引用。&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;接下来可以正式开始讲讲weakSelf 和 strongSelf的用法了。&lt;/p&gt;
+
+&lt;h5 id=&quot;weakself&quot;&gt;1.weakSelf&lt;/h5&gt;
+
+&lt;p&gt;说道weakSelf，需要先来区分几种写法。
+__weak __typeof(self)weakSelf = self;  这是AFN里面的写法。。&lt;/p&gt;
+
+&lt;p&gt;#define WEAKSELF typeof(self) __weak weakSelf = self; 这是我们平时的写法。。&lt;/p&gt;
+
+&lt;p&gt;先区分__typeof() 和 typeof()
+由于笔者一直很崇拜AFNetWorking的作者，这个库里面的代码都很整洁，里面各方面的代码都可以当做代码范本来阅读。遇到不懂疑惑的，都要深究，肯定会有收获。这里就是一处，平时我们的写法是不带__的，AFN里面用这种写法有什么特殊的用途么？&lt;/p&gt;
+
+&lt;p&gt;在SOF上能找到相关的&lt;a href=&quot;http://stackoverflow.com/questions/14877415/difference-between-typeof-typeof-and-typeof-objective-c&quot;&gt;答案&lt;/a&gt;：&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;p&gt;__typeof__() and __typeof() are compiler-specific extensions to the C language, because standard C does not include such an operator. Standard C requires compilers to prefix language extensions with a double-underscore (which is also why you should never do so for your own functions, variables, etc.)
+typeof() is exactly the same, but throws the underscores out the window with the understanding that every modern compiler supports it. (Actually, now that I think about it, Visual C++ might not. It does support decltype() though, which generally provides the same behaviour as typeof().)
+All three mean the same thing, but none are standard C so a conforming compiler may choose to make any mean something different.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;其实两者都是一样的东西，只不过是C里面不同的标准，兼容性不同罢了。&lt;/p&gt;
+
+&lt;p&gt;更加详细的&lt;a href=&quot;http://gcc.gnu.org/onlinedocs/gcc/Alternate-Keywords.html#Alternate-Keywords&quot;&gt;官方说明&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;那么抽象出来就是这2种写法。  &lt;br /&gt;
+#define WEAKSELF  __weak typeof(self)weakSelf = self;
+#define WEAKSELF typeof(self) __weak weakSelf = self;&lt;/p&gt;
+
+&lt;p&gt;这样子看就清楚了，两种写法就是完全一样的。&lt;/p&gt;
+
+&lt;p&gt;我们可以用WEAKSELF来解决循环引用的问题。例子6：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;span class=&quot;cp&quot;&gt;#import &quot;ViewController.h&quot;
+#import &quot;Student.h&quot;
+&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewController&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;@implementation&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewController&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;viewDidLoad&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;super&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;viewDidLoad&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;alloc&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;init&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;  &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt;&lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;@&quot;Hello World&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;__weak&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;typeof&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;weakSelf&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;  &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;study&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;^&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSLog&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;@&quot;my name is = %@&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;weakSelf&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;};&lt;/span&gt;
+
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;study&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;这样就解决了循环引用的问题了。&lt;/p&gt;
+
+&lt;p&gt;解决循环应用的问题一定要分析清楚哪里出现了循环引用，只需要把其中一环加上weakSelf这类似的宏，就可以解决循环引用。如果分析不清楚，就只能无脑添加weakSelf、strongSelf，这样的做法不可取。&lt;/p&gt;
+
+&lt;p&gt;在上面的例子3中，就完全不存在循环引用，要是无脑加weakSelf、strongSelf是不对的。在例子6中，也只需要加一个weakSelf就可以了，也不需要加strongSelf。&lt;/p&gt;
+
+&lt;p&gt;曾经在segmentfault也看到过这样一个问题，问：&lt;a href=&quot;https://segmentfault.com/q/1010000004343510&quot;&gt;为什么iOS的Masonry中的self不会循环引用?&lt;/a&gt;&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+
+UIButton *testButton = [[UIButton alloc] init];
+[self.view addSubview:testButton];
+testButton.backgroundColor = [UIColor redColor];
+[testButton mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.width.equalTo(@100);
+    make.height.equalTo(@100);
+    make.left.equalTo(self.view.mas_left);
+    make.top.equalTo(self.view.mas_top);
+}];
+[testButton bk_addEventHandler:^(id sender) {
+    [self dismissViewControllerAnimated:YES completion:nil];
+} forControlEvents:UIControlEventTouchUpInside];
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;如果我用blocksKit的bk_addEventHandler
+方法, 其中使用strong self, 该viewController就无法dealloc, 我理解是因为,self retain self.view, retain testButton, retain self. 但是如果只用Mansonry的mas_makeConstraints
+方法, 同样使用strong self, 该viewController却能正常dealloc, 请问这是为什么, 为什么Masonry没有导致循环引用？&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;看到这里，读者应该就应该能回答这个问题了。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+- (NSArray *)mas_makeConstraints:(void(^)(MASConstraintMaker *))block {
+    self.translatesAutoresizingMaskIntoConstraints = NO;
+    MASConstraintMaker *constraintMaker = [[MASConstraintMaker alloc] initWithView:self];
+    block(constraintMaker);
+    return [constraintMaker install];
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;&lt;del&gt;在Masonry这个block中，block仅仅捕获了self的translatesAutoresizingMaskIntoConstraints变量，但是并没有持有self。&lt;/del&gt;&lt;/p&gt;
+
+&lt;p&gt;上述描述有误，感谢@酷酷的哀殿 耐心指点&lt;/p&gt;
+
+&lt;p&gt;更正如下：&lt;/p&gt;
+
+&lt;p&gt;关于 Masonry ，它捕获了变量 self，然后对其执行了&lt;code class=&quot;highlighter-rouge&quot;&gt;setTranslatesAutoresizingMaskIntoConstraints:&lt;/code&gt;方法。但是，因为执行完毕后，block会被销毁，没有形成环。所以，没有引起循环依赖。&lt;/p&gt;
+
+&lt;h5 id=&quot;strongself&quot;&gt;2.strongSelf&lt;/h5&gt;
+
+&lt;p&gt;上面介绍完了weakSelf，既然weakSelf能完美解决Retain Circle的问题了，那为何还需要strongSelf呢？&lt;/p&gt;
+
+&lt;p&gt;还是先从AFN经典说起，以下是AFN其中的一段代码：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+#pragma mark - NSOperation
+
+- (void)setCompletionBlock:(void (^)(void))block {
+    [self.lock lock];
+    if (!block) {
+        [super setCompletionBlock:nil];
+    } else {
+        __weak __typeof(self)weakSelf = self;
+        [super setCompletionBlock:^ {
+            __strong __typeof(weakSelf)strongSelf = weakSelf;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored &quot;-Wgnu&quot;
+            dispatch_group_t group = strongSelf.completionGroup ?: url_request_operation_completion_group();
+            dispatch_queue_t queue = strongSelf.completionQueue ?: dispatch_get_main_queue();
+#pragma clang diagnostic pop
+
+            dispatch_group_async(group, queue, ^{
+                block();
+            });
+
+            dispatch_group_notify(group, url_request_operation_completion_queue(), ^{
+                [strongSelf setCompletionBlock:nil];
+            });
+        }];
+    }
+    [self.lock unlock];
+}
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;如果block里面不加__strong __typeof(weakSelf)strongSelf = weakSelf会如何呢？&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;span class=&quot;cp&quot;&gt;#import &quot;ViewController.h&quot;
+#import &quot;Student.h&quot;
+&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewController&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;@implementation&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewController&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;viewDidLoad&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;super&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;viewDidLoad&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;alloc&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;init&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;@&quot;Hello World&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;__weak&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;typeof&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;weakSelf&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;  &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;study&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;^&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;dispatch_after&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dispatch_time&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;DISPATCH_TIME_NOW&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;int64_t&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)(&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSEC_PER_SEC&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)),&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;dispatch_get_main_queue&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;^&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSLog&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;@&quot;my name is = %@&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;weakSelf&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;});&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;};&lt;/span&gt;
+
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;study&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;输出：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;my name is = (null)
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;为什么输出是这样的呢？&lt;/p&gt;
+
+&lt;p&gt;重点就在dispatch_after这个函数里面。在study()的block结束之后，student被自动释放了。又由于dispatch_after里面捕获的__weak的student，根据第二章讲过的__weak的实现原理，在原对象释放之后，__weak对象就会变成null，防止野指针。所以就输出了null了。&lt;/p&gt;
+
+&lt;p&gt;那么我们怎么才能在weakSelf之后，block里面还能继续使用weakSelf之后的对象呢？&lt;/p&gt;
+
+&lt;p&gt;究其根本原因就是weakSelf之后，无法控制什么时候会被释放，为了保证在block内不会被释放，需要添加__strong。&lt;/p&gt;
+
+&lt;p&gt;在block里面使用的__strong修饰的weakSelf是为了在函数生命周期中防止self提前释放。strongSelf是一个自动变量当block执行完毕就会释放自动变量strongSelf不会对self进行一直进行强引用。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;span class=&quot;cp&quot;&gt;#import &quot;ViewController.h&quot;
+#import &quot;Student.h&quot;
+&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewController&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;@implementation&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewController&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;viewDidLoad&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;super&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;viewDidLoad&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;alloc&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;init&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;  &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;@&quot;Hello World&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;__weak&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;typeof&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;weakSelf&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;  &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;study&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;^&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;__strong&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;typeof&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;strongSelf&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;weakSelf&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;dispatch_after&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dispatch_time&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;DISPATCH_TIME_NOW&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;int64_t&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)(&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSEC_PER_SEC&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)),&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;dispatch_get_main_queue&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;^&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSLog&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;@&quot;my name is = %@&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;strongSelf&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;});&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;  &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;};&lt;/span&gt;
+
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;study&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;输出&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;my name is = Hello World
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;至此，我们就明白了weakSelf、strongSelf的用途了。&lt;/p&gt;
+
+&lt;p&gt;weakSelf 是为了block不持有self，避免Retain Circle循环引用。在 Block 内如果需要访问 self 的方法、变量，建议使用 weakSelf。&lt;/p&gt;
+
+&lt;p&gt;strongSelf的目的是因为一旦进入block执行，假设不允许self在这个执行过程中释放，就需要加入strongSelf。block执行完后这个strongSelf 会自动释放，没有不会存在循环引用问题。如果在 Block 内需要多次 访问 self，则需要使用 strongSelf。&lt;/p&gt;
+
+&lt;p&gt;关于Retain Circle最后总结一下，有3种方式可以解决循环引用。&lt;/p&gt;
+
+&lt;p&gt;结合《Effective Objective-C 2.0》(编写高质量iOS与OS X代码的52个有效方法)这本书的例子，来总结一下。&lt;/p&gt;
+
+&lt;p&gt;EOCNetworkFetcher.h&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;typedef&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;^&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;EOCNetworkFetcherCompletionHandler&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSData&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;data&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;@interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;EOCNetworkFetcher&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;NSObject&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;strong&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;readonly&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSURL&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;id&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;initWithURL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSURL&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;startWithCompletionHandler&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;EOCNetworkFetcherCompletionHandler&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;completion&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;EOCNetworkFetcher.m&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;span class=&quot;k&quot;&gt;@interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;EOCNetworkFetcher&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;strong&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;readwrite&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSURL&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;copy&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;EOCNetworkFetcherCompletionHandler&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;completionHandler&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;strong&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSData&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;downloadData&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;@implementation&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;EOCNetworkFetcher&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;id&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;initWithURL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSURL&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;url&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;self&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;super&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;init&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;])&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;_url&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;self&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;startWithCompletionHandler&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;EOCNetworkFetcherCompletionHandler&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;completion&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;self&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;completionHandler&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;completion&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;//开始网络请求
+&lt;/span&gt;    &lt;span class=&quot;n&quot;&gt;dispatch_async&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dispatch_get_global_queue&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;^&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;_downloadData&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSData&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;alloc&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;initWithContentsOfURL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;_url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;dispatch_async&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;dispatch_get_main_queue&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(),&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;^&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+             &lt;span class=&quot;c1&quot;&gt;//网络请求完成
+&lt;/span&gt;            &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;self&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;p_requestCompleted&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;});&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;});&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;p_requestCompleted&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;_completionHandler&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;_completionHandler&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;_downloadData&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;EOCClass.m&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;span class=&quot;k&quot;&gt;@implementation&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;EOCClass&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;EOCNetworkFetcher&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;_networkFetcher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;NSData&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;_fetchedData&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;o&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;downloadData&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;NSURL&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;url&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSURL&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;URLWithString&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;@&quot;http://www.baidu.com&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;_networkFetcher&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;EOCNetworkFetcher&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;alloc&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;initWithURL&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;_networkFetcher&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;startWithCompletionHandler&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;^&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;NSData&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;data&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;_fetchedData&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;data&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}];&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;在这个例子中，存在3者之间形成环&lt;/p&gt;
+
+&lt;p&gt;1、completion handler的block因为要设置_fetchedData实例变量的值，所以它必须捕获self变量，也就是说handler块保留了EOCClass实例；&lt;/p&gt;
+
+&lt;p&gt;2、EOCClass实例通过strong实例变量保留了EOCNetworkFetcher，最后EOCNetworkFetcher实例对象也会保留了handler的block。&lt;/p&gt;
+
+&lt;p&gt;书上说的3种方法来打破循环。&lt;/p&gt;
+
+&lt;p&gt;方法一：手动释放EOCNetworkFetcher使用之后持有的_networkFetcher，这样可以打破循环引用&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;- (void)downloadData {
+    NSURL *url = [NSURL URLWithString:@&quot;http://www.baidu.com&quot;];
+    _networkFetcher = [[EOCNetworkFetcher alloc] initWithURL:url];
+    [_networkFetcher startWithCompletionHandler:^(NSData *data) {
+        _fetchedData = data;
+        _networkFetcher = nil;//加上此行，打破循环引用
+    }];
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;方法二：直接释放block。因为在使用完对象之后需要人为手动释放，如果忘记释放就会造成循环引用了。如果使用完completion handler之后直接释放block即可。打破循环引用&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+- (void)p_requestCompleted {
+    if(_completionHandler) {
+        _completionHandler(_downloadData);
+    }
+    self.completionHandler = nil;//加上此行，打破循环引用
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;方法三：使用weakSelf、strongSelf&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;- (void)downloadData {
+   __weak __typeof(self) weakSelf = self;
+   NSURL *url = [NSURL URLWithString:@&quot;http://www.baidu.com&quot;];
+   _networkFetcher = [[EOCNetworkFetcher alloc] initWithURL:url];
+   [_networkFetcher startWithCompletionHandler:^(NSData *data) {
+        __typeof(&amp;amp;*weakSelf) strongSelf = weakSelf;
+        if (strongSelf) {
+            strongSelf.fetchedData = data;
+        }
+   }];
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-59b08429238b088d.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;h4 id=&quot;weakifystrongify&quot;&gt;四.@weakify、@strongify实现原理&lt;/h4&gt;
+
+&lt;p&gt;上面讲完了weakSelf、strongSelf之后，接下来再讲讲@weakify、@strongify，这两个关键字是RAC中避免Block循环引用而开发的2个宏，这2个宏的实现过程很牛，值得我们学习。&lt;/p&gt;
+
+&lt;p&gt;@weakify、@strongify的作用和weakSelf、strongSelf对应的一样。这里我们具体看看大神是怎么实现这2个宏的。&lt;/p&gt;
+
+&lt;p&gt;直接从源码看起来。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;#define weakify(...) \
+    rac_keywordify \
+    metamacro_foreach_cxt(rac_weakify_,, __weak, __VA_ARGS__)
+
+
+#define strongify(...) \
+    rac_keywordify \
+    _Pragma(&quot;clang diagnostic push&quot;) \
+    _Pragma(&quot;clang diagnostic ignored \&quot;-Wshadow\&quot;&quot;) \
+    metamacro_foreach(rac_strongify_,, __VA_ARGS__) \
+    _Pragma(&quot;clang diagnostic pop&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;看到这种宏定义，咋一看什么都不知道。那就只能一层层的往下看。&lt;/p&gt;
+
+&lt;h5 id=&quot;weakify&quot;&gt;1. weakify&lt;/h5&gt;
+&lt;p&gt;先从weakify(…)开始。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+#if DEBUG
+#define rac_keywordify autoreleasepool {}
+#else
+#define rac_keywordify try {} @catch (...) {}
+#endif
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;这里在debug模式下使用@autoreleasepool是为了维持编译器的分析能力，而使用@try/@catch 是为了防止插入一些不必要的autoreleasepool。rac_keywordify 实际上就是autoreleasepool {}
+的宏替换。因为有了autoreleasepool {}的宏替换，所以weakify要加上@，形成@autoreleasepool {}。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+#define metamacro_foreach_cxt(MACRO, SEP, CONTEXT, ...) \
+        metamacro_concat(metamacro_foreach_cxt, metamacro_argcount(__VA_ARGS__))(MACRO, SEP, CONTEXT, __VA_ARGS__)
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;__VA_ARGS__：总体来说就是将左边宏中 … 的内容原样抄写在右边 __VA_ARGS__ 所在的位置。它是一个可变参数的宏，是新的C99规范中新增的，目前似乎只有gcc支持（VC从VC2005开始支持）。&lt;/p&gt;
+
+&lt;p&gt;那么我们使用@weakify(self)传入进去。__VA_ARGS__相当于self。此时我们可以把最新开始的weakify套下来。于是就变成了这样：&lt;/p&gt;
+
+&lt;p&gt;rac_weakify_,, __weak, __VA_ARGS__整体替换MACRO, SEP, CONTEXT, …&lt;/p&gt;
+
+&lt;p&gt;这里需要注意的是，源码中就是给的两个”,”逗号是连着的，所以我们也要等效替换参数，相当于SEP是空值。&lt;/p&gt;
+
+&lt;p&gt;替换完成之后就是下面这个样子：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;autoreleasepool {}
+metamacro_concat(metamacro_foreach_cxt, metamacro_argcount(self))(rac_weakify_, , __weak, self)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;现在我们需要弄懂的就是metamacro_concat 和 metamacro_argcount是干什么用的。&lt;/p&gt;
+
+&lt;p&gt;继续看看metamacro_concat  的实现&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+
+#define metamacro_concat(A, B) \
+        metamacro_concat_(A, B)
+
+
+#define metamacro_concat_(A, B) A ## B
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;## 是宏连接符。举个例子：&lt;/p&gt;
+
+&lt;p&gt;假设宏定义为#define XNAME(n) x##n，代码为：XNAME(4)，则在预编译时，宏发现XNAME(4)与XNAME(n)匹配，则令 n 为 4，然后将右边的n的内容也变为4，然后将整个XNAME(4)替换为 x##n，亦即 x4，故 最终结果为 XNAME(4) 变为 x4。所以A##B就是AB。&lt;/p&gt;
+
+&lt;p&gt;metamacro_argcount 的实现&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;#define metamacro_argcount(...) \
+        metamacro_at(20, __VA_ARGS__, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
+
+
+#define metamacro_at(N, ...) \
+        metamacro_concat(metamacro_at, N)(__VA_ARGS__)
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;metamacro_concat是上面讲过的连接符，那么metamacro_at, N = metamacro_atN，由于N = 20，于是metamacro_atN = metamacro_at20。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+#define metamacro_at0(...) metamacro_head(__VA_ARGS__)
+#define metamacro_at1(_0, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at2(_0, _1, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at3(_0, _1, _2, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at4(_0, _1, _2, _3, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at5(_0, _1, _2, _3, _4, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at6(_0, _1, _2, _3, _4, _5, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at7(_0, _1, _2, _3, _4, _5, _6, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at8(_0, _1, _2, _3, _4, _5, _6, _7, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at9(_0, _1, _2, _3, _4, _5, _6, _7, _8, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at10(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at11(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at12(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at13(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at14(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at15(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at16(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at17(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at18(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at19(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, ...) metamacro_head(__VA_ARGS__)
+#define metamacro_at20(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, ...) metamacro_head(__VA_ARGS__)
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;metamacro_at20的作用就是截取前20个参数，剩下的参数传入metamacro_head。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+#define metamacro_head(...) \
+        metamacro_head_(__VA_ARGS__, 0)
+
+
+#define metamacro_head_(FIRST, ...) FIRST
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;metamacro_head的作用返回第一个参数。返回到上一级metamacro_at20，如果我们从最源头的@weakify(self)，传递进来，那么metamacro_at20(self,20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1)，截取前20个参数，最后一个留给metamacro_head_(1)，那么就应该返回1。&lt;/p&gt;
+
+&lt;p&gt;metamacro_concat(metamacro_foreach_cxt, metamacro_argcount(self)) = metamacro_concat(metamacro_foreach_cxt, 1) 最终可以替换成metamacro_foreach_cxt1。&lt;/p&gt;
+
+&lt;p&gt;在源码中继续搜寻。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+// metamacro_foreach_cxt expansions
+#define metamacro_foreach_cxt0(MACRO, SEP, CONTEXT)
+#define metamacro_foreach_cxt1(MACRO, SEP, CONTEXT, _0) MACRO(0, CONTEXT, _0)
+
+#define metamacro_foreach_cxt2(MACRO, SEP, CONTEXT, _0, _1) \
+    metamacro_foreach_cxt1(MACRO, SEP, CONTEXT, _0) \
+    SEP \
+    MACRO(1, CONTEXT, _1)
+
+#define metamacro_foreach_cxt3(MACRO, SEP, CONTEXT, _0, _1, _2) \
+    metamacro_foreach_cxt2(MACRO, SEP, CONTEXT, _0, _1) \
+    SEP \
+    MACRO(2, CONTEXT, _2)
+
+#define metamacro_foreach_cxt4(MACRO, SEP, CONTEXT, _0, _1, _2, _3) \
+    metamacro_foreach_cxt3(MACRO, SEP, CONTEXT, _0, _1, _2) \
+    SEP \
+    MACRO(3, CONTEXT, _3)
+
+#define metamacro_foreach_cxt5(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4) \
+    metamacro_foreach_cxt4(MACRO, SEP, CONTEXT, _0, _1, _2, _3) \
+    SEP \
+    MACRO(4, CONTEXT, _4)
+
+#define metamacro_foreach_cxt6(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5) \
+    metamacro_foreach_cxt5(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4) \
+    SEP \
+    MACRO(5, CONTEXT, _5)
+
+#define metamacro_foreach_cxt7(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6) \
+    metamacro_foreach_cxt6(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5) \
+    SEP \
+    MACRO(6, CONTEXT, _6)
+
+#define metamacro_foreach_cxt8(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7) \
+    metamacro_foreach_cxt7(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6) \
+    SEP \
+    MACRO(7, CONTEXT, _7)
+
+#define metamacro_foreach_cxt9(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8) \
+    metamacro_foreach_cxt8(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7) \
+    SEP \
+    MACRO(8, CONTEXT, _8)
+
+#define metamacro_foreach_cxt10(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9) \
+    metamacro_foreach_cxt9(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8) \
+    SEP \
+    MACRO(9, CONTEXT, _9)
+
+#define metamacro_foreach_cxt11(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10) \
+    metamacro_foreach_cxt10(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9) \
+    SEP \
+    MACRO(10, CONTEXT, _10)
+
+#define metamacro_foreach_cxt12(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11) \
+    metamacro_foreach_cxt11(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10) \
+    SEP \
+    MACRO(11, CONTEXT, _11)
+
+#define metamacro_foreach_cxt13(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12) \
+    metamacro_foreach_cxt12(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11) \
+    SEP \
+    MACRO(12, CONTEXT, _12)
+
+#define metamacro_foreach_cxt14(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13) \
+    metamacro_foreach_cxt13(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12) \
+    SEP \
+    MACRO(13, CONTEXT, _13)
+
+#define metamacro_foreach_cxt15(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14) \
+    metamacro_foreach_cxt14(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13) \
+    SEP \
+    MACRO(14, CONTEXT, _14)
+
+#define metamacro_foreach_cxt16(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15) \
+    metamacro_foreach_cxt15(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14) \
+    SEP \
+    MACRO(15, CONTEXT, _15)
+
+#define metamacro_foreach_cxt17(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16) \
+    metamacro_foreach_cxt16(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15) \
+    SEP \
+    MACRO(16, CONTEXT, _16)
+
+#define metamacro_foreach_cxt18(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17) \
+    metamacro_foreach_cxt17(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16) \
+    SEP \
+    MACRO(17, CONTEXT, _17)
+
+#define metamacro_foreach_cxt19(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18) \
+    metamacro_foreach_cxt18(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17) \
+    SEP \
+    MACRO(18, CONTEXT, _18)
+
+#define metamacro_foreach_cxt20(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19) \
+    metamacro_foreach_cxt19(MACRO, SEP, CONTEXT, _0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18) \
+    SEP \
+    MACRO(19, CONTEXT, _19)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;metamacro_foreach_cxt这个宏定义有点像递归，这里可以看到N 最大就是20，于是metamacro_foreach_cxt19就是最大，metamacro_foreach_cxt19会生成rac_weakify_(0,__weak,_18)，然后再把前18个数传入metamacro_foreach_cxt18，并生成rac_weakify_(0,__weak,_17)，依次类推，一直递推到metamacro_foreach_cxt0。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+#define metamacro\_foreach\_cxt0(MACRO, SEP, CONTEXT)
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;metamacro_foreach_cxt0就是终止条件，不做任何操作了。&lt;/p&gt;
+
+&lt;p&gt;于是最初的@weakify就被替换成&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;autoreleasepool {}
+metamacro_foreach_cxt1(rac_weakify_, , __weak, self)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+#define metamacro_foreach_cxt1(MACRO, SEP, CONTEXT, _0) MACRO(0, CONTEXT, _0)
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;代入参数&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;autoreleasepool {}
+rac_weakify_（0,__weak,self）
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;最终需要解析的就是rac_weakify_&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+
+#define rac_weakify_(INDEX, CONTEXT, VAR) \
+    CONTEXT __typeof__(VAR) metamacro_concat(VAR, _weak_) = (VAR);
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;把（0,__weak,self）的参数替换进来(INDEX, CONTEXT, VAR)。
+INDEX = 0， CONTEXT = __weak，VAR = self，&lt;/p&gt;
+
+&lt;p&gt;于是&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+CONTEXT __typeof__(VAR) metamacro_concat(VAR, _weak_) = (VAR);
+
+
+等效替换为
+
+
+__weak __typeof__(self) self_weak_ = self;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;最终@weakify(self) = __weak __typeof__(self) self_weak_ = self;&lt;/p&gt;
+
+&lt;p&gt;这里的self_weak_ 就完全等价于我们之前写的weakSelf。&lt;/p&gt;
+
+&lt;h5 id=&quot;strongify&quot;&gt;2. strongify&lt;/h5&gt;
+
+&lt;p&gt;再继续分析strongify(…)&lt;/p&gt;
+
+&lt;p&gt;rac_keywordify还是和weakify一样，是autoreleasepool {}，只为了前面能加上@&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;language-obejctivec&quot;&gt;
+_Pragma(&quot;clang diagnostic push&quot;) \
+_Pragma(&quot;clang diagnostic ignored \&quot;-Wshadow\&quot;&quot;) \
+_Pragma(&quot;clang diagnostic pop&quot;)
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;strongify比weakify多了这些_Pragma语句。&lt;/p&gt;
+
+&lt;p&gt;关键字_Pragma是C99里面引入的。_Pragma比#pragma（在设计上）更加合理，因而功能也有所增强。&lt;/p&gt;
+
+&lt;p&gt;上面的等效替换&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;language-obejctivec&quot;&gt;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored &quot;-Wshadow&quot;
+#pragma clang diagnostic pop
+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;这里的clang语句的作用:忽略当一个局部变量或类型声明遮盖另一个变量的警告。&lt;/p&gt;
+
+&lt;p&gt;最初的&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;#define strongify(...) \
+    rac_keywordify \
+    _Pragma(&quot;clang diagnostic push&quot;) \
+    _Pragma(&quot;clang diagnostic ignored \&quot;-Wshadow\&quot;&quot;) \
+    metamacro_foreach(rac_strongify_,, __VA_ARGS__) \
+    _Pragma(&quot;clang diagnostic pop&quot;)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;strongify里面需要弄清楚的就是metamacro_foreach 和 rac_strongify_。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;#define metamacro_foreach(MACRO, SEP, ...) \
+        metamacro_foreach_cxt(metamacro_foreach_iter, SEP, MACRO, __VA_ARGS__)
+
+#define rac_strongify_(INDEX, VAR) \
+    __strong __typeof__(VAR) VAR = metamacro_concat(VAR, _weak_);
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;我们先替换一次，SEP = 空 ， MACRO = rac_strongify_ ， __VA_ARGS__ , 于是替换成这样。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+metamacro_foreach_cxt(metamacro_foreach_iter,,rac_strongify_,self)
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;根据之前分析，metamacro_foreach_cxt再次等效替换，metamacro_foreach_cxt##1(metamacro_foreach_iter,,rac_strongify_,self)&lt;/p&gt;
+
+&lt;p&gt;根据&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+#define metamacro_foreach_cxt1(MACRO, SEP, CONTEXT, _0) MACRO(0, CONTEXT, _0)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;再次替换成metamacro_foreach_iter(0, rac_strongify_, self)&lt;/p&gt;
+
+&lt;p&gt;继续看看metamacro_foreach_iter的实现&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+
+#define metamacro_foreach_iter(INDEX, MACRO, ARG) MACRO(INDEX, ARG)
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;最终替换成rac_strongify_(0,self)&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+#define rac_strongify_(INDEX, VAR) \
+    __strong __typeof__(VAR) VAR = metamacro_concat(VAR, _weak_);
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;INDEX = 0, VAR = self,于是@strongify(self)就等价于&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+ __strong __typeof__(VAR) VAR = metamacro_concat(VAR, _weak_);
+
+等价于
+
+__strong __typeof__(self) self = self_weak_;
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;注意@strongify(self)只能使用在block中，如果用在block外面，会报错，因为这里会提示你Redefinition of ‘self’。&lt;/p&gt;
+
+&lt;p&gt;总结一下&lt;/p&gt;
+
+&lt;p&gt;@weakify(self) = @autoreleasepool{} __weak __typeof__ (self) self_weak_ = self;&lt;/p&gt;
+
+&lt;p&gt;@strongify(self) = @autoreleasepool{} __strong __typeof__(self) self = self_weak_;&lt;/p&gt;
+
+&lt;p&gt;经过分析以后，其实@weakify(self) 和 @strongify(self) 就是比我们日常写的weakSelf、strongSelf多了一个@autoreleasepool{}而已，至于为何要用这些复杂的宏定义来做，目前我还没有理解。如果有大神指导其中的原因，还请多多指点。&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;更新&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;针对文章中给的例子3，大家都提出了疑问，为何没有检测出循环引用？其实这个例子有点不好。因为这个ViewController的引用计数一出来就是6，因为它被其他很多对象引用着。当然它是强引用了student，因为student的retainCount值是2。ViewController释放的时候才会把student的值减一。针对这个例子3，我重新抽取出中间的模型，重新举一个例子。&lt;/p&gt;
+
+&lt;p&gt;既然ViewController特殊，那我们就新建一个类。&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;span class=&quot;cp&quot;&gt;#import &amp;lt;Foundation/Foundation.h&amp;gt;
+#import &quot;Student.h&quot;
+&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Teacher&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;NSObject&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;copy&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSString&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@property&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;strong&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;nonatomic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;stu&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;span class=&quot;cp&quot;&gt;#import &quot;ViewController.h&quot;
+#import &quot;Student.h&quot;
+#import &quot;Teacher.h&quot;
+&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewController&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;()&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;@end&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;@implementation&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ViewController&lt;/span&gt;
+
+&lt;span class=&quot;k&quot;&gt;-&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;viewDidLoad&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;super&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;viewDidLoad&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;  &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;student&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Student&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;alloc&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;init&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Teacher&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;*&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;teacher&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;[[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Teacher&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;alloc&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;init&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;  &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;teacher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;@&quot;i&#39;m teacher&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;teacher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;stu&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;  &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;@&quot;halfrost&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;  &lt;/span&gt; 
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;study&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;^&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NSLog&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;@&quot;my name is = %@&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;teacher&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;name&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;p&quot;&gt;};&lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt;  &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt;
+&lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;err&quot;&gt; &lt;/span&gt; &lt;span class=&quot;n&quot;&gt;student&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;study&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-81da182083ef4625.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-3b483f1ccd94e77c.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;如图所示，还是出现了循环引用，student的block强引用了teacher，teacher又强引用了student，导致两者都无法释放。&lt;/p&gt;
+
+</description>
+        <pubDate>Mon, 05 Sep 2016 07:02:00 +0800</pubDate>
+        <link>http://vno.onevcat.com/2016/09/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E7%94%A8weakSelf-strongSelf-@weakify-@strongify%E8%A7%A3%E5%86%B3%E5%BE%AA%E7%8E%AF%E5%BC%95%E7%94%A8/</link>
+        <guid isPermaLink="true">http://vno.onevcat.com/2016/09/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E7%94%A8weakSelf-strongSelf-@weakify-@strongify%E8%A7%A3%E5%86%B3%E5%BE%AA%E7%8E%AF%E5%BC%95%E7%94%A8/</guid>
+        
+        <category>iOS</category>
+        
+        
+        <category>Blog</category>
+        
+      </item>
     
       <item>
         <title>深入研究Block捕获外部变量和__block实现原理</title>
@@ -19,7 +1355,7 @@
 
 &lt;p&gt;Block在OC中的实现如下：&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;pre&gt;&lt;code class=&quot;language-objectivec&quot;&gt;
 struct Block_layout {
     void *isa;
     int flags;
@@ -36,9 +1372,8 @@ struct Block_descriptor {
     void (*dispose)(void *);
 };
 &lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
 
-&lt;p&gt;&lt;img src=&quot;https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_1.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-1739b7e85e46b4db.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
 
 &lt;p&gt;从结构图中很容易看到isa，所以OC处理Block是按照对象来处理的。在iOS中，isa常见的就是_NSConcreteStackBlock，_NSConcreteMallocBlock，_NSConcreteGlobalBlock这3种(另外只在GC环境下还有3种使用的_NSConcreteFinalizingBlock，_NSConcreteAutoBlock，_NSConcreteWeakBlockVariable，本文暂不谈论这3种，有兴趣的看看官方文档)&lt;/p&gt;
 
@@ -47,21 +1382,19 @@ struct Block_descriptor {
 &lt;p&gt;&lt;strong&gt;研究工具：clang&lt;/strong&gt;
 为了研究编译器的实现原理，我们需要使用 clang 命令。clang 命令可以将 Objetive-C 的源码改写成 C / C++ 语言的，借此可以研究 block 中各个特性的源码实现方式。该命令是&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;clang -rewrite-objc block.c
+&lt;div class=&quot;language-vim highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;clang &lt;span class=&quot;p&quot;&gt;-&lt;/span&gt;rewrite&lt;span class=&quot;p&quot;&gt;-&lt;/span&gt;objc block&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;c&lt;/span&gt;
 
 &lt;/code&gt;&lt;/pre&gt;
 &lt;/div&gt;
 
-&lt;h4 id=&quot;section-1&quot;&gt;目录&lt;/h4&gt;
-&lt;ul&gt;
-  &lt;li&gt;1.Block捕获外部变量实质&lt;/li&gt;
-  &lt;li&gt;2.Block的copy和release&lt;/li&gt;
-  &lt;li&gt;3.Block中__block实现原理&lt;/li&gt;
-&lt;/ul&gt;
+&lt;p&gt;####目录
+- 1.Block捕获外部变量实质
+- 2.Block的copy和release
+- 3.Block中__block实现原理&lt;/p&gt;
 
 &lt;h4 id=&quot;block&quot;&gt;一.Block捕获外部变量实质&lt;/h4&gt;
 
-&lt;p&gt;&lt;img src=&quot;https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_2.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-b7046feffe189bfa.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
 
 &lt;p&gt;拿起我们的Block一起来捕捉外部变量吧。&lt;/p&gt;
 
@@ -85,11 +1418,11 @@ struct Block_descriptor {
 
 &lt;p&gt;写出Block测试代码。&lt;/p&gt;
 
-&lt;p&gt;&lt;img src=&quot;https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_3.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-cba895ef7fe45179.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
 
 &lt;p&gt;这里很快就出现了一个错误，提示说自动变量没有加__block，由于__block有点复杂，我们先实验静态变量，静态全局变量，全局变量这3类。测试代码如下：&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;pre&gt;&lt;code class=&quot;language-objectivec&quot;&gt;
 #import &amp;lt;Foundation/Foundation.h&amp;gt;
 
 int global_i = 1;
@@ -120,14 +1453,12 @@ int main(int argc, const char * argv[]) {
 }
 
 &lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
 
-&lt;p&gt;运行结果&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;Block 外  global_i = 2,static_global_j = 3,static_k = 4,val = 5
+&lt;p&gt;运行结果
+&lt;code class=&quot;highlighter-rouge&quot;&gt;vim
+Block 外  global_i = 2,static_global_j = 3,static_k = 4,val = 5
 Block 中  global_i = 3,static_global_j = 4,static_k = 5,val = 4
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
+&lt;/code&gt;&lt;/p&gt;
 
 &lt;p&gt;这里就有2点需要弄清楚了
 1.为什么在Block里面不加__bolck不允许更改变量？
@@ -139,7 +1470,7 @@ Block 中  global_i = 3,static_global_j = 4,static_k = 5,val = 4
 
 &lt;p&gt;源码如下&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;pre&gt;&lt;code class=&quot;language-objectivec&quot;&gt;
 int global_i = 1;
 
 static int static_global_j = 2;
@@ -190,7 +1521,6 @@ int main(int argc, const char * argv[]) {
     return 0;
 }
 &lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
 
 &lt;p&gt;首先全局变量global_i和静态全局变量static_global_j的值增加，以及它们被Block捕获进去，这一点很好理解，因为是全局的，作用域很广，所以Block捕获了它们进去之后，在Block里面进行++操作，Block结束之后，它们的值依旧可以得以保存下来。&lt;/p&gt;
 
@@ -199,11 +1529,10 @@ int main(int argc, const char * argv[]) {
 
 &lt;p&gt;接着看构造函数，&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;pre&gt;&lt;code class=&quot;language-objectivec&quot;&gt;
 __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, int *_static_k, int _val, int flags=0) : static_k(_static_k), val(_val)
 
 &lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
 &lt;p&gt;这个构造函数中，自动变量和静态变量被捕获为成员变量追加到了构造函数中。&lt;/p&gt;
 
 &lt;p&gt;main里面的myBlock闭包中的__main_block_impl_0结构体，初始化如下&lt;/p&gt;
@@ -227,7 +1556,7 @@ val = 4;
 
 &lt;p&gt;再研究一下源码，我们注意到__main_block_func_0这个函数的实现&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;pre&gt;&lt;code class=&quot;language-objectivec&quot;&gt;
 static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
   int *static_k = __cself-&amp;gt;static_k; // bound by copy
   int val = __cself-&amp;gt;val; // bound by copy
@@ -238,7 +1567,6 @@ static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
         NSLog((NSString *)&amp;amp;__NSConstantStringImpl__var_folders_45_k1d9q7c52vz50wz1683_hk9r0000gn_T_main_6fe658_mi_0,global_i,static_global_j,(*static_k),val);
     }
 &lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
 
 &lt;p&gt;我们可以发现，系统自动给我们加上的注释，bound by copy，自动变量val虽然被捕获进来了，但是是用 __cself-&amp;gt;val来访问的。Block仅仅捕获了val的值，并没有捕获val的内存地址。所以在__main_block_func_0这个函数中即使我们重写这个自动变量val的值，依旧没法去改变Block外面自动变量val的值。&lt;/p&gt;
 
@@ -250,7 +1578,7 @@ static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
 &lt;/div&gt;
 
 &lt;p&gt;小结一下：
-到此为止，上面提出的第二个问题就解开答案了。自动变量是以值传递方式传递到Block的构造函数里面去的。Block只捕获Block中会用到的变量。由于只捕获了自动变量的值，并内存地址，所以Block内部不能改变自动变量的值。Block捕获的外表变量可以改变值的是静态变量，静态全局变量，全局变量。上面例子也都证明过了。&lt;/p&gt;
+到此为止，上面提出的第二个问题就解开答案了。自动变量是以值传递方式传递到Block的构造函数里面去的。Block只捕获Block中会用到的变量。由于只捕获了自动变量的值，并非内存地址，所以Block内部不能改变自动变量的值。Block捕获的外部变量可以改变值的是静态变量，静态全局变量，全局变量。上面例子也都证明过了。&lt;/p&gt;
 
 &lt;p&gt;剩下问题一我们还没有解决。&lt;/p&gt;
 
@@ -259,7 +1587,7 @@ static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
 &lt;ol&gt;
   &lt;li&gt;
     &lt;p&gt;静态全局变量，全局变量由于作用域的原因，于是可以直接在Block里面被改变。他们也都存储在全局区。
-&lt;img src=&quot;https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_4.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-cf406451fc813cdb.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
   &lt;/li&gt;
   &lt;li&gt;
     &lt;p&gt;静态变量传递给Block是内存地址值，所以能在Block里面直接改变值。&lt;/p&gt;
@@ -272,7 +1600,7 @@ static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
 
 &lt;p&gt;先来实验一下第一种方式，传递内存地址到Block中，改变变量的值。&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;pre&gt;&lt;code class=&quot;language-objectivec&quot;&gt;
 #import &amp;lt;Foundation/Foundation.h&amp;gt;
 
 int main(int argc, const char * argv[]) {
@@ -292,17 +1620,16 @@ int main(int argc, const char * argv[]) {
 }
 
 &lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
 &lt;p&gt;控制台输出：&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;Block 外  str = Hello,
-Block 中  str = Hello,World!
+&lt;div class=&quot;language-vim highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;Block 外  str &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; Hello&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+Block 中  str &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; Hello&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;World&lt;span class=&quot;p&quot;&gt;!&lt;/span&gt;
 
 &lt;/code&gt;&lt;/pre&gt;
 &lt;/div&gt;
 &lt;p&gt;看结果是成功改变了变量的值了，转换一下源码。&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;pre&gt;&lt;code class=&quot;language-objectivec&quot;&gt;
 struct __main_block_impl_0 {
   struct __block_impl impl;
   struct __main_block_desc_0* Desc;
@@ -343,7 +1670,6 @@ int main(int argc, const char * argv[]) {
     return 0;
 }
 &lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
 &lt;p&gt;在__main_block_func_0里面可以看到传递的是指针。所以成功改变了变量的值。&lt;/p&gt;
 
 &lt;p&gt;至于源码里面的copy和dispose下一节会讲到。&lt;/p&gt;
@@ -352,11 +1678,13 @@ int main(int argc, const char * argv[]) {
 
 &lt;h4 id=&quot;blockcopydispose&quot;&gt;二.Block的copy和dispose&lt;/h4&gt;
 
-&lt;p&gt;&lt;img src=&quot;https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_5.jpg&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-244bd60d4cb8ad27.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
 
-&lt;p&gt;OC中，一般Block就分为一下3种，_NSConcreteStackBlock，_NSConcreteMallocBlock，_NSConcreteGlobalBlock。先来说明一下3者的区别。&lt;/p&gt;
+&lt;p&gt;OC中，一般Block就分为以下3种，_NSConcreteStackBlock，_NSConcreteMallocBlock，_NSConcreteGlobalBlock。&lt;/p&gt;
 
-&lt;h5 id=&quot;section-2&quot;&gt;1.从捕获外部变量的角度上来看&lt;/h5&gt;
+&lt;p&gt;先来说明一下3者的区别。&lt;/p&gt;
+
+&lt;h5 id=&quot;section-1&quot;&gt;1.从捕获外部变量的角度上来看&lt;/h5&gt;
 
 &lt;ul&gt;
   &lt;li&gt;
@@ -376,7 +1704,7 @@ StackBlock的生命周期由系统控制的，一旦返回之后，就被系统�
 
 &lt;p&gt;没有用到外部变量肯定是_NSConcreteGlobalBlock，这点很好理解。不过只用到全局变量、静态变量的block也是_NSConcreteGlobalBlock。举例如下：&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;pre&gt;&lt;code class=&quot;language-objectivec&quot;&gt;
 #import &amp;lt;Foundation/Foundation.h&amp;gt;
 
 int global_i = 1;
@@ -398,11 +1726,10 @@ int main(int argc, const char * argv[]) {
 }
 
 &lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
 &lt;p&gt;输出：&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&amp;lt;__NSGlobalBlock__: 0x100001050&amp;gt;
-Block中 变量 = 2 3 1
+&lt;div class=&quot;language-vim highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;__NSGlobalBlock__&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;x100001050&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt;
+Block中 变量 &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;2&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;3&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;/div&gt;
 
@@ -410,13 +1737,13 @@ Block中 变量 = 2 3 1
 
 &lt;p&gt;所以在ARC环境下，3种类型都可以捕获外部变量。&lt;/p&gt;
 
-&lt;h5 id=&quot;section-3&quot;&gt;2.从持有对象的角度上来看：&lt;/h5&gt;
+&lt;h5 id=&quot;section-2&quot;&gt;2.从持有对象的角度上来看：&lt;/h5&gt;
 
 &lt;ul&gt;
   &lt;li&gt;_NSConcreteStackBlock是不持有对象的。&lt;/li&gt;
 &lt;/ul&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;pre&gt;&lt;code class=&quot;language-objectivec&quot;&gt;
 //以下是在MRC下执行的
     NSObject * obj = [[NSObject alloc]init];
     NSLog(@&quot;1.Block外 obj = %lu&quot;,(unsigned long)obj.retainCount);
@@ -429,13 +1756,12 @@ Block中 变量 = 2 3 1
     
     myBlock();
 &lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
 
 &lt;p&gt;输出：&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;1.Block外 obj = 1
-2.Block外 obj = 1
-Block中 obj = 1
+&lt;div class=&quot;language-vim highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;Block外 obj &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
+&lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;Block外 obj &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
+Block中 obj &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;/div&gt;
 
@@ -443,7 +1769,7 @@ Block中 obj = 1
   &lt;li&gt;_NSConcreteMallocBlock是持有对象的。&lt;/li&gt;
 &lt;/ul&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;//以下是在MRC下执行的
+&lt;pre&gt;&lt;code class=&quot;language-objectivec&quot;&gt;//以下是在MRC下执行的
     NSObject * obj = [[NSObject alloc]init];
     NSLog(@&quot;1.Block外 obj = %lu&quot;,(unsigned long)obj.retainCount);
     
@@ -459,14 +1785,13 @@ Block中 obj = 1
     
     NSLog(@&quot;3.Block外 obj = %lu&quot;,(unsigned long)obj.retainCount);
 &lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
 
 &lt;p&gt;输出：&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;1.Block外 obj = 1
-2.Block外 obj = 2
-Block中 obj = 2
-3.Block外 obj = 1
+&lt;div class=&quot;language-vim highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;Block外 obj &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
+&lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;Block外 obj &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;
+Block中 obj &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;
+&lt;span class=&quot;m&quot;&gt;3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;Block外 obj &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;/div&gt;
 
@@ -474,7 +1799,7 @@ Block中 obj = 2
   &lt;li&gt;_NSConcreteGlobalBlock也不持有对象&lt;/li&gt;
 &lt;/ul&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;//以下是在MRC下执行的
+&lt;pre&gt;&lt;code class=&quot;language-objectivec&quot;&gt;//以下是在MRC下执行的
     void (^myBlock)(void) = ^{
         
         NSObject * obj = [[NSObject alloc]init];
@@ -484,12 +1809,11 @@ Block中 obj = 2
     myBlock();
 
 &lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
 
 &lt;p&gt;输出：&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-Block 中 obj = 1
+&lt;div class=&quot;language-vim highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+Block 中 obj &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;
 &lt;/code&gt;&lt;/pre&gt;
 &lt;/div&gt;
 
@@ -506,7 +1830,7 @@ Block 中 obj = 1
 
 &lt;p&gt;copy函数把Block从栈上拷贝到堆上，dispose函数是把堆上的函数在废弃的时候销毁掉。&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;pre&gt;&lt;code class=&quot;language-objectivec&quot;&gt;
 #define Block_copy(...) ((__typeof(__VA_ARGS__))_Block_copy((const void *)(__VA_ARGS__)))
 #define Block_release(...) _Block_release((const void *)(__VA_ARGS__))
 
@@ -528,11 +1852,10 @@ BLOCK_EXPORT void _Block_object_assign(void *, const void *, const int)
 BLOCK_EXPORT void _Block_object_dispose(const void *, const int)
     __OSX_AVAILABLE_STARTING(__MAC_10_6, __IPHONE_3_2);
 &lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
 
 &lt;p&gt;上面是源码中2个常用的宏定义和4个常用的方法，一会我们就会看到这4个方法。&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;pre&gt;&lt;code class=&quot;language-objectivec&quot;&gt;
 static void *_Block_copy_internal(const void *arg, const int flags) {
     struct Block_layout *aBlock;
     const bool wantsOne = (WANTS_ONE &amp;amp; flags) == WANTS_ONE;
@@ -577,11 +1900,10 @@ static void *_Block_copy_internal(const void *arg, const int flags) {
     return result;
 }
 &lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
 
 &lt;p&gt;上面这一段是Block_copy的一个实现，实现了从_NSConcreteStackBlock复制到_NSConcreteMallocBlock的过程。对应有9个步骤。&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;pre&gt;&lt;code class=&quot;language-objectivec&quot;&gt;
 void _Block_release(void *arg) {
     // 1
     struct Block_layout *aBlock = (struct Block_layout *)arg;
@@ -607,11 +1929,10 @@ void _Block_release(void *arg) {
     
     // 6
     else {
-        printf(&quot;Block_release called upon a stack Block: %p, ignored\n&quot;, (void *)aBlock);
+        printf(&quot;Block_release called upon a stack Block: %p, ignored\\\\n&quot;, (void *)aBlock);
     }
 }
 &lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
 
 &lt;p&gt;上面这一段是Block_release的一个实现，实现了怎么释放一个Block。对应有6个步骤。&lt;/p&gt;
 
@@ -623,12 +1944,11 @@ void _Block_release(void *arg) {
 
 &lt;p&gt;相应的增加了2个方法。&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;static void __main_block_copy_0(struct __main_block_impl_0*dst, struct __main_block_impl_0*src) {_Block_object_assign((void*)&amp;amp;dst-&amp;gt;str, (void*)src-&amp;gt;str, 3/*BLOCK_FIELD_IS_OBJECT*/);}
+&lt;pre&gt;&lt;code class=&quot;language-objectivec&quot;&gt;static void __main_block_copy_0(struct __main_block_impl_0*dst, struct __main_block_impl_0*src) {_Block_object_assign((void*)&amp;amp;dst-&amp;gt;str, (void*)src-&amp;gt;str, 3/*BLOCK_FIELD_IS_OBJECT*/);}
 
 static void __main_block_dispose_0(struct __main_block_impl_0*src) {_Block_object_dispose((void*)src-&amp;gt;str, 3/*BLOCK_FIELD_IS_OBJECT*/);}
 
 &lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
 &lt;p&gt;这里的_Block_object_assign和_Block_object_dispose就对应着retain和release方法。&lt;/p&gt;
 
 &lt;p&gt;BLOCK_FIELD_IS_OBJECT 是Block截获对象时候的特殊标示，如果是截获的__block，那么是BLOCK_FIELD_IS_BYREF。&lt;/p&gt;
@@ -637,7 +1957,11 @@ static void __main_block_dispose_0(struct __main_block_impl_0*src) {_Block_objec
 
 &lt;p&gt;我们继续研究一下__block实现原理。&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;h5 id=&quot;section-3&quot;&gt;1.普通非对象的变量&lt;/h5&gt;
+
+&lt;p&gt;先来看看普通变量的情况。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;language-objectivec&quot;&gt;
 #import &amp;lt;Foundation/Foundation.h&amp;gt;
 
 int main(int argc, const char * argv[]) {
@@ -654,7 +1978,6 @@ int main(int argc, const char * argv[]) {
     return 0;
 }
 &lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
 &lt;p&gt;把上述代码用clang转换成源码。&lt;/p&gt;
 
 &lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
@@ -706,13 +2029,12 @@ int main(int argc, const char * argv[]) {
 &lt;/div&gt;
 &lt;p&gt;从源码我们能发现，带有 __block的变量也被转化成了一个结构体__Block_byref_i_0,这个结构体有5个成员变量。第一个是isa指针，第二个是指向自身类型的__forwarding指针，第三个是一个标记flag，第四个是它的大小，第五个是变量值，名字和变量名同名。&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;__attribute__((__blocks__(byref))) __Block_byref_i_0 i = {(void*)0,(__Block_byref_i_0 *)&amp;amp;i, 0, sizeof(__Block_byref_i_0), 0};
+&lt;pre&gt;&lt;code class=&quot;language-objectivec&quot;&gt;__attribute__((__blocks__(byref))) __Block_byref_i_0 i = {(void*)0,(__Block_byref_i_0 *)&amp;amp;i, 0, sizeof(__Block_byref_i_0), 0};
 
 &lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
 &lt;p&gt;源码中是这样初始化的。__forwarding指针初始化传递的是自己的地址。然而这里__forwarding指针真的永远指向自己么？我们来做一个实验。&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+&lt;pre&gt;&lt;code class=&quot;language-objectivec&quot;&gt;
 //以下代码在MRC中运行
     __block int i = 0;
     NSLog(@&quot;%p&quot;,&amp;amp;i);
@@ -723,12 +2045,11 @@ int main(int argc, const char * argv[]) {
     }copy];
 
 &lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
 &lt;p&gt;我们把Block拷贝到了堆上，这个时候打印出来的2个i变量的地址就不同了。&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;0x7fff5fbff818
-&amp;lt;__NSMallocBlock__: 0x100203cc0&amp;gt;
-这是Block 里面 0x1002038a8
+&lt;div class=&quot;language-vim highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;x7fff5fbff818
+&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;__NSMallocBlock__&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;x100203cc0&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt;
+这是Block 里面 &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;x1002038a8
 &lt;/code&gt;&lt;/pre&gt;
 &lt;/div&gt;
 
@@ -742,13 +2063,12 @@ int main(int argc, const char * argv[]) {
 
 &lt;p&gt;__forwarding指针这里的作用就是针对堆的Block，把原来__forwarding指针指向自己，换成指向_NSConcreteMallocBlock上复制之后的__block自己。然后堆上的变量的__forwarding再指向自己。这样不管__block怎么复制到堆上，还是在栈上，都可以通过(i-&amp;gt;__forwarding-&amp;gt;i)来访问到变量值。&lt;/p&gt;
 
-&lt;p&gt;&lt;img src=&quot;https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_6.jpg&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;p&gt;所以在__main_block_func_0函数里面就是写的(i-&amp;gt;__forwarding-&amp;gt;i)。&lt;/p&gt;
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-5f5f486bab68191f.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;
+所以在__main_block_func_0函数里面就是写的(i-&amp;gt;__forwarding-&amp;gt;i)。&lt;/p&gt;
 
 &lt;p&gt;这里还有一个需要注意的地方。还是从例子说起：&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;//以下代码在MRC中运行
+&lt;pre&gt;&lt;code class=&quot;language-objectivec&quot;&gt;//以下代码在MRC中运行
     __block int i = 0;
     NSLog(@&quot;%p&quot;,&amp;amp;i);
     
@@ -763,14 +2083,13 @@ int main(int argc, const char * argv[]) {
     myBlock();
 
 &lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
 
 &lt;p&gt;结果和之前copy的例子完全不同。&lt;/p&gt;
 
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
- 0x7fff5fbff818
-&amp;lt;__NSStackBlock__: 0x7fff5fbff7c0&amp;gt;**
- 0x7fff5fbff818
+&lt;div class=&quot;language-vim highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+ &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;x7fff5fbff818
+&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;__NSStackBlock__&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;x7fff5fbff7c0&lt;span class=&quot;p&quot;&gt;&amp;gt;&lt;/span&gt;**
+ &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;x7fff5fbff818
 
 &lt;/code&gt;&lt;/pre&gt;
 &lt;/div&gt;
@@ -785,27 +2104,165 @@ int main(int argc, const char * argv[]) {
 
 &lt;p&gt;MRC环境下，只有copy，__block才会被复制到堆上，否则，__block一直都在栈上，block也只是__NSStackBlock，这个时候__forwarding指针就只指向自己了。&lt;/p&gt;
 
-&lt;p&gt;&lt;img src=&quot;https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_7.jpg&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-5e5ae21bfacf7b91.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
 
 &lt;p&gt;至此，文章开头提出的问题一，也解答了。__block的实现原理也已经明了。&lt;/p&gt;
 
-&lt;h4 id=&quot;section-4&quot;&gt;最后&lt;/h4&gt;
+&lt;h5 id=&quot;section-4&quot;&gt;2.对象的变量&lt;/h5&gt;
+
+&lt;p&gt;还是先举一个例子：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+//以下代码是在ARC下执行的
+#import &amp;lt;Foundation/Foundation.h&amp;gt;
+
+int main(int argc, const char * argv[]) {
+     
+    __block id block_obj = [[NSObject alloc]init];
+    id obj = [[NSObject alloc]init];
+
+    NSLog(@&quot;block_obj = [%@ , %p] , obj = [%@ , %p]&quot;,block_obj , &amp;amp;block_obj , obj , &amp;amp;obj);
+    
+    void (^myBlock)(void) = ^{
+        NSLog(@&quot;***Block中****block_obj = [%@ , %p] , obj = [%@ , %p]&quot;,block_obj , &amp;amp;block_obj , obj , &amp;amp;obj);
+    };
+    
+    myBlock();
+   
+    return 0;
+}
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;输出&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+block_obj = [&amp;lt;NSObject: 0x100b027d0&amp;gt; , 0x7fff5fbff7e8] , obj = [&amp;lt;NSObject: 0x100b03b50&amp;gt; , 0x7fff5fbff7b8]
+Block****中********block_obj = [&amp;lt;NSObject: 0x100b027d0&amp;gt; , 0x100f000a8] , obj = [&amp;lt;NSObject: 0x100b03b50&amp;gt; , 0x100f00070]
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;我们把上面的代码转换成源码研究一下：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+struct __Block_byref_block_obj_0 {
+  void *__isa;
+__Block_byref_block_obj_0 *__forwarding;
+ int __flags;
+ int __size;
+ void (*__Block_byref_id_object_copy)(void*, void*);
+ void (*__Block_byref_id_object_dispose)(void*);
+ id block_obj;
+};
+
+struct __main_block_impl_0 {
+  struct __block_impl impl;
+  struct __main_block_desc_0* Desc;
+  id obj;
+  __Block_byref_block_obj_0 *block_obj; // by ref
+  __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, id _obj, __Block_byref_block_obj_0 *_block_obj, int flags=0) : obj(_obj), block_obj(_block_obj-&amp;gt;__forwarding) {
+    impl.isa = &amp;amp;_NSConcreteStackBlock;
+    impl.Flags = flags;
+    impl.FuncPtr = fp;
+    Desc = desc;
+  }
+};
+static void __main_block_func_0(struct __main_block_impl_0 *__cself) {
+  __Block_byref_block_obj_0 *block_obj = __cself-&amp;gt;block_obj; // bound by ref
+  id obj = __cself-&amp;gt;obj; // bound by copy
+
+        NSLog((NSString *)&amp;amp;__NSConstantStringImpl__var_folders_45_k1d9q7c52vz50wz1683_hk9r0000gn_T_main_e64910_mi_1,(block_obj-&amp;gt;__forwarding-&amp;gt;block_obj) , &amp;amp;(block_obj-&amp;gt;__forwarding-&amp;gt;block_obj) , obj , &amp;amp;obj);
+    }
+static void __main_block_copy_0(struct __main_block_impl_0*dst, struct __main_block_impl_0*src) {_Block_object_assign((void*)&amp;amp;dst-&amp;gt;block_obj, (void*)src-&amp;gt;block_obj, 8/*BLOCK_FIELD_IS_BYREF*/);_Block_object_assign((void*)&amp;amp;dst-&amp;gt;obj, (void*)src-&amp;gt;obj, 3/*BLOCK_FIELD_IS_OBJECT*/);}
+
+static void __main_block_dispose_0(struct __main_block_impl_0*src) {_Block_object_dispose((void*)src-&amp;gt;block_obj, 8/*BLOCK_FIELD_IS_BYREF*/);_Block_object_dispose((void*)src-&amp;gt;obj, 3/*BLOCK_FIELD_IS_OBJECT*/);}
+
+static struct __main_block_desc_0 {
+  size_t reserved;
+  size_t Block_size;
+  void (*copy)(struct __main_block_impl_0*, struct __main_block_impl_0*);
+  void (*dispose)(struct __main_block_impl_0*);
+} __main_block_desc_0_DATA = { 0, sizeof(struct __main_block_impl_0), __main_block_copy_0, __main_block_dispose_0};
+
+
+int main(int argc, const char * argv[]) {
+
+    __attribute__((__blocks__(byref))) __Block_byref_block_obj_0 block_obj = {(void*)0,(__Block_byref_block_obj_0 *)&amp;amp;block_obj, 33554432, sizeof(__Block_byref_block_obj_0), __Block_byref_id_object_copy_131, __Block_byref_id_object_dispose_131, ((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)objc_getClass(&quot;NSObject&quot;), sel_registerName(&quot;alloc&quot;)), sel_registerName(&quot;init&quot;))};
+
+    id obj = ((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)((NSObject *(*)(id, SEL))(void *)objc_msgSend)((id)objc_getClass(&quot;NSObject&quot;), sel_registerName(&quot;alloc&quot;)), sel_registerName(&quot;init&quot;));
+    NSLog((NSString *)&amp;amp;__NSConstantStringImpl__var_folders_45_k1d9q7c52vz50wz1683_hk9r0000gn_T_main_e64910_mi_0,(block_obj.__forwarding-&amp;gt;block_obj) , &amp;amp;(block_obj.__forwarding-&amp;gt;block_obj) , obj , &amp;amp;obj);
+
+    void (*myBlock)(void) = ((void (*)())&amp;amp;__main_block_impl_0((void *)__main_block_func_0, &amp;amp;__main_block_desc_0_DATA, obj, (__Block_byref_block_obj_0 *)&amp;amp;block_obj, 570425344));
+
+    ((void (*)(__block_impl *))((__block_impl *)myBlock)-&amp;gt;FuncPtr)((__block_impl *)myBlock);
+
+    return 0;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;首先需要说明的一点是对象在OC中，默认声明自带__strong所有权修饰符的，所以main开头我们声明的&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+__block id block_obj = [[NSObject alloc]init];
+id obj = [[NSObject alloc]init];
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;p&gt;等价于&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+__block id __strong block_obj = [[NSObject alloc]init];
+id __strong obj = [[NSObject alloc]init];
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;在转换出来的源码中，我们也可以看到，Block捕获了__block，并且强引用了，因为在__Block_byref_block_obj_0结构体中，有一个变量是id block_obj，这个默认也是带__strong所有权修饰符的。&lt;/p&gt;
+
+&lt;p&gt;根据打印出来的结果来看，ARC环境下，Block捕获外部对象变量，是都会copy一份的，地址都不同。只不过带有__block修饰符的变量会被捕获到Block内部持有。&lt;/p&gt;
+
+&lt;p&gt;我们再来看看MRC环境下的情况，还是将上述代码的例子运行在MRC中。&lt;/p&gt;
+
+&lt;p&gt;输出：&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
+block_obj = [&amp;lt;NSObject: 0x100b001b0&amp;gt; , 0x7fff5fbff7e8] , obj = [&amp;lt;NSObject: 0x100b001c0&amp;gt; , 0x7fff5fbff7b8]
+Block****中********block_obj = [&amp;lt;NSObject: 0x100b001b0&amp;gt; , 0x7fff5fbff7e8] , obj = [&amp;lt;NSObject: 0x100b001c0&amp;gt; , 0x7fff5fbff790]
+
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;这个时候block在栈上，__NSStackBlock__，可以打印出来retainCount值都是1。当把这个block copy一下，就变成__NSMallocBlock__，对象的retainCount值就会变成2了。&lt;/p&gt;
+
+&lt;p&gt;总结：&lt;/p&gt;
+
+&lt;p&gt;在MRC环境下，__block根本不会对指针所指向的对象执行copy操作，而只是把指针进行的复制。
+而在ARC环境下，对于声明为__block的外部对象，在block内部会进行retain，以至于在block环境内能安全的引用外部对象，所以才会产生循环引用的问题！&lt;/p&gt;
+
+&lt;h4 id=&quot;section-5&quot;&gt;最后&lt;/h4&gt;
 
 &lt;p&gt;关于Block捕获外部变量有很多用途，用途也很广，只有弄清了捕获变量和持有的变量的概念以后，之后才能清楚的解决Block循环引用的问题。&lt;/p&gt;
 
 &lt;p&gt;再次回到文章开头，5种变量，自动变量，函数参数 ，静态变量，静态全局变量，全局变量，如果严格的来说，捕获是必须在Block结构体__main_block_impl_0里面有成员变量的话，Block能捕获的变量就只有带有自动变量和静态变量了。捕获进Block的对象会被Block持有。&lt;/p&gt;
 
-&lt;p&gt;自动变量的值，被copy进了Block，不带__block的自动变量只能在里面被访问，并不能改变值。&lt;/p&gt;
+&lt;p&gt;对于非对象的变量来说，&lt;/p&gt;
 
-&lt;p&gt;&lt;img src=&quot;https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_8.jpg&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+&lt;p&gt;自动变量的值，被copy进了Block，不带__block的自动变量只能在里面被访问，并不能改变值。&lt;br /&gt;
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-9c34ab1560e75504.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
 
-&lt;p&gt;带__block的自动变量 和 静态变量 就是直接地址访问。所以在Block里面可以直接改变变量的值。&lt;/p&gt;
-
-&lt;p&gt;&lt;img src=&quot;https://ob6mci30g.qnssl.com/Blog/ArticleImage/21_9.jpg&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+&lt;p&gt;带__block的自动变量 和 静态变量 就是直接地址访问。所以在Block里面可以直接改变变量的值。&lt;br /&gt;
+&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-455842213775d7dd.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
 
 &lt;p&gt;而剩下的静态全局变量，全局变量，函数参数，也是可以在直接在Block中改变变量值的，但是他们并没有变成Block结构体__main_block_impl_0的成员变量，因为他们的作用域大，所以可以直接更改他们的值。&lt;/p&gt;
 
 &lt;p&gt;值得注意的是，静态全局变量，全局变量，函数参数他们并不会被Block持有，也就是说不会增加retainCount值。&lt;/p&gt;
+
+&lt;p&gt;对于对象来说，&lt;/p&gt;
+
+&lt;p&gt;在MRC环境下，__block根本不会对指针所指向的对象执行copy操作，而只是把指针进行的复制。
+而在ARC环境下，对于声明为__block的外部对象，在block内部会进行retain，以至于在block环境内能安全的引用外部对象。&lt;/p&gt;
 
 &lt;p&gt;请大家多多指点。&lt;/p&gt;
 
@@ -3695,296 +5152,6 @@ class NotificationViewController: UIViewController, UNNotificationContentExtensi
         <pubDate>Sun, 26 Jun 2016 21:21:00 +0800</pubDate>
         <link>http://vno.onevcat.com/2016/06/WWDC2016-Session%E7%AC%94%E8%AE%B0-iOS-10-%E6%8E%A8%E9%80%81Notification%E6%96%B0%E7%89%B9%E6%80%A7/</link>
         <guid isPermaLink="true">http://vno.onevcat.com/2016/06/WWDC2016-Session%E7%AC%94%E8%AE%B0-iOS-10-%E6%8E%A8%E9%80%81Notification%E6%96%B0%E7%89%B9%E6%80%A7/</guid>
-        
-        <category>iOS</category>
-        
-        
-        <category>Blog</category>
-        
-      </item>
-    
-      <item>
-        <title>iOS如何优雅的处理“回调地狱Callback hell”(二)——使用Swift</title>
-        <description>&lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-a590ae3efef185d3.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
-
-&lt;h4 id=&quot;section&quot;&gt;前言&lt;/h4&gt;
-&lt;p&gt;在上篇中，我谈到了可以用promise来解决Callback hell的问题，这篇我们换一种方式一样可以解决这个问题。&lt;/p&gt;
-
-&lt;p&gt;我们先分析一下为何promise能解决多层回调嵌套的问题，经过上篇的分析，我总结也一下几点：&lt;/p&gt;
-
-&lt;p&gt;1.promise封装了所有异步操作，把异步操作封装成了一个“盒子”。&lt;br /&gt;
-2.promise提供了Monad，then相当于flatMap。&lt;br /&gt;
-3.promise的函数返回对象本身，于是就可形成链式调用&lt;/p&gt;
-
-&lt;p&gt;好了，既然这些能优雅的解决callback hell，那么我们只要能做到这些，也一样可以完成任务。到这里大家可能就已经恍然大悟了，Swift就是完成这个任务的最佳语言！Swift支持函数式编程，分分钟就可以完成promise的基本功能。&lt;/p&gt;
-
-&lt;h4 id=&quot;swiftcallback-hell&quot;&gt;一.利用Swift特性处理回调Callback hell&lt;/h4&gt;
-
-&lt;p&gt;我们还是以上篇的例子来举例，先来描述一下场景：
-假设有这样一个提交按钮，当你点击之后，就会提交一次任务。当你点下按钮的那一刻，首先要先判断是否有权限提交，没有权限就弹出错误。有权限提交之后，还要请求一次，判断当前任务是否已经存在，如果存在，弹出错误。如果不存在，这个时候就可以安心提交任务了。&lt;/p&gt;
-
-&lt;p&gt;那么代码如下：&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;func requestAsyncOperation(request : String , success : String -&amp;gt; Void , failure : NSError -&amp;gt; Void)
-{
-    WebRequestAPI.fetchDataAPI(request, success : { result in
-        WebOtherRequestAPI.fetchOtherDataAPI ( result ,  success : {OtherResult in
-            [self fulfillData:OtherResult];
-            
-            let finallyTheParams = self.transformResult(OtherResult)
-            TaskAPI.fetchOtherDataAPI ( finallyTheParams , success : { TaskResult in
-                
-                let finallyTaskResult = self.transformTaskResult(TaskResult)
-                
-                success(finallyTaskResult)
-                },
-                failure:{ TaskError in
-                    failure(TaskError)
-                }
-                
-            )
-            },failure : { ExistError in
-                failure(ExistError)
-            }
-        )
-        } , failure : { AuthorityError in
-            failure(AuthorityError)
-        }
-    )
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;接下来我们就来优雅的解决上述看上去不好维护的Callback hell。&lt;/p&gt;
-
-&lt;p&gt;1.首先我们要封装异步操作，把异步操作封装到Async中，顺带把返回值也一起封装成Result。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-enum Result &amp;lt;T&amp;gt; {
-    case Success(T)
-    case Failure(ErrorType)
-}
-
-struct Async&amp;lt;T&amp;gt; {
-    let trunk:(Result&amp;lt;T&amp;gt;-&amp;gt;Void)-&amp;gt;Void
-    init(function:(Result&amp;lt;T&amp;gt;-&amp;gt;Void)-&amp;gt;Void) {
-        trunk = function
-    }
-    func execute(callBack:Result&amp;lt;T&amp;gt;-&amp;gt;Void) {
-        trunk(callBack)
-    }
-}
-
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;2.封装Monad，提供Map和flatMap操作。顺带返回值也返回Async，以方便后面可以继续链式调用。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;// Monad
-extension Async{
-
-
-    func map&amp;lt;U&amp;gt;(f: T throws-&amp;gt; U) -&amp;gt; Async&amp;lt;U&amp;gt; {
-        return flatMap{ .unit(try f($0)) }
-    }
-
-    func flatMap&amp;lt;U&amp;gt;(f:T throws-&amp;gt; Async&amp;lt;U&amp;gt;) -&amp;gt; Async&amp;lt;U&amp;gt; {
-        return Async&amp;lt;U&amp;gt;{ cont in
-            self.execute{
-                switch $0.map(f){
-                case .Success(let async):
-                    async.execute(cont)
-                case .Failure(let error):
-                    cont(.Failure(error))
-                }
-            }
-        }
-    }
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;这是我们把异步的过程就封装成一个盒子了，盒子里面有Map，flatMap操作，flatMap对应的其实就是promise的then&lt;/p&gt;
-
-&lt;p&gt;3.我们可以把flatMap名字直接换成then，那么之前那30多行的代码就会简化成下面这样：&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-func requestAsyncOperation(request : String ) -&amp;gt; Async &amp;lt;String&amp;gt;
-{
-    return fetchDataAPI(request)
-           .then(fetchOtherDataAPI)
-           .map(transformResult)
-           .then(fetchOtherDataAPI)
-           .map(transformTaskResult)
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;基本上和用promise一样的效果。这样就不用PromiseKit库，利用promise思想的精髓，优雅的完美的处理了回调地狱。这也得益于Swift语言的优点。&lt;/p&gt;
-
-&lt;p&gt;文章至此，虽然已经解决了问题了，不过还没有结束，我们还可以继续再进一步讨论一些东西。&lt;/p&gt;
-
-&lt;h4 id=&quot;section-1&quot;&gt;二.进一步的讨论&lt;/h4&gt;
-&lt;p&gt;1.@noescape，throws，rethrows关键字
-flatMap还有这种写法：&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;func flatMap&amp;lt;U&amp;gt; (@noescape f: T throws -&amp;gt; Async&amp;lt;U&amp;gt;)rethrows -&amp;gt; Async&amp;lt;U&amp;gt; 
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;@noescape 从字面上看，就知道是“不会逃走”的意思，这个关键字专门用于修饰函数闭包这种参数类型的，当出现这个参数时，它表示该闭包不会跳出这个函数调用的生命期：即函数调用完之后，这个闭包的生命期也结束了。
-在苹果官方文档上是这样写的：
-&amp;gt;A new @noescape attribute may be used on closure parameters to functions. This indicates that the parameter is only ever called (or passed as an @noescape parameter in a call), which means that it cannot outlive the lifetime of the call. This enables some minor performance optimizations, but more importantly disables the self. requirement in closure arguments.&lt;/p&gt;
-
-&lt;p&gt;那什么时候一个闭包参数会跳出函数的生命期呢？&lt;/p&gt;
-
-&lt;p&gt;引用唐巧大神的解释：
-&amp;gt;在函数实现内，将一个闭包用 dispatch_async
-嵌套，这样这个闭包就会在另外一个线程中存在，从而跳出了当前函数的生命期。这样做主要是可以帮助编译器做性能的优化。&lt;/p&gt;
-
-&lt;p&gt;throws关键字是代表该闭包可能会抛出异常。
-rethrows关键字是代表这个闭包如果抛出异常，仅可能是因为传递给它的闭包的调用导致了异常。&lt;/p&gt;
-
-&lt;p&gt;2.继续说说上面例子里面的Result，和Async一样，我们也可以继续封装Result，也加上map和flatMap方法。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-func ==&amp;lt;T:Equatable&amp;gt;(lhs:Result&amp;lt;T&amp;gt;, rhs:Result&amp;lt;T&amp;gt;) -&amp;gt; Bool{
-    if case (.Success(let l), .Success(let r)) = (lhs, rhs){
-        return l == r
-    }
-    return false
-}
-
-extension Result{
-
-    func map&amp;lt;U&amp;gt;(f:T throws-&amp;gt; U) -&amp;gt; Result&amp;lt;U&amp;gt; {
-        return flatMap{.unit(try f($0))}
-    }
-
-    func flatMap&amp;lt;U&amp;gt;(f:T throws-&amp;gt; Result&amp;lt;U&amp;gt;) -&amp;gt; Result&amp;lt;U&amp;gt; {
-        switch self{
-        case .Success(let value):
-            do{
-                return try f(value)
-            }catch let e{
-                return .Failure(e)
-            }
-        case .Failure(let e):
-            return .Failure(e)
-        }
-    }
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;3.上面我们已经把Async和Result封装了map方法，所以他们也可以叫做&lt;strong&gt;函子(Functor)&lt;/strong&gt;。接下来可以继续封装，把他们都封装成&lt;strong&gt;适用函子(Applicative Functor)&lt;/strong&gt;和&lt;strong&gt;单子(Monad)&lt;/strong&gt;&lt;/p&gt;
-
-&lt;p&gt;&lt;strong&gt;适用函子(Applicative Functor)&lt;/strong&gt;根据定义：
-对于任意一个函子F，如果能支持以下运算，该函子就是一个适用函子：&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;func pure&amp;lt;A&amp;gt;(value:A) -&amp;gt;F&amp;lt;A&amp;gt;
-
-func &amp;lt;*&amp;gt;&amp;lt;A,B&amp;gt;(f:F&amp;lt;A - &amp;gt; B&amp;gt;, x:F&amp;lt;A&amp;gt;) -&amp;gt;F&amp;lt;B&amp;gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;以Async为例，我们为它加上这两个方法&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-extension Async{
-
-    static func unit(x:T) -&amp;gt; Async&amp;lt;T&amp;gt; {
-        return Async{ $0(.Success(x)) }
-    }
-
-    func map&amp;lt;U&amp;gt;(f: T throws-&amp;gt; U) -&amp;gt; Async&amp;lt;U&amp;gt; {
-        return flatMap{ .unit(try f($0)) }
-    }
-
-    func flatMap&amp;lt;U&amp;gt;(f:T throws-&amp;gt; Async&amp;lt;U&amp;gt;) -&amp;gt; Async&amp;lt;U&amp;gt; {
-        return Async&amp;lt;U&amp;gt;{ cont in
-            self.execute{
-                switch $0.map(f){
-                case .Success(let async):
-                    async.execute(cont)
-                case .Failure(let error):
-                    cont(.Failure(error))
-                }
-            }
-        }
-    }
-
-    func apply&amp;lt;U&amp;gt;(af:Async&amp;lt;T throws-&amp;gt; U&amp;gt;) -&amp;gt; Async&amp;lt;U&amp;gt; {
-        return af.flatMap(map)
-    }
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;unit和apply就是上面定义中的两个方法。接下来我们在看看Monad的定义。&lt;/p&gt;
-
-&lt;p&gt;&lt;strong&gt;单子(Monad)&lt;/strong&gt;根据定义：
-对于任意一个类型构造体F定义了下面两个函数，它就是一个单子Monad：&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;func pure&amp;lt;A&amp;gt;(value:A) -&amp;gt;F&amp;lt;A&amp;gt;
-
-func flatMap&amp;lt;A,B&amp;gt;(x:F&amp;lt;A&amp;gt;)-&amp;gt;(A-&amp;gt;F&amp;lt;B&amp;gt;)-&amp;gt;F&amp;lt;B&amp;gt;
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;还是以Async为例，此时的Async已经有了unit和flatMap满足定义了，这个时候，就可以说Async已经是一个Monad了。&lt;/p&gt;
-
-&lt;p&gt;至此，我们就把Async和Result都变成了&lt;strong&gt;适用函子(Applicative Functor)&lt;/strong&gt;和&lt;strong&gt;单子(Monad)&lt;/strong&gt;了。&lt;/p&gt;
-
-&lt;p&gt;4.再说说运算符。
-flatMap函数有时候会被定义为一个运算符»=。由于它会将第一个参数的计算结果绑定到第二个参数的输入上面，这个运算符也会被称为“绑定(bind)”运算.&lt;/p&gt;
-
-&lt;p&gt;为了方便，那我们就把上面的4个操作都定义成运算符吧。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;func unit&amp;lt;T&amp;gt; (x:T) -&amp;gt; Async&amp;lt;T&amp;gt; {
-    return Async{$0(.Success(x))}
-}
-
-func &amp;lt;^&amp;gt; &amp;lt;T, U&amp;gt; (f: T throws-&amp;gt; U, async: Async&amp;lt;T&amp;gt;) -&amp;gt; Async&amp;lt;U&amp;gt; {
-    return async.map(f)
-}
-
-func &amp;gt;&amp;gt;= &amp;lt;T, U&amp;gt; (async:Async&amp;lt;T&amp;gt;, f:T throws-&amp;gt; Async&amp;lt;U&amp;gt;) -&amp;gt; Async&amp;lt;U&amp;gt; {
-    return async.flatMap(f)
-}
-
-func &amp;lt;*&amp;gt; &amp;lt;T, U&amp;gt; (af: Async&amp;lt;T throws-&amp;gt; U&amp;gt;, async:Async&amp;lt;T&amp;gt;) -&amp;gt; Async&amp;lt;U&amp;gt; {
-    return async.apply(af)
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-&lt;p&gt;按照顺序，第二个对应的就是原来的map函数，第三个对应的就是原来的flatMap函数。&lt;/p&gt;
-
-&lt;p&gt;5.说到运算符，我们这里还可以继续回到文章最开始的地方去讨论一下那段回调地狱的代码。上面我们通过map和flatMap成功的展开了Callback hell，其实这里还有另外一个方法可以解决问题，那就是用自定义运算符。这里我们用不到适用函子的&amp;lt;*&amp;gt;，有些问题就可能用到它。还是回到上述问题，这里我们用Monad里面的运算符来解决回调地狱。&lt;/p&gt;
-
-&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;
-func requestAsyncOperation(request : String ) -&amp;gt; Async &amp;lt;String&amp;gt;
-{
-    return fetchDataAPI(request) &amp;gt;&amp;gt;= (fetchOtherDataAPI) &amp;lt;^&amp;gt;(transformResult) &amp;gt;&amp;gt;= (fetchOtherDataAPI) &amp;lt;^&amp;gt; (transformTaskResult)
-}
-&lt;/code&gt;&lt;/pre&gt;
-&lt;/div&gt;
-
-&lt;p&gt;通过运算符，最终原来的40多行代码变成了最后一行了！当然，我们中间封装了一些操作。&lt;/p&gt;
-
-&lt;h4 id=&quot;section-2&quot;&gt;三.总结&lt;/h4&gt;
-&lt;p&gt;经过上篇和本篇的讨论，优雅的处理”回调地狱Callback hell”的方法有以下几种:&lt;br /&gt;
-1.使用PromiseKit&lt;br /&gt;
-2.使用Swift的map和flatMap封装异步操作(思想和promise差不多)&lt;br /&gt;
-3.使用Swift自定义运算符展开回调嵌套&lt;/p&gt;
-
-&lt;p&gt;目前为止，我能想到的处理方法还有2种：&lt;br /&gt;
-4.使用Reactive cocoa&lt;br /&gt;
-5.使用RxSwift&lt;/p&gt;
-
-&lt;p&gt;下篇或者下下篇可能应该就是讨论RAC和RxSwift如果优雅的处理回调地狱了。如果大家还有什么其他方法能优雅的解决这个问题，也欢迎大家提出来，一起讨论，相互学习！&lt;/p&gt;
-</description>
-        <pubDate>Wed, 22 Jun 2016 22:45:00 +0800</pubDate>
-        <link>http://vno.onevcat.com/2016/06/iOS%E5%A6%82%E4%BD%95%E4%BC%98%E9%9B%85%E7%9A%84%E5%A4%84%E7%90%86-%E5%9B%9E%E8%B0%83%E5%9C%B0%E7%8B%B1Callback-hell-(%E4%BA%8C)-%E4%BD%BF%E7%94%A8Swift/</link>
-        <guid isPermaLink="true">http://vno.onevcat.com/2016/06/iOS%E5%A6%82%E4%BD%95%E4%BC%98%E9%9B%85%E7%9A%84%E5%A4%84%E7%90%86-%E5%9B%9E%E8%B0%83%E5%9C%B0%E7%8B%B1Callback-hell-(%E4%BA%8C)-%E4%BD%BF%E7%94%A8Swift/</guid>
         
         <category>iOS</category>
         
