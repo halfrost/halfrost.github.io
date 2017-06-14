@@ -1,2 +1,2 @@
 # halfrostpage.github.com
-www.halfrost.com
+https://halfrost.github.io/
