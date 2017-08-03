@@ -2,7 +2,7 @@
 layout: post
 title: 手把手教你利用Jenkins持续集成iOS项目
 author: 一缕殇流化隐半边冰霜
-date: 2016.07.31 15:04:00 +0800
+date: 2016.07.31 15:04:02+0800
 categories: Blog
 tag: iOS
 ---
