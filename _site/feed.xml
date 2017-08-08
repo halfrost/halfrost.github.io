@@ -1334,7 +1334,7 @@ __strong __typeof__(self) self = self_weak_;
 &lt;p&gt;如图所示，还是出现了循环引用，student的block强引用了teacher，teacher又强引用了student，导致两者都无法释放。&lt;/p&gt;
 
 </description>
-        <pubDate>Mon, 05 Sep 2016 07:02:02+0800</pubDate>
+        <pubDate>Mon, 05 Sep 2016 07:02:03+0800</pubDate>
         <link>http://vno.onevcat.com/2016/09/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E7%94%A8weakSelf-strongSelf-@weakify-@strongify%E8%A7%A3%E5%86%B3%E5%BE%AA%E7%8E%AF%E5%BC%95%E7%94%A8/</link>
         <guid isPermaLink="true">http://vno.onevcat.com/2016/09/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E7%94%A8weakSelf-strongSelf-@weakify-@strongify%E8%A7%A3%E5%86%B3%E5%BE%AA%E7%8E%AF%E5%BC%95%E7%94%A8/</guid>
         
@@ -2294,7 +2294,7 @@ int main(int argc, const char * argv[]) {
 
 &lt;p&gt;这种情况就是ARC环境下Block是__NSStackBlock的类型。&lt;/p&gt;
 </description>
-        <pubDate>Sat, 27 Aug 2016 22:05:02+0800</pubDate>
+        <pubDate>Sat, 27 Aug 2016 22:05:03+0800</pubDate>
         <link>http://vno.onevcat.com/2016/08/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E6%8D%95%E8%8E%B7%E5%A4%96%E9%83%A8%E5%8F%98%E9%87%8F%E5%92%8C__block%E5%AE%9E%E7%8E%B0%E5%8E%9F%E7%90%86/</link>
         <guid isPermaLink="true">http://vno.onevcat.com/2016/08/%E6%B7%B1%E5%85%A5%E7%A0%94%E7%A9%B6Block%E6%8D%95%E8%8E%B7%E5%A4%96%E9%83%A8%E5%8F%98%E9%87%8F%E5%92%8C__block%E5%AE%9E%E7%8E%B0%E5%8E%9F%E7%90%86/</guid>
         
@@ -2544,7 +2544,7 @@ Unable to get pid for &#39;UIKitApplication:com.tencent.xin[0xdf6d]&#39;: No suc
 
 &lt;p&gt;请大家多多指教。&lt;/p&gt;
 </description>
-        <pubDate>Thu, 18 Aug 2016 18:58:02+0800</pubDate>
+        <pubDate>Thu, 18 Aug 2016 18:58:03+0800</pubDate>
         <link>http://vno.onevcat.com/2016/08/%E7%BB%99iOS-%E6%A8%A1%E6%8B%9F%E5%99%A8-%E5%AE%89%E8%A3%85-app%E6%96%87%E4%BB%B6/</link>
         <guid isPermaLink="true">http://vno.onevcat.com/2016/08/%E7%BB%99iOS-%E6%A8%A1%E6%8B%9F%E5%99%A8-%E5%AE%89%E8%A3%85-app%E6%96%87%E4%BB%B6/</guid>
         
@@ -2917,7 +2917,7 @@ REQUESTBASE_URL = @&quot;http:\\/\\/10.20.100.1&quot;
 
 &lt;p&gt;最后就可以打出不同环境的包了。请大家多多指教。&lt;/p&gt;
 </description>
-        <pubDate>Thu, 11 Aug 2016 09:01:02+0800</pubDate>
+        <pubDate>Thu, 11 Aug 2016 09:01:03+0800</pubDate>
         <link>http://vno.onevcat.com/2016/08/%E6%89%8B%E6%8A%8A%E6%89%8B%E6%95%99%E4%BD%A0%E7%BB%99%E4%B8%80%E4%B8%AAiOS-app%E9%85%8D%E7%BD%AE%E5%A4%9A%E4%B8%AA%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F/</link>
         <guid isPermaLink="true">http://vno.onevcat.com/2016/08/%E6%89%8B%E6%8A%8A%E6%89%8B%E6%95%99%E4%BD%A0%E7%BB%99%E4%B8%80%E4%B8%AAiOS-app%E9%85%8D%E7%BD%AE%E5%A4%9A%E4%B8%AA%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F/</guid>
         
@@ -3454,7 +3454,7 @@ curl -F &quot;file=@${IPA_PATH}&quot; -F &quot;uKey=${uKey}&quot; -F &quot;_api_
 
 &lt;p&gt;以上就是我关于Jenkins持续集成的一次实践经验。分享给大家，如果里面有什么错误，欢迎大家多多指教。&lt;/p&gt;
 </description>
-        <pubDate>Sun, 31 Jul 2016 15:04:02+0800</pubDate>
+        <pubDate>Sun, 31 Jul 2016 15:04:03+0800</pubDate>
         <link>http://vno.onevcat.com/2016/07/%E6%89%8B%E6%8A%8A%E6%89%8B%E6%95%99%E4%BD%A0%E5%88%A9%E7%94%A8Jenkins%E6%8C%81%E7%BB%AD%E9%9B%86%E6%88%90iOS%E9%A1%B9%E7%9B%AE/</link>
         <guid isPermaLink="true">http://vno.onevcat.com/2016/07/%E6%89%8B%E6%8A%8A%E6%89%8B%E6%95%99%E4%BD%A0%E5%88%A9%E7%94%A8Jenkins%E6%8C%81%E7%BB%AD%E9%9B%86%E6%88%90iOS%E9%A1%B9%E7%9B%AE/</guid>
         
@@ -3666,7 +3666,7 @@ self = [super initWithFrame:frame];
 
 &lt;p&gt;&lt;img src=&quot;http://upload-images.jianshu.io/upload_images/1194012-932768201a4dae84.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
 </description>
-        <pubDate>Fri, 22 Jul 2016 21:13:02+0800</pubDate>
+        <pubDate>Fri, 22 Jul 2016 21:13:03+0800</pubDate>
         <link>http://vno.onevcat.com/2016/07/%E5%85%B3%E4%BA%8EIB_DESIGNABLE-IBInspectable%E7%9A%84%E9%82%A3%E4%BA%9B%E9%9C%80%E8%A6%81%E6%B3%A8%E6%84%8F%E7%9A%84%E4%BA%8B/</link>
         <guid isPermaLink="true">http://vno.onevcat.com/2016/07/%E5%85%B3%E4%BA%8EIB_DESIGNABLE-IBInspectable%E7%9A%84%E9%82%A3%E4%BA%9B%E9%9C%80%E8%A6%81%E6%B3%A8%E6%84%8F%E7%9A%84%E4%BA%8B/</guid>
         
@@ -4163,7 +4163,7 @@ cell.customPlacementConstraints = [centering]
 
 &lt;p&gt;最后，请大家多多指教。&lt;/p&gt;
 </description>
-        <pubDate>Sun, 17 Jul 2016 19:36:02+0800</pubDate>
+        <pubDate>Sun, 17 Jul 2016 19:36:03+0800</pubDate>
         <link>http://vno.onevcat.com/2016/07/WWDC2016-Session%E7%AC%94%E8%AE%B0-Xcode-8-Auto-Layout%E6%96%B0%E7%89%B9%E6%80%A7/</link>
         <guid isPermaLink="true">http://vno.onevcat.com/2016/07/WWDC2016-Session%E7%AC%94%E8%AE%B0-Xcode-8-Auto-Layout%E6%96%B0%E7%89%B9%E6%80%A7/</guid>
         
@@ -4375,7 +4375,7 @@ Push-driver可以类比看电视，节目不管你看不看，都一直播放，
 
 &lt;p&gt;我会不定期把关于RAC相关难理解易混淆的概念都整理进来……欢迎大家指点。&lt;/p&gt;
 </description>
-        <pubDate>Mon, 11 Jul 2016 15:36:02+0800</pubDate>
+        <pubDate>Mon, 11 Jul 2016 15:36:03+0800</pubDate>
         <link>http://vno.onevcat.com/2016/07/%E5%87%BD%E6%95%B0%E5%93%8D%E5%BA%94%E5%BC%8F%E7%BC%96%E7%A8%8B(FRP)%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0-%E6%94%BE%E5%BC%83-%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5%E7%AF%87/</link>
         <guid isPermaLink="true">http://vno.onevcat.com/2016/07/%E5%87%BD%E6%95%B0%E5%93%8D%E5%BA%94%E5%BC%8F%E7%BC%96%E7%A8%8B(FRP)%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0-%E6%94%BE%E5%BC%83-%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5%E7%AF%87/</guid>
         
@@ -4731,7 +4731,7 @@ collectionView.refreshControl = refreshControl
 
 &lt;p&gt;请大家多多指教。&lt;/p&gt;
 </description>
-        <pubDate>Mon, 04 Jul 2016 01:02:02+0800</pubDate>
+        <pubDate>Mon, 04 Jul 2016 01:02:03+0800</pubDate>
         <link>http://vno.onevcat.com/2016/07/WWDC2016-Session%E7%AC%94%E8%AE%B0-iOS-10-UICollectionView%E6%96%B0%E7%89%B9%E6%80%A7/</link>
         <guid isPermaLink="true">http://vno.onevcat.com/2016/07/WWDC2016-Session%E7%AC%94%E8%AE%B0-iOS-10-UICollectionView%E6%96%B0%E7%89%B9%E6%80%A7/</guid>
         
@@ -5149,7 +5149,7 @@ class NotificationViewController: UIViewController, UNNotificationContentExtensi
 
 &lt;p&gt;最后，请大家多多指教。&lt;/p&gt;
 </description>
-        <pubDate>Sun, 26 Jun 2016 21:21:02+0800</pubDate>
+        <pubDate>Sun, 26 Jun 2016 21:21:03+0800</pubDate>
         <link>http://vno.onevcat.com/2016/06/WWDC2016-Session%E7%AC%94%E8%AE%B0-iOS-10-%E6%8E%A8%E9%80%81Notification%E6%96%B0%E7%89%B9%E6%80%A7/</link>
         <guid isPermaLink="true">http://vno.onevcat.com/2016/06/WWDC2016-Session%E7%AC%94%E8%AE%B0-iOS-10-%E6%8E%A8%E9%80%81Notification%E6%96%B0%E7%89%B9%E6%80%A7/</guid>
         

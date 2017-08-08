@@ -2,7 +2,7 @@
 layout: post
 title: 关于IB_DESIGNABLE / IBInspectable的那些需要注意的事
 author: 一缕殇流化隐半边冰霜
-date: 2016.07.22 21:13:02+0800
+date: 2016.07.22 21:13:03+0800
 categories: Blog
 tag: iOS
 ---
